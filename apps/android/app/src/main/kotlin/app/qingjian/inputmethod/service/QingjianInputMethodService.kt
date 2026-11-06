@@ -106,12 +106,44 @@ class QingjianInputMethodService :
                     panel?.refreshClipboard()
                 }
                 "failed" -> glow?.finish(false)
+                "private_received" -> {
+                    if (isInputViewShown && shownPreedit.isEmpty() && editor == null) {
+                        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.onReceived(this@QingjianInputMethodService, currentInputConnection, currentInputEditorInfo?.isPasswordField() == true)
+                    } else app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
+                    refreshPrivateHint()
+                }
             }
         }
     }
 
     /** 浮在键盘上方接管打字的编辑条（常用语编辑框、快捷翻译）；null 是没开。 */
     private var editor: FloatingEditor? = null
+
+    private val privateUiHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val privateHintRefresh = object : Runnable {
+        override fun run() {
+            refreshPrivateHint()
+            if (isInputViewShown) privateUiHandler.postDelayed(this, 500L)
+        }
+    }
+
+    private fun refreshPrivateHint() {
+        val receiver = app.qingjian.inputmethod.clipboard.sync.PrivateReceive
+        if (shownPreedit.isNotEmpty() || editor != null) receiver.cancelWaiting()
+        val hint = when {
+            !isInputViewShown || !receiver.enabled(this) || editor != null -> null
+            receiver.pending() -> R.string.private_fill_hint
+            receiver.isWaiting -> R.string.private_wait_hint
+            else -> null
+        }
+        panel?.bar?.showPrivateHint(hint)
+    }
+
+    private fun privateInput() {
+        if (shownPreedit.isNotEmpty() || editor != null) { toast(getString(R.string.private_finish_composing)); return }
+        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.input(this, currentInputConnection, currentInputEditorInfo?.isPasswordField() == true)
+        refreshPrivateHint()
+    }
 
     private lateinit var quickTranslate: QuickTranslate
 
@@ -181,6 +213,9 @@ class QingjianInputMethodService :
     }
 
     override fun onDestroy() {
+        privateUiHandler.removeCallbacks(privateHintRefresh)
+        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
+        runCatching { app.qingjian.inputmethod.core.Native.clipboardSyncPrivateClear() }
         AppLog.info("ime destroy")
         clipboardWatcher.stop()
         ClipboardSync.removeListener(syncListener)
@@ -336,6 +371,7 @@ class QingjianInputMethodService :
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
         super.onStartInput(attribute, restarting)
         composer.directInput = attribute.wantsDirectInput()
         composer.privateInput = attribute.wantsPrivacy()
@@ -349,6 +385,7 @@ class QingjianInputMethodService :
     }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
+        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
         super.onStartInputView(info, restarting)
         AppLog.info(
             "start input view: ${info.packageName}, inputType 0x${Integer.toHexString(info.inputType)}, " +
@@ -365,6 +402,8 @@ class QingjianInputMethodService :
         // 进程可能刚被系统杀过又拉起，或开关刚改过；顺便补一轮
         ClipboardSync.apply(this)
         ClipboardSync.changed()
+        privateUiHandler.removeCallbacks(privateHintRefresh)
+        privateUiHandler.post(privateHintRefresh)
     }
 
     /** 系统问「该不该显示键盘」：接着实体键盘时缺省不显示，有时候弹不出来先看这一条。 */
@@ -380,9 +419,14 @@ class QingjianInputMethodService :
     override fun onWindowShown() {
         super.onWindowShown()
         AppLog.info("window shown")
+        privateUiHandler.removeCallbacks(privateHintRefresh)
+        privateUiHandler.post(privateHintRefresh)
     }
 
     override fun onWindowHidden() {
+        privateUiHandler.removeCallbacks(privateHintRefresh)
+        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
+        panel?.bar?.showPrivateHint(null)
         super.onWindowHidden()
         AppLog.info("window hidden")
         // 猛人输入法：收起键盘，删除键的撤回记录清空（只在内存里，不留到下次）
@@ -390,6 +434,8 @@ class QingjianInputMethodService :
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        privateUiHandler.removeCallbacks(privateHintRefresh)
+        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
         super.onFinishInputView(finishingInput)
         voice.cancel()
         closeEditor()
@@ -530,6 +576,7 @@ class QingjianInputMethodService :
         ToolbarTool.SYMBOLS -> openPanel(PanelKind.SYMBOLS)
         ToolbarTool.CLIPBOARD -> clipboard()
         ToolbarTool.PRIVATE_SEND -> app.qingjian.inputmethod.clipboard.sync.PrivateSend.manual(this)
+        ToolbarTool.PRIVATE_INPUT -> privateInput()
         ToolbarTool.TRANSLATE -> toggleTranslate()
         ToolbarTool.RESIZE -> startResize()
         ToolbarTool.PHRASES -> openPanel(PanelKind.PHRASES)

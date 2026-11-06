@@ -85,9 +85,16 @@ impl ClipboardApp {
         match event {
             SyncEvent::PrivateReceived => {
                 #[cfg(windows)]
-                crate::system::windows::listener::notice("private.received");
+                crate::system::windows::private::received(self.settings.private_auto_fill);
             }
-            SyncEvent::PrivateSent { .. } | SyncEvent::PrivateFailed => {}
+            SyncEvent::PrivateSent { .. } => {
+                #[cfg(windows)]
+                crate::system::windows::listener::notice("private.sent");
+            }
+            SyncEvent::PrivateFailed => {
+                #[cfg(windows)]
+                crate::system::windows::listener::notice("private.send_failed");
+            }
             SyncEvent::NearbyChanged => {}
             SyncEvent::Paired { name } => {
                 self.pairing = Pairing::Idle;

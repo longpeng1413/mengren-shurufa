@@ -28,7 +28,7 @@ object PrivateSend {
     }
 
     private fun send(context: Context, text: String) {
-        if (!ClipboardSync.isRunning || text.length > 16384 || text.any { it.code < 32 || it.code == 127 }) {
+        if (!ClipboardSync.isRunning || context.getSystemService(android.app.KeyguardManager::class.java)?.isDeviceLocked != false || context.getSystemService(android.os.PowerManager::class.java)?.isInteractive != true || text.length > 16384 || text.any { it.code < 32 || it.code == 127 }) {
             notice(context, R.string.private_failed); return
         }
         thread(name = "mengren-private-send") {

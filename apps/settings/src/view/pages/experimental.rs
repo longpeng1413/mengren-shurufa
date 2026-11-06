@@ -209,6 +209,44 @@ fn clipboard(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, RenderErr
         rows.push(toggle_info(
             ui,
             page,
+            tr("private.auto_fill"),
+            Some(tr("private.auto_fill_info")),
+            ("clipboard", "private_auto_fill"),
+            config.private_auto_fill,
+            !on || !config.sync_enabled || !config.private_receive,
+        )?);
+        let modes = [
+            tr("private.mode_auto"),
+            tr("private.mode_manual"),
+            tr("private.mode_off"),
+        ];
+        let values = ["auto", "manual", "off"];
+        let selected = values
+            .iter()
+            .position(|mode| *mode == config.private_send_mode)
+            .unwrap_or(0);
+        let control = Segmented::new(&modes, selected)
+            .disabled(!on || !config.sync_enabled)
+            .build(ui, theme, "clipboard-private-mode", |index| {
+                Message::set("clipboard", "private_send_mode", values[index])
+            })?;
+        rows.push(
+            SettingRow::new(tr("private.send_mode"))
+                .info(tr("private.send_info"))
+                .control(control)
+                .build(ui, theme)?,
+        );
+        rows.push(recorder(
+            ui,
+            page,
+            Shortcut::PrivateSend,
+            tr("private.send_hotkey_info"),
+            !on || !config.sync_enabled || config.private_send_mode == "off",
+        )?);
+
+        rows.push(toggle_info(
+            ui,
+            page,
             tr("private.receive"),
             Some(tr("private.info")),
             ("clipboard", "private_receive"),

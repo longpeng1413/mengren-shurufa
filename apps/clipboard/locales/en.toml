@@ -80,4 +80,12 @@ failed = "Private input failed or was blocked. The content was cleared. Send it 
 empty = "No private content is pending. It may have expired or been used."
 hotkey_taken = "A shortcut is in use by another application. Change it in settings."
 paused_hint = "Recording paused: new desktop copies are not sent. Receiving and existing history remain available. Resume from the tray menu."
-
+send = "Send clipboard privately"
+send_empty = "The clipboard has no supported private text, exceeds the size limit or contains control characters."
+send_disabled = "Enable clipboard sync and private sending first."
+send_failed = "Private send failed. No online receiver is available or the connection failed. No offline retry."
+sent = "Private content sent to online paired receivers. Single input within two minutes."
+wait = "Wait to fill the current field privately"
+wait_started = "Ready to fill this field. Send from another device within two minutes. Changing focus cancels waiting."
+wait_cancelled = "Waiting for private input was cancelled or expired."
+wait_unavailable = "The field cannot be safely bound or private receiving is disabled. Use the private input shortcut in the target field."

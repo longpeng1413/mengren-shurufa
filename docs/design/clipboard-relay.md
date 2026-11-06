@@ -37,3 +37,8 @@ Windows 设置程序将令牌放入当前用户 DPAPI，普通配置只保存 UR
 PrivateVault 单槽、取用即清除。监听线程每 250 ms 回收过期内容；Windows WTS/电源消息直接撤销保险箱，阻止迟到网络包重新填充。关闭接收、解绑和服务 Drop 清理。Windows Unicode SendInput 先等修饰键松开、复核前台窗口，失败不回退到剪贴板。默认与原 Ctrl+Alt+V 共用注册，有私密槽才优先消费；另可录制独立快捷键。
 
 Android 普通图片捕获以 64 KiB 缓冲暂存于自己的 clipboard-import 目录，JNI 只接收路径并限长读取，结束删除暂存文件；私密内容从不走这个路径。接收 wire 解码复用消息 Vec，避免额外复制整张大图。JNI 图片完成事件只传历史图片路径，系统通过只读 ContentProvider 提供图片；监听忽略自己 provider 的 URI，避免回声。
+
+
+## 猛人 v0.3.7
+
+v0.3.7 私密收发扩展到两端，服务协议不变。接收权限和屏幕可用性提交与入槽串行，在网络确认前释放锁。私密发送不等待可能过期的在线列表，而由中转按即时注册状态接通，不存离线消息。自动填充、焦点授权和调研依据见 [private-transfer.md](private-transfer.md)。

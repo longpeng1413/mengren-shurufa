@@ -14,6 +14,7 @@ enum class ToolbarTool(val label: String, val icon: Icon) {
     CLIPBOARD("剪贴板", Icon.CLIPBOARD),
     TRANSLATE("翻译", Icon.TRANSLATE),
     PRIVATE_SEND("", Icon.LOCK),
+    PRIVATE_INPUT("", Icon.UNLOCK),
     RESIZE("键盘高度", Icon.RESIZE),
     PHRASES("常用语", Icon.PHRASES),
     SWITCH_INPUT_METHOD("切换输入法", Icon.GLOBE),
@@ -22,7 +23,7 @@ enum class ToolbarTool(val label: String, val icon: Icon) {
 
     companion object {
         /** 没定制过的工具栏，也是「恢复默认」回到的样子。 */
-        val DEFAULT = listOf(EMOJI, KEYBOARDS, VOICE, SYMBOLS, CLIPBOARD, TRANSLATE, PRIVATE_SEND, RESIZE)
+        val DEFAULT = listOf(EMOJI, KEYBOARDS, VOICE, SYMBOLS, CLIPBOARD, TRANSLATE, PRIVATE_SEND, PRIVATE_INPUT, RESIZE)
 
         /** 存的是逗号分隔的名字；没存过为 null，用 [DEFAULT]；空串是全部移除了。认不出的名字（降级装回旧版）跳过。 */
         fun parse(value: String?): List<ToolbarTool> {

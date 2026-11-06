@@ -17,6 +17,7 @@ pub enum Shortcut {
     /// 呼出剪贴板面板（全局快捷键）。
     Clipboard,
     PrivateInput,
+    PrivateSend,
     /// 辅码触发键（单个符号，不带修饰键）。
     AuxCodeKey,
     /// 组句时上屏高亮候选的键（空格、回车或一个符号键，可加 Shift）。
@@ -27,7 +28,7 @@ pub enum Shortcut {
 
 impl Shortcut {
     #[cfg(test)]
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::Translation,
         Self::TranslationSecond,
         Self::TranslateSelection,
@@ -35,6 +36,7 @@ impl Shortcut {
         Self::TranslatePanel,
         Self::Clipboard,
         Self::PrivateInput,
+        Self::PrivateSend,
         Self::AuxCodeKey,
         Self::CommitCandidate,
         Self::CommitRaw,
@@ -49,6 +51,7 @@ impl Shortcut {
             Self::TranslatePanel => tr("shortcut.translate_panel"),
             Self::Clipboard => tr("shortcut.clipboard"),
             Self::PrivateInput => tr("private.shortcut"),
+            Self::PrivateSend => tr("private.send_shortcut"),
             Self::AuxCodeKey => tr("shortcut.aux_code_key"),
             Self::CommitCandidate => tr("shortcut.commit_candidate"),
             Self::CommitRaw => tr("shortcut.commit_raw"),
@@ -65,6 +68,7 @@ impl Shortcut {
             Self::TranslatePanel => ("shortcut", "translate_panel"),
             Self::Clipboard => ("shortcut", "clipboard"),
             Self::PrivateInput => ("shortcut", "private_input"),
+            Self::PrivateSend => ("shortcut", "private_send"),
             Self::AuxCodeKey => ("general", "aux_code_key"),
             Self::CommitCandidate => ("shortcut", "commit_candidate"),
             Self::CommitRaw => ("shortcut", "commit_raw"),
@@ -79,7 +83,8 @@ impl Shortcut {
             | Self::Predict
             | Self::TranslatePanel
             | Self::Clipboard
-            | Self::PrivateInput => tr("shortcut.prompt_combo"),
+            | Self::PrivateInput
+            | Self::PrivateSend => tr("shortcut.prompt_global"),
             Self::AuxCodeKey => tr("shortcut.prompt_symbol"),
             Self::CommitCandidate | Self::CommitRaw => tr("shortcut.prompt_commit"),
         }
@@ -97,6 +102,7 @@ impl Shortcut {
             Self::TranslatePanel => combo_label(shortcut.translate_panel),
             Self::Clipboard => combo_label(shortcut.clipboard),
             Self::PrivateInput => combo_label(shortcut.private_input),
+            Self::PrivateSend => combo_label(shortcut.private_send),
             Self::AuxCodeKey => config.general.aux_code_key().to_string(),
             Self::CommitCandidate => shortcut.commit_candidate.label(),
             Self::CommitRaw => shortcut.commit_raw.label(),
@@ -106,10 +112,13 @@ impl Shortcut {
     /// 录下的全局快捷键被别的程序占着。与现在的相同时不算：多半是剪贴板自己占着。
     pub fn taken(self, value: &str, config: &Config) -> bool {
         #[cfg(windows)]
-        if matches!(self, Self::Clipboard | Self::PrivateInput)
-            && let Ok(combo) = value.parse::<KeyCombo>()
-            && combo != config.shortcut.clipboard
-            && combo != config.shortcut.private_input
+        if matches!(
+            self,
+            Self::Clipboard | Self::PrivateInput | Self::PrivateSend
+        ) && let Ok(combo) = value.parse::<KeyCombo>()
+            && !same_combo(combo, config.shortcut.clipboard)
+            && !same_combo(combo, config.shortcut.private_input)
+            && !same_combo(combo, config.shortcut.private_send)
         {
             return !crate::system::hotkey::combo_available(combo);
         }
@@ -125,6 +134,7 @@ impl Shortcut {
             Self::TranslatePanel => config.shortcut.translate_panel,
             Self::Clipboard => config.shortcut.clipboard,
             Self::PrivateInput => config.shortcut.private_input,
+            Self::PrivateSend => config.shortcut.private_send,
             _ => config.shortcut.translate_selection,
         }
     }
@@ -197,14 +207,20 @@ impl Shortcut {
                 }
                 Ok(key.key_string())
             }
-            Self::Clipboard | Self::PrivateInput => {
+            Self::Clipboard | Self::PrivateInput | Self::PrivateSend => {
                 let key = match &press.key {
-                    KeyCode::Character(text) => {
-                        single(text).filter(|key| key.is_ascii_alphanumeric() || *key == '.')
-                    }
+                    KeyCode::Character(text) => single(text)
+                        .map(|key| {
+                            if ('！'..='～').contains(&key) {
+                                char::from_u32(u32::from(key) - 0xFEE0).unwrap_or(key)
+                            } else {
+                                key
+                            }
+                        })
+                        .filter(char::is_ascii_graphic),
                     _ => None,
                 }
-                .ok_or(tr("shortcut.need_combo"))?;
+                .ok_or(tr("shortcut.need_global"))?;
                 // 全局生效：只按一个修饰键的组合（Ctrl + V 这类）一占，所有程序里都用不了了
                 let held = [
                     modifiers.control,
@@ -215,6 +231,8 @@ impl Shortcut {
                 if held.iter().filter(|on| **on).count() < 2 {
                     return Err(tr("shortcut.need_two_modifiers").to_owned());
                 }
+                #[cfg(windows)]
+                let key = qingjian_platform::global_hotkey::recorded_key(key, modifiers.shift);
                 let combo = KeyCombo {
                     modifiers,
                     key: key.to_ascii_lowercase(),
@@ -224,7 +242,15 @@ impl Shortcut {
                     Self::Predict,
                     Self::TranslatePanel,
                 ] {
-                    if other.combo(config) == combo {
+                    if same_combo(other.combo(config), combo) {
+                        return Err(tr_args("shortcut.clash", &[("other", &other.title())]));
+                    }
+                }
+                for other in [Self::Clipboard, Self::PrivateInput, Self::PrivateSend] {
+                    if other != self
+                        && (self == Self::PrivateSend || other == Self::PrivateSend)
+                        && same_combo(other.combo(config), combo)
+                    {
                         return Err(tr_args("shortcut.clash", &[("other", &other.title())]));
                     }
                 }
@@ -245,7 +271,11 @@ impl Shortcut {
                     modifiers,
                     key: key.to_ascii_lowercase(),
                 };
-                if Feature::Clipboard.here() && config.shortcut.clipboard == combo {
+                if Feature::Clipboard.here()
+                    && (same_combo(config.shortcut.clipboard, combo)
+                        || same_combo(config.shortcut.private_input, combo)
+                        || same_combo(config.shortcut.private_send, combo))
+                {
                     let other = Self::Clipboard.title();
                     return Err(tr_args("shortcut.clash", &[("other", &other)]));
                 }
@@ -269,6 +299,26 @@ impl Shortcut {
                 Ok(modifiers.key())
             }
         }
+    }
+}
+
+fn same_combo(first: KeyCombo, second: KeyCombo) -> bool {
+    #[cfg(windows)]
+    {
+        let binding = |combo: KeyCombo| {
+            qingjian_platform::global_hotkey::binding(
+                combo.key,
+                combo.modifiers.control,
+                combo.modifiers.shift,
+                combo.modifiers.option,
+                combo.modifiers.command,
+            )
+        };
+        binding(first).is_some_and(|first| Some(first) == binding(second))
+    }
+    #[cfg(not(windows))]
+    {
+        first == second
     }
 }
 
@@ -503,6 +553,51 @@ mod tests {
             Shortcut::Predict
                 .accept(&press("j", Held::default()), &config)
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn private_shortcuts_record_symbols_and_detect_physical_key_conflicts() {
+        let mut config = Config::default();
+        let held = Held {
+            control: true,
+            shift: true,
+            ..Held::default()
+        };
+        let value = Shortcut::PrivateInput
+            .accept(&press("?", held), &config)
+            .unwrap();
+        let combo = value.parse::<KeyCombo>().unwrap();
+        assert_eq!(combo.key, '?');
+        config.shortcut.private_input = combo;
+        assert!(
+            Shortcut::PrivateSend
+                .accept(&press("?", held), &config)
+                .is_err()
+        );
+        #[cfg(windows)]
+        {
+            assert!(
+                Shortcut::PrivateSend
+                    .accept(&press("/", held), &config)
+                    .is_err()
+            );
+            assert_eq!(
+                Shortcut::PrivateInput
+                    .accept(&press("/", held), &config)
+                    .unwrap(),
+                value
+            );
+        }
+        for symbol in [";", "[", "+", "-", "="] {
+            let value = Shortcut::PrivateSend
+                .accept(&press(symbol, held), &config)
+                .unwrap();
+            assert!(value.parse::<KeyCombo>().is_ok());
+        }
+        assert_eq!(
+            Shortcut::PrivateSend.config_key(),
+            ("shortcut", "private_send")
         );
     }
 }

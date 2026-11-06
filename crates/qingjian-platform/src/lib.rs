@@ -11,6 +11,8 @@ mod config;
 pub mod dirs;
 mod error;
 pub mod extra_dictionaries;
+#[cfg(windows)]
+pub mod global_hotkey;
 mod i18n;
 pub mod logs;
 #[cfg(windows)]

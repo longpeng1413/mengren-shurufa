@@ -14,6 +14,7 @@ mod private;
 mod received_item;
 pub(crate) mod round;
 mod scan;
+mod sender;
 pub(crate) mod state;
 mod worker;
 
@@ -21,6 +22,7 @@ pub use event::SyncEvent;
 pub use link::{PeerState, PeerStatus};
 pub use options::SyncOptions;
 pub use received_item::ReceivedItem;
+pub use sender::PrivateSender;
 pub use state::Nearby;
 
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -283,6 +285,7 @@ impl SyncService {
 
 impl Drop for SyncService {
     fn drop(&mut self) {
+        self.shared.private_running.store(false, Ordering::SeqCst);
         self.shared.private_receiver.store(false, Ordering::SeqCst);
         self.shared.private_vault.suspend();
         self.stop.store(true, Ordering::Relaxed);

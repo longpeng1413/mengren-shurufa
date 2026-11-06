@@ -103,37 +103,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         services[0].notify_changed();
         wait(|| replicas[1].0.lock().unwrap().contains_key(&image_id))?;
         println!("Encrypted image payload ({image_size} bytes): verified");
-        services[0].set_private_receiver(true);
-        if !services[1].send_private(
-            qingjian_clipboard_sync::private::Secret::new(
-                "synthetic-one-time-private-probe".into(),
-            )
-            .ok_or("Invalid synthetic secret")?,
-        ) {
-            return Err("Private send not started".into());
+        for service in &services {
+            service.set_private_receiver(true);
         }
-        wait(|| services[0].private_vault().pending())?;
-        let secret = services[0]
-            .private_vault()
-            .take()
-            .ok_or("Missing private payload")?;
-        if secret.as_str() != "synthetic-one-time-private-probe"
-            || services[0].private_vault().pending()
-        {
-            return Err("Private payload mismatch".into());
-        }
-        if replicas.iter().any(|replica| {
-            replica
-                .0
-                .lock()
-                .unwrap()
-                .values()
-                .any(|record| record.text.contains("synthetic-one-time-private"))
-        }) {
-            return Err("Private payload leaked into replica".into());
+        for source in 0..2 {
+            let expected = format!("synthetic-one-time-private-probe-{source}");
+            if !services[source].private_sender().send(
+                qingjian_clipboard_sync::private::Secret::new(expected.clone())
+                    .ok_or("Invalid synthetic secret")?,
+            ) {
+                return Err("Private send not started".into());
+            }
+            wait(|| services[1 - source].private_vault().pending())?;
+            let secret = services[1 - source]
+                .private_vault()
+                .take()
+                .ok_or("Missing private payload")?;
+            if secret.as_str() != expected || services[1 - source].private_vault().pending() {
+                return Err("Private payload mismatch".into());
+            }
+            if replicas.iter().any(|replica| {
+                replica
+                    .0
+                    .lock()
+                    .unwrap()
+                    .values()
+                    .any(|record| record.text.contains("synthetic-one-time-private"))
+            }) {
+                return Err("Private payload leaked into replica".into());
+            }
         }
         println!(
-            "Authenticated private single-use memory delivery, excluded from history: verified"
+            "Bidirectional private single-use memory delivery, excluded from history: verified"
         );
         services[0].unpair(&services[1].device_id())?;
         services[1].notify_changed();

@@ -355,6 +355,8 @@ commit_candidate_info = "打拼音时按它上屏高亮的候选"
 commit_raw_info = "打拼音时按它把敲的字母原样上屏"
 
 [shortcut]
+prompt_global = "按下修饰键 + 字母、数字或符号"
+need_global = "要修饰键加一个字母、数字或符号"
 clipboard = "呼出剪贴板"
 need_two_modifiers = "至少按住两个修饰键，免得占掉程序常用的快捷键"
 hotkey_taken = "这个组合键已被其他程序占用，换一个"
@@ -713,7 +715,15 @@ cleared = "中转令牌已删除"
 
 [private]
 shortcut = "私密输入快捷键"
-receive = "接收手机私密内容"
+receive = "接收设备私密内容"
 info = "仅接收已配对设备的私密文字，保存于内存两分钟，不进历史。锁屏、休眠或退出后清除。"
-hotkey_info = "默认 Ctrl+Alt+V。与剪贴板快捷键相同时，有私密内容先单次输入，否则打开历史面板；也可录制不同组合。"
-
+hotkey_info = "默认 Ctrl+Alt+V。与剪贴板快捷键相同时，有私密内容先单次输入，否则打开历史面板；也可录制不同组合，支持 ?、/、; 等符号。"
+send_shortcut = "私密发送快捷键"
+send_mode = "私密发送方式"
+send_info = "自动发送已标为敏感的复制内容，或用托盘菜单、快捷键手动发送。只发给在线且已配对的接收设备，不进历史、不离线补发。"
+mode_auto = "自动及手动"
+mode_manual = "仅手动"
+mode_off = "关闭"
+send_hotkey_info = "默认 Ctrl+Alt+Shift+V。支持字母、数字及符号，例如 Ctrl+Shift+?；发送键不能与输入键或历史面板键共用。"
+auto_fill = "密码框自动填入"
+auto_fill_info = "光标位于可识别的密码框时，收到私密内容后自动填入。普通输入框可在托盘准备“等待私密填入”，切换控件即取消。"

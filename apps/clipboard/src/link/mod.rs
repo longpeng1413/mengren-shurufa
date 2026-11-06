@@ -107,7 +107,11 @@ impl SyncLink {
         #[cfg(windows)]
         {
             service.set_private_receiver(settings.private_receive);
-            crate::system::windows::private::attach(service.private_vault());
+            crate::system::windows::private::attach(
+                service.private_vault(),
+                service.private_sender(),
+                settings.private_receive,
+            );
         }
         Ok(service)
     }

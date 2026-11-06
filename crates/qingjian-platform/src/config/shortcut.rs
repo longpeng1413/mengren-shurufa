@@ -53,6 +53,8 @@ pub struct ShortcutConfig {
     /// 私密内容单次输入；与剪贴板快捷键相同时，有待输入内容才优先消费。
     pub private_input: KeyCombo,
 
+    pub private_send: KeyCombo,
+
     /// 在简体与上次用的繁体字形之间切换（Windows 用），空串禁用（缺省），例如 `ctrl+shift+f`。
     /// 缺省不开：只要青简是当前输入法，这个组合在所有应用里都会被拿走，编辑器的「在文件中查找」也用它。
     #[serde(with = "super::optional_key_combo")]
@@ -97,6 +99,15 @@ impl Default for ShortcutConfig {
             translate_panel: KeyCombo::TRANSLATE_PANEL_DEFAULT,
             clipboard: KeyCombo::CLIPBOARD_DEFAULT,
             private_input: KeyCombo::CLIPBOARD_DEFAULT,
+            private_send: KeyCombo {
+                modifiers: Modifiers {
+                    control: true,
+                    option: true,
+                    shift: true,
+                    command: false,
+                },
+                key: 'v',
+            },
             toggle_traditional: None,
             commit_candidate: CommitKey::SPACE,
             commit_raw: CommitKey::ENTER,

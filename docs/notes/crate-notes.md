@@ -823,3 +823,8 @@ Windows 的后台任务集中在 `apps/settings/src/jobs/update/`，只把校验
 ## 猛人 v0.3.6 剪贴板与私密输入
 
 单条图片小于 100,000,000 字节；文字最多 100 万字符，Windows 图片另限 4000 万像素。跨网络部署与使用见 [剪贴板说明](https://github.com/longpeng1413/mengren-shurufa/blob/main/docs/user/help/mengren-relay.md)。Windows 默认 Ctrl+Alt+V：有私密内容时单次直接输入，否则打开历史；可在实验功能分别录制快捷键。私密内容两分钟过期，不入历史，不离线补传；锁屏、休眠、退出、解绑清除。
+
+
+## 猛人 v0.3.7
+
+v0.3.7：共享 PrivateSender 弱句柄，接收权限/可用性短锁，私密六向互传；Android JNI 仅传 pending 元数据、取用时返回一次正文，PrivateTarget 弱引用和单调时钟绑定输入连接。Windows private/ 子模块使用 UIA 焦点对象与密码标记，不读 Value，MTA 任务有界。符号按键统一 global_hotkey 映射，录制、探测与真实注册一致；plus 尾部 ++ 序列化。

@@ -74,7 +74,16 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
             ),
         )
         if (!on) return views
+        views += ui.group(null, ui.toggle(R.string.private_receive_enabled, R.string.private_receive_note,
+            app.qingjian.inputmethod.clipboard.sync.PrivateReceive.enabled(this)) {
+            prefs.edit().putBoolean(app.qingjian.inputmethod.clipboard.sync.PrivateReceive.KEY_ENABLED, it).apply()
+            app.qingjian.inputmethod.clipboard.sync.PrivateReceive.update(this)
+        })
         val privateModes = arrayOf(getString(R.string.private_auto), getString(R.string.private_manual), getString(R.string.private_off))
+        views += ui.group(null, ui.toggle(R.string.private_auto_fill, R.string.private_auto_fill_note,
+            app.qingjian.inputmethod.clipboard.sync.PrivateReceive.autoFillEnabled(this)) {
+            prefs.edit().putBoolean(app.qingjian.inputmethod.clipboard.sync.PrivateReceive.KEY_AUTO_FILL, it).apply()
+        })
         val privateIndex = app.qingjian.inputmethod.clipboard.sync.PrivateSend.MODES.indexOf(app.qingjian.inputmethod.clipboard.sync.PrivateSend.mode(this)).coerceAtLeast(0)
         views += ui.group(null,
             ui.row(getString(R.string.private_title), privateModes[privateIndex]).apply {

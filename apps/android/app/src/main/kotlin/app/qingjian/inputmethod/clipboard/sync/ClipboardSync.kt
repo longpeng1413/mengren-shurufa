@@ -94,6 +94,7 @@ object ClipboardSync {
         }.getOrDefault(false)
         if (!started) return
         running = true
+        PrivateReceive.start(context)
         val info = runCatching { Native.clipboardSyncInfo() }.getOrNull()?.let(::JSONObject)
         if (info != null) {
             discovery = NsdDiscovery(context, info.getString("id")).apply {
@@ -104,6 +105,7 @@ object ClipboardSync {
     }
 
     private fun stop() {
+        PrivateReceive.stop()
         running = false
         poller = null
         runCatching { Native.clipboardSyncStop() }
@@ -136,6 +138,8 @@ object ClipboardSync {
                     if (type == "private_sent") app.qingjian.inputmethod.R.string.private_sent else app.qingjian.inputmethod.R.string.private_failed,
                     android.widget.Toast.LENGTH_LONG).show() }
             }
+            if (type == "private_received") main.post { if (PrivateReceive.pending()) android.widget.Toast.makeText(context,
+                app.qingjian.inputmethod.R.string.private_received, android.widget.Toast.LENGTH_LONG).show() }
         }
     }
 

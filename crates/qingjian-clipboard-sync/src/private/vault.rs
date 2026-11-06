@@ -20,6 +20,9 @@ impl Default for PrivateVault {
 }
 
 impl PrivateVault {
+    pub fn accepting(&self) -> bool {
+        self.accepting.load(std::sync::atomic::Ordering::SeqCst)
+    }
     pub(crate) fn store(&self, secret: Secret, lifetime: Duration) -> bool {
         let mut slot = self.slot.lock().unwrap_or_else(PoisonError::into_inner);
         if !self.accepting.load(std::sync::atomic::Ordering::SeqCst) {

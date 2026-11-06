@@ -44,8 +44,10 @@ const ICON_ON_LIGHT: usize = 3;
 
 const PERSONALIZE_KEY: PCWSTR = w!(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
 
-const CHOICES: [Choice; 5] = [
+const CHOICES: [Choice; 7] = [
     Choice::Open,
+    Choice::PrivateSend,
+    Choice::PrivateWait,
     Choice::TogglePause,
     Choice::OpenSettings,
     Choice::ToggleAutostart,
@@ -171,6 +173,8 @@ pub fn show_menu(window: HWND, state: &MenuState) -> Option<Choice> {
     };
     let mut items = vec![
         (Choice::Open, MF_STRING, tr("tray.open")),
+        (Choice::PrivateSend, MF_STRING, tr("private.send")),
+        (Choice::PrivateWait, MF_STRING, tr("private.wait")),
         (Choice::TogglePause, check(state.paused), tr("tray.pause")),
     ];
     if state.has_settings {

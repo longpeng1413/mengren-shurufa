@@ -140,10 +140,56 @@ fn rtf_format() -> u32 {
 }
 
 fn sensitive() -> bool {
+    let Some(opened) = Opened::new() else {
+        return true;
+    };
+    marked_sensitive(&opened)
+}
+
+fn marked_sensitive(opened: &Opened) -> bool {
+    for name in [
+        w!("CanIncludeInClipboardHistory"),
+        w!("CanUploadToCloudClipboard"),
+    ] {
+        let format = unsafe { RegisterClipboardFormatW(name) };
+        if let Some(bytes) = opened.read(format, 4)
+            && bytes.as_slice() == 0u32.to_le_bytes()
+        {
+            return true;
+        }
+    }
     SENSITIVE_FORMATS.iter().any(|&name| unsafe {
         let format = RegisterClipboardFormatW(name);
         format != 0 && IsClipboardFormatAvailable(format).is_ok()
     })
+}
+
+/// 私密发送读取原始 Unicode 文字，受控副本覆盖清理，不生成 Capture 或历史格式。
+pub(crate) fn read_private(
+    only_sensitive: bool,
+) -> Option<qingjian_clipboard_sync::private::Secret> {
+    if SELF_WRITE.load(Ordering::Relaxed) {
+        return None;
+    }
+    let opened = Opened::new()?;
+    if only_sensitive && !marked_sensitive(&opened) {
+        return None;
+    }
+    let bytes = zeroize::Zeroizing::new(opened.read(
+        CF_UNICODETEXT,
+        qingjian_clipboard_sync::private::MAX_SECRET_BYTES * 2 + 2,
+    )?);
+    let units = zeroize::Zeroizing::new(
+        bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    );
+    let end = units
+        .iter()
+        .position(|unit| *unit == 0)
+        .unwrap_or(units.len());
+    qingjian_clipboard_sync::private::Secret::new(String::from_utf16(&units[..end]).ok()?)
 }
 
 /// 读这次复制的内容。文件优先，其次文字（网页、Office 同时给文字和图片时用户多半要文字），最后才是图片。

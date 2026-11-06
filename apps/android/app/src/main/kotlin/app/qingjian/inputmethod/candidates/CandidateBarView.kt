@@ -92,12 +92,18 @@ class CandidateBarView(
     /** 显示的是工具栏：横滑滑的是它中间那排图标，不是整条。 */
     /** 工具栏位置上的一句提示与点它要做的事；null 是没有提示。几秒后、出候选或点过就收起。 */
     private var notice: Pair<String, () -> Unit>? = null
+    private var privateHint: Int? = null
+    private var composing = false
+
+    fun showPrivateHint(message: Int?) {
+        if (privateHint != message) { privateHint = message; invalidate() }
+    }
     private val clearNotice = Runnable {
         notice = null
         invalidate()
     }
 
-    private val toolbarShown: Boolean get() = !resizing && strip.isEmpty && notice == null
+    private val toolbarShown: Boolean get() = !resizing && strip.isEmpty && notice == null && privateHint == null
 
     /** 候选能用的宽度：有 ⌄ 时让出那一格。 */
     private val stripWidth: Int get() = if (expandable) width - expandSlot.toInt() else width
@@ -153,6 +159,7 @@ class CandidateBarView(
 
     /** 拼音行右侧的提示（删候选的结果）由渲染器从 Rust 那边的帧里取，这里只要拼音和候选。 */
     fun show(preedit: String, candidates: List<Candidate>) {
+        composing = preedit.isNotEmpty()
         closePopup()
         if (preedit.isNotEmpty() || candidates.isNotEmpty()) clearNotice.run()
         strip.show(preedit, candidates)
@@ -193,6 +200,7 @@ class CandidateBarView(
 
     override fun onDraw(canvas: Canvas) = when {
         resizing -> resizeHandle.draw(canvas, width)
+        !composing && privateHint != null -> toolbar.drawNotice(canvas, width, context.getString(privateHint!!))
         strip.isEmpty && notice != null -> toolbar.drawNotice(canvas, width, notice!!.first)
         strip.isEmpty -> toolbar.draw(canvas, width)
         else -> {
@@ -205,6 +213,7 @@ class CandidateBarView(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean = when {
+        privateHint != null && event.flags and 3 != 0 -> false
         resizing -> resizeHandle.onTouch(event, width)
         popup.showing -> onPopupTouch(event)
         else -> gestures.onTouchEvent(event)
@@ -221,6 +230,7 @@ class CandidateBarView(
     }
 
     private fun tap(x: Float, y: Float) {
+        if (!composing && privateHint != null) { listener.onToolbar(ToolbarTool.PRIVATE_INPUT); return }
         if (expandable && x >= stripWidth) {
             listener.onExpand()
             return

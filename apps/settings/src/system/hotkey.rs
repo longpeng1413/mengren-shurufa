@@ -7,32 +7,25 @@ use windows::Win32::UI::Input::Ime::{
     MOD_RIGHT,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    HKL, HOT_KEY_MODIFIERS, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT, MOD_WIN, RegisterHotKey,
-    UnregisterHotKey, VK_SPACE,
+    HKL, MOD_CONTROL, MOD_NOREPEAT, RegisterHotKey, UnregisterHotKey, VK_SPACE,
 };
 
 use crate::i18n::tr;
 
 /// 这个组合现在能注册成全局快捷键：试着注册一下马上放掉。系统保留的（Win + V）与别的程序占着的都注册不上。
 pub fn combo_available(combo: KeyCombo) -> bool {
-    let mut modifiers: HOT_KEY_MODIFIERS = MOD_NOREPEAT;
-    for (held, modifier) in [
-        (combo.modifiers.control, MOD_CONTROL),
-        (combo.modifiers.shift, MOD_SHIFT),
-        (combo.modifiers.option, MOD_ALT),
-        (combo.modifiers.command, MOD_WIN),
-    ] {
-        if held {
-            modifiers |= modifier;
-        }
-    }
-    let key = if combo.key == '.' {
-        0xBE
-    } else {
-        u32::from(combo.key.to_ascii_uppercase())
+    let Some((modifiers, key)) = qingjian_platform::global_hotkey::binding(
+        combo.key,
+        combo.modifiers.control,
+        combo.modifiers.shift,
+        combo.modifiers.option,
+        combo.modifiers.command,
+    ) else {
+        return false;
     };
     const PROBE_ID: i32 = 0x5157;
-    let registered = unsafe { RegisterHotKey(None, PROBE_ID, modifiers, key) }.is_ok();
+    let registered =
+        unsafe { RegisterHotKey(None, PROBE_ID, modifiers | MOD_NOREPEAT, key) }.is_ok();
     if registered {
         let _ = unsafe { UnregisterHotKey(None, PROBE_ID) };
     }

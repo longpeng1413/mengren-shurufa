@@ -39,7 +39,7 @@ pub(super) struct DeviceInfo {
 }
 
 /// 回答别的设备的询问（开头那个字节已读过）。
-pub(super) fn answer<S: Write>(stream: &mut S, shared: &Shared) -> Result<(), SyncError> {
+pub(super) fn answer<S: Read + Write>(stream: &mut S, shared: &Shared) -> Result<(), SyncError> {
     let body = serde_json::to_vec(&DeviceInfo {
         id: shared.identity.device_id(),
         name: shared.name.clone(),
@@ -51,6 +51,9 @@ pub(super) fn answer<S: Write>(stream: &mut S, shared: &Shared) -> Result<(), Sy
     stream.write_all(&length.to_be_bytes())?;
     stream.write_all(&body)?;
     stream.flush()?;
+    // 读到确认再断，避免 Windows 提前 reset；旧端读取后关闭也会结束等待。
+    let mut received = [0u8; 1];
+    let _ = stream.read_exact(&mut received);
     Ok(())
 }
 
@@ -69,6 +72,7 @@ pub(super) fn probe(address: SocketAddr) -> Result<DeviceInfo, SyncError> {
     let mut body = vec![0_u8; length];
     stream.read_exact(&mut body)?;
     let info: DeviceInfo = serde_json::from_slice(&body)?;
+    let _ = stream.write_all(&[0x06]);
     if info.version == PROTOCOL_VERSION {
         Ok(info)
     } else {

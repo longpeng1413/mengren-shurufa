@@ -3,6 +3,8 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Choice {
     Open,
+    PrivateSend,
+    PrivateWait,
     TogglePause,
     OpenSettings,
     ToggleAutostart,

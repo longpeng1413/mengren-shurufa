@@ -32,6 +32,12 @@ pub struct ClipSettings {
 
     pub private_receive: bool,
 
+    pub private_auto_fill: bool,
+
+    pub private_send_mode: String,
+
+    pub private_send_hotkey: Hotkey,
+
     /// 最多留多少条。
     pub history_limit: usize,
 
@@ -84,6 +90,12 @@ impl Default for ClipSettings {
             hotkey: Hotkey::DEFAULT,
             private_hotkey: Hotkey::DEFAULT,
             private_receive: true,
+            private_auto_fill: true,
+            private_send_mode: "auto".into(),
+            private_send_hotkey: Hotkey {
+                shift: true,
+                ..Hotkey::DEFAULT
+            },
             language: String::new(),
             history_limit: DEFAULT_HISTORY_LIMIT,
             paused: false,
@@ -179,6 +191,18 @@ impl ClipSettings {
                 .as_ref()
                 .and_then(toml::Value::as_bool)
                 .unwrap_or(true),
+            private_send_mode: text_of(&file.clipboard.private_send_mode)
+                .filter(|mode| matches!(mode.as_str(), "auto" | "manual" | "off"))
+                .unwrap_or_else(|| "auto".into()),
+            private_auto_fill: file
+                .clipboard
+                .private_auto_fill
+                .as_ref()
+                .and_then(toml::Value::as_bool)
+                .unwrap_or(true),
+            private_send_hotkey: text_of(&file.shortcut.private_send)
+                .and_then(|key| Hotkey::parse(&key))
+                .unwrap_or(defaults.private_send_hotkey),
             language: text_of(&file.general.ui_language).unwrap_or(defaults.language),
             history_limit: file
                 .clipboard
@@ -251,6 +275,15 @@ mod tests {
                 key: 'k',
             }
         );
+    }
+
+    #[test]
+    fn private_shortcuts_keep_symbols_and_plus_delimiters() {
+        let settings = ClipSettings::parse("[shortcut]\nprivate_input = 'ctrl+shift+?'\nprivate_send = 'ctrl+alt++'\n[clipboard]\nprivate_send_mode = 'manual'\n").unwrap();
+        assert_eq!(settings.private_hotkey.key, '?');
+        assert!(settings.private_hotkey.shift && settings.private_hotkey.control);
+        assert_eq!(settings.private_send_hotkey.key, '+');
+        assert_eq!(settings.private_send_mode, "manual");
     }
 
     #[test]
@@ -341,7 +374,8 @@ mod tests {
             "ctrl+alt+v"
         };
         assert_eq!(Hotkey::parse(expected), Some(Hotkey::DEFAULT));
-        for bad in ["v", "ctrl+", "ctrl+vv", "ctrl+-", "hyper+v", "+v"] {
+        assert!(Hotkey::parse("ctrl+-").is_some());
+        for bad in ["v", "ctrl+", "ctrl+vv", "hyper+v", "+v"] {
             assert_eq!(Hotkey::parse(bad), None, "{bad}");
         }
     }

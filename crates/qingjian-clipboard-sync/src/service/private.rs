@@ -17,12 +17,23 @@ const ACK: &[u8] = b"private-accepted-v1";
 
 impl SyncService {
     pub fn set_private_receiver(&self, enabled: bool) {
+        let _gate = lock(&self.shared.private_gate);
         self.shared
             .private_receiver
             .store(enabled, Ordering::SeqCst);
-        if !enabled {
-            self.shared.private_vault.clear();
-        }
+        update_availability(&self.shared);
+    }
+
+    pub fn set_private_available(&self, available: bool) {
+        let _gate = lock(&self.shared.private_gate);
+        self.shared
+            .private_available
+            .store(available, Ordering::SeqCst);
+        update_availability(&self.shared);
+    }
+
+    pub fn private_sender(&self) -> super::PrivateSender {
+        super::PrivateSender(Arc::downgrade(&self.shared))
     }
 
     pub fn private_vault(&self) -> Arc<PrivateVault> {
@@ -31,40 +42,58 @@ impl SyncService {
 
     /// 仅尝试此刻在线的接收端，后台一次发送，绝不排队或补发。
     pub fn send_private(&self, secret: Secret) -> bool {
-        if self.shared.private_sending.swap(true, Ordering::SeqCst) {
-            return false;
-        }
-        let shared = self.shared.clone();
-        let spawned = std::thread::Builder::new()
-            .name("clipboard-private-send".into())
-            .spawn(move || {
-                let start = Instant::now();
-                let expires = now_millis() + LIFETIME.as_millis() as i64;
-                let peers = lock(&shared.book).peers().to_vec();
-                let mut count = 0;
-                for peer in peers {
-                    if start.elapsed() >= Duration::from_secs(15) {
-                        break;
-                    }
-                    match deliver(&shared, &peer, &secret, expires) {
-                        Ok(()) => count += 1,
-                        Err(error) => {
-                            tracing::debug!(%error, "Private delivery ended without confirmation");
-                        }
+        send_once(self.shared.clone(), secret)
+    }
+}
+
+fn update_availability(shared: &Shared) {
+    if shared.private_receiver.load(Ordering::SeqCst)
+        && shared.private_available.load(Ordering::SeqCst)
+    {
+        shared.private_vault.resume();
+    } else {
+        shared.private_vault.suspend();
+    }
+}
+
+pub(super) fn send_once(shared: Arc<Shared>, secret: Secret) -> bool {
+    if !shared.private_running.load(Ordering::SeqCst) {
+        return false;
+    }
+    if shared.private_sending.swap(true, Ordering::SeqCst) {
+        return false;
+    }
+    let task = shared.clone();
+    let spawned = std::thread::Builder::new()
+        .name("clipboard-private-send".into())
+        .spawn(move || {
+            let shared = task;
+            let start = Instant::now();
+            let expires = now_millis() + LIFETIME.as_millis() as i64;
+            let peers = lock(&shared.book).peers().to_vec();
+            let mut count = 0;
+            for peer in peers {
+                if start.elapsed() >= Duration::from_secs(15) {
+                    break;
+                }
+                match deliver(&shared, &peer, &secret, expires) {
+                    Ok(()) => count += 1,
+                    Err(error) => {
+                        tracing::debug!(%error, "Private delivery ended without confirmation");
                     }
                 }
-                shared.private_sending.store(false, Ordering::SeqCst);
-                shared.emit(if count == 0 {
-                    SyncEvent::PrivateFailed
-                } else {
-                    SyncEvent::PrivateSent { count }
-                });
+            }
+            shared.private_sending.store(false, Ordering::SeqCst);
+            shared.emit(if count == 0 {
+                SyncEvent::PrivateFailed
+            } else {
+                SyncEvent::PrivateSent { count }
             });
-        if spawned.is_err() {
-            self.shared.private_sending.store(false, Ordering::SeqCst);
-        }
-        spawned.is_ok()
+        });
+    if spawned.is_err() {
+        shared.private_sending.store(false, Ordering::SeqCst);
     }
+    spawned.is_ok()
 }
 
 pub(super) fn respond<S: Read + Write>(
@@ -79,11 +108,13 @@ pub(super) fn respond<S: Read + Write>(
         if channel.receive_limited(64)? != REQUEST {
             return Err(SyncError::Handshake);
         }
-        channel.send(if shared.private_receiver.load(Ordering::SeqCst) {
-            AVAILABLE
-        } else {
-            b"disabled"
-        })?;
+        channel.send(
+            if shared.private_receiver.load(Ordering::SeqCst) && shared.private_vault.accepting() {
+                AVAILABLE
+            } else {
+                b"disabled"
+            },
+        )?;
         let _ = channel.receive_limited(8)?;
         return Ok(());
     }
@@ -103,8 +134,10 @@ pub(super) fn respond<S: Read + Write>(
     if !shared.private_receiver.load(Ordering::SeqCst) {
         return Err(SyncError::Handshake);
     }
+    let permission = lock(&shared.private_gate);
     let book = lock(&shared.book);
-    if !book.contains(channel.remote())
+    if !shared.private_receiver.load(Ordering::SeqCst)
+        || !book.contains(channel.remote())
         || !shared
             .private_vault
             .store(secret, Duration::from_millis(remaining as u64))
@@ -112,6 +145,7 @@ pub(super) fn respond<S: Read + Write>(
         return Err(SyncError::Handshake);
     }
     drop(book);
+    drop(permission);
     shared.emit(SyncEvent::PrivateReceived);
     channel.send(ACK)?;
     let _ = channel.receive_limited(8)?;
@@ -139,7 +173,8 @@ fn deliver(shared: &Shared, peer: &Peer, secret: &Secret, expires: i64) -> Resul
         }
     }
     let config = lock(&shared.relay).clone();
-    if !config.enabled || !lock(&shared.relay_peers).contains(&peer.device_id) {
+    // 配对完成时在线清单可能尚未推送；让中转按此刻真实登记状态立即接通，不缓存或补发。
+    if !config.enabled || !shared.relay_connected.load(Ordering::SeqCst) {
         return Err(SyncError::Handshake);
     }
     let relay =

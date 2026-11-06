@@ -18,8 +18,7 @@ use windows::Win32::System::DataExchange::AddClipboardFormatListener;
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    HOT_KEY_MODIFIERS, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT, MOD_WIN, RegisterHotKey,
-    UnregisterHotKey,
+    HOT_KEY_MODIFIERS, MOD_NOREPEAT, RegisterHotKey, UnregisterHotKey,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GW_HWNDNEXT, GWL_EXSTYLE, GetCursorPos,
@@ -42,6 +41,8 @@ const HOTKEY_ID: i32 = 1;
 
 const PRIVATE_HOTKEY_ID: i32 = 2;
 
+const SEND_HOTKEY_ID: i32 = 3;
+
 const WATCH_TIMER: usize = 1;
 
 /// 托盘图标挂的窗口。
@@ -49,9 +50,6 @@ static TRAY_WINDOW: AtomicIsize = AtomicIsize::new(0);
 
 /// 资源管理器重启时广播的消息，托盘图标要重新加。
 static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
-
-/// 句号键的虚拟键码（`VK_OEM_PERIOD`）；字母、数字的键码就是它的大写 ASCII。
-const VK_PERIOD: u32 = 0xBE;
 
 /// 多久看一次配置文件。
 const WATCH_INTERVAL: Duration = Duration::from_secs(1);
@@ -96,35 +94,75 @@ fn modified(path: Option<&PathBuf>) -> Option<SystemTime> {
         .ok()
 }
 
-fn virtual_key(hotkey: Hotkey) -> u32 {
-    if hotkey.key == '.' {
-        VK_PERIOD
-    } else {
-        u32::from(hotkey.key.to_ascii_uppercase())
-    }
+fn binding(hotkey: Hotkey) -> Option<(HOT_KEY_MODIFIERS, u32)> {
+    qingjian_platform::global_hotkey::binding(
+        hotkey.key,
+        hotkey.control,
+        hotkey.shift,
+        hotkey.alt,
+        hotkey.win,
+    )
 }
 
-/// 注册呼出快捷键。被别的程序占着不算致命：照样记录，换个键再注册。
-fn register(window: HWND, hotkey: Hotkey) {
-    register_id(window, hotkey, HOTKEY_ID);
+fn equivalent(first: Hotkey, second: Hotkey) -> bool {
+    binding(first).is_some_and(|first| Some(first) == binding(second))
+}
+
+fn virtual_key(hotkey: Hotkey) -> u32 {
+    binding(hotkey).map_or(0, |(_, key)| key)
 }
 
 fn register_id(window: HWND, hotkey: Hotkey, id: i32) {
-    let mut modifiers: HOT_KEY_MODIFIERS = MOD_NOREPEAT;
-    for (held, modifier) in [
-        (hotkey.control, MOD_CONTROL),
-        (hotkey.shift, MOD_SHIFT),
-        (hotkey.alt, MOD_ALT),
-        (hotkey.win, MOD_WIN),
-    ] {
-        if held {
-            modifiers |= modifier;
-        }
-    }
-    let key = virtual_key(hotkey);
-    if let Err(error) = unsafe { RegisterHotKey(Some(window), id, modifiers, key) } {
+    let Some((modifiers, key)) = binding(hotkey) else {
+        notice("private.hotkey_taken");
+        return;
+    };
+    if let Err(error) = unsafe { RegisterHotKey(Some(window), id, modifiers | MOD_NOREPEAT, key) } {
         tracing::warn!(%error, ?hotkey, "clipboard hotkey is taken");
         notice("private.hotkey_taken");
+    }
+}
+
+fn register_all(window: HWND, settings: &ClipSettings) {
+    for id in [HOTKEY_ID, PRIVATE_HOTKEY_ID, SEND_HOTKEY_ID] {
+        let _ = unsafe { UnregisterHotKey(Some(window), id) };
+    }
+    register_id(window, settings.hotkey, HOTKEY_ID);
+    if !equivalent(settings.private_hotkey, settings.hotkey) {
+        register_id(window, settings.private_hotkey, PRIVATE_HOTKEY_ID);
+    }
+    if settings.sync_enabled
+        && settings.private_send_mode != "off"
+        && !equivalent(settings.private_send_hotkey, settings.hotkey)
+        && !equivalent(settings.private_send_hotkey, settings.private_hotkey)
+    {
+        register_id(window, settings.private_send_hotkey, SEND_HOTKEY_ID);
+    } else if settings.sync_enabled && settings.private_send_mode != "off" {
+        notice("private.hotkey_taken");
+    }
+}
+
+fn send_private(manual: bool) {
+    let mode = WATCH.with_borrow(|state| {
+        state.as_ref().map_or_else(
+            || "off".to_owned(),
+            |(watch, _)| {
+                if watch.settings.sync_enabled && (manual || !watch.settings.paused) {
+                    watch.settings.private_send_mode.clone()
+                } else {
+                    "off".into()
+                }
+            },
+        )
+    });
+    if mode == "off" {
+        if manual {
+            notice("private.send_disabled");
+        }
+        return;
+    }
+    if manual || mode == "auto" {
+        super::private::send_current(!manual);
     }
 }
 
@@ -153,15 +191,13 @@ fn check_config(window: HWND) {
     let Some((previous, next)) = changed else {
         return;
     };
-    if previous.hotkey != next.hotkey {
-        let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
-        register(window, next.hotkey);
-    }
-    if previous.private_hotkey != next.private_hotkey || previous.hotkey != next.hotkey {
-        let _ = unsafe { UnregisterHotKey(Some(window), PRIVATE_HOTKEY_ID) };
-        if next.private_hotkey != next.hotkey {
-            register_id(window, next.private_hotkey, PRIVATE_HOTKEY_ID);
-        }
+    if previous.hotkey != next.hotkey
+        || previous.private_send_mode != next.private_send_mode
+        || previous.sync_enabled != next.sync_enabled
+        || previous.private_hotkey != next.private_hotkey
+        || previous.private_send_hotkey != next.private_send_hotkey
+    {
+        register_all(window, &next);
     }
     send(Signal::Settings(next));
 }
@@ -237,6 +273,12 @@ fn tray_menu(window: HWND) {
     };
     match tray::show_menu(window, &state) {
         Some(Choice::Open) => open_from_tray(),
+        Some(Choice::PrivateSend) => send_private(true),
+        Some(Choice::PrivateWait) => {
+            let target = window_under_taskbar();
+            super::paste::refocus(target);
+            super::private::prepare(Some(target));
+        }
         Some(Choice::TogglePause) => write_flag(window, "paused", !paused),
         Some(Choice::OpenSettings) => {
             if let Some(program) = settings_program()
@@ -325,10 +367,7 @@ fn run(watch: Watch) -> windows::core::Result<()> {
         tray::add(icon_window);
         set_owner(window);
         AddClipboardFormatListener(window)?;
-        register(window, watch.settings.hotkey);
-        if watch.settings.private_hotkey != watch.settings.hotkey {
-            register_id(window, watch.settings.private_hotkey, PRIVATE_HOTKEY_ID);
-        }
+        register_all(window, &watch.settings);
         if watch.path.is_some() {
             SetTimer(
                 Some(window),
@@ -368,6 +407,7 @@ unsafe extern "system" fn procedure(
             LRESULT(0)
         }
         WM_CLIPBOARDUPDATE => {
+            send_private(false);
             let capture = WATCH.with_borrow(|state| {
                 read_capture(|source| {
                     state
@@ -392,13 +432,13 @@ unsafe extern "system" fn procedure(
         WM_HOTKEY => {
             let shared = WATCH.with_borrow(|state| {
                 state.as_ref().is_some_and(|(watch, _)| {
-                    watch.settings.private_hotkey == watch.settings.hotkey
+                    equivalent(watch.settings.private_hotkey, watch.settings.hotkey)
                 })
             });
-            if wparam.0 == PRIVATE_HOTKEY_ID as usize {
-                if !super::private::input() {
-                    notice("private.empty");
-                }
+            if wparam.0 == SEND_HOTKEY_ID as usize {
+                send_private(true);
+            } else if wparam.0 == PRIVATE_HOTKEY_ID as usize {
+                super::private::input_or_wait();
             } else if !shared || !super::private::input() {
                 send(hotkey_signal());
             }

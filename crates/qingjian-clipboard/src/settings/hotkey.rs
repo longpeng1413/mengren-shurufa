@@ -12,7 +12,7 @@ pub struct Hotkey {
     /// Windows 键。
     pub win: bool,
 
-    /// 字母、数字或句号（小写）。
+    /// 字母、数字或可打印 ASCII 符号（字母小写）。
     pub key: char,
 }
 
@@ -38,12 +38,17 @@ impl Hotkey {
 
     /// 配置的写法：`ctrl+alt+v`，修饰键也认 `control`、`option`、`cmd`、`win`，顺序随意；至少一个修饰键。
     pub fn parse(text: &str) -> Option<Self> {
-        let (modifiers, key) = text.trim().rsplit_once('+')?;
+        let trimmed = text.trim();
+        let (modifiers, key) = if let Some(prefix) = trimmed.strip_suffix("++") {
+            (prefix, "+")
+        } else {
+            trimmed.rsplit_once('+')?
+        };
         let mut chars = key.trim().chars();
         let (Some(key), None) = (chars.next(), chars.next()) else {
             return None;
         };
-        if !key.is_ascii_alphanumeric() && key != '.' {
+        if !key.is_ascii_graphic() {
             return None;
         }
         let mut hotkey = Self {

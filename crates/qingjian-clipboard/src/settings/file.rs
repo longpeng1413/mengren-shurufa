@@ -37,6 +37,10 @@ pub(super) struct ClipboardSection {
 
     pub(super) private_receive: Option<toml::Value>,
 
+    pub(super) private_auto_fill: Option<toml::Value>,
+
+    pub(super) private_send_mode: Option<toml::Value>,
+
     pub(super) relay_url: Option<toml::Value>,
 
     pub(super) relay_revision: Option<toml::Value>,
@@ -50,6 +54,8 @@ pub(super) struct ClipboardSection {
 #[serde(default)]
 pub(super) struct ShortcutSection {
     pub(super) private_input: Option<toml::Value>,
+
+    pub(super) private_send: Option<toml::Value>,
 
     pub(super) clipboard: Option<toml::Value>,
 }

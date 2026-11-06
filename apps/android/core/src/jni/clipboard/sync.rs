@@ -29,6 +29,75 @@ struct Running {
 
 static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
 
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncPrivatePending<
+    'local,
+>(
+    _env: JNIEnv<'local>,
+    _this: JObject<'local>,
+) -> jboolean {
+    if catch_unwind(|| {
+        running()
+            .as_ref()
+            .is_some_and(|running| running.service.private_vault().pending())
+    })
+    .unwrap_or(false)
+    {
+        JNI_TRUE
+    } else {
+        JNI_FALSE
+    }
+}
+
+/// 接收权限与屏幕状态分别控制；灭屏会撤销保险箱，迟到包也不能重新填充。
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncPrivateState<
+    'local,
+>(
+    _env: JNIEnv<'local>,
+    _this: JObject<'local>,
+    enabled: jboolean,
+    available: jboolean,
+) {
+    let _ = catch_unwind(|| {
+        if let Some(running) = running().as_ref() {
+            running
+                .service
+                .set_private_available(available != JNI_FALSE);
+            running.service.set_private_receiver(enabled != JNI_FALSE);
+        }
+    });
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncPrivateClear<
+    'local,
+>(
+    _env: JNIEnv<'local>,
+    _this: JObject<'local>,
+) {
+    let _ = catch_unwind(|| {
+        if let Some(running) = running().as_ref() {
+            running.service.private_vault().clear();
+        }
+    });
+}
+
+/// 仅用户点击私密输入时取出，不经 JSON 事件，不放系统剪贴板。
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncPrivateTake<
+    'local,
+>(
+    env: JNIEnv<'local>,
+    _this: JObject<'local>,
+) -> jstring {
+    let secret = catch_unwind(|| running().as_ref()?.service.private_vault().take());
+    match secret {
+        Ok(Some(secret)) => to_java(&env, secret.as_str()),
+        _ => std::ptr::null_mut(),
+    }
+}
+
 /// 私密内容不进入历史，JNI 参数只在本次发送的内存对象里停留。
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncPrivateSend<

@@ -3,6 +3,7 @@
 mod device;
 mod large;
 mod memory;
+mod multidirectional;
 mod private;
 use crate::{Record, SyncEvent};
 use device::Device;

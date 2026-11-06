@@ -355,6 +355,8 @@ commit_candidate_info = "Press while typing pinyin to commit the highlighted can
 commit_raw_info = "Press while typing pinyin to commit the typed letters as is"
 
 [shortcut]
+prompt_global = "Press modifiers + a letter, digit or symbol"
+need_global = "Needs modifiers plus a letter, digit or symbol"
 clipboard = "Open clipboard"
 need_two_modifiers = "Hold at least two modifier keys so app shortcuts stay free"
 hotkey_taken = "Another app is using this shortcut. Pick a different one"
@@ -713,7 +715,15 @@ cleared = "Relay token deleted"
 
 [private]
 shortcut = "Private input shortcut"
-receive = "Receive private content from phones"
+receive = "Receive private content from paired devices"
 info = "Paired devices only. Kept in memory for two minutes, excluded from history, cleared on lock, sleep or exit."
-hotkey_info = "Default Ctrl+Alt+V. When shared with the clipboard shortcut, pending private content is typed once; otherwise history opens. A separate shortcut can be recorded."
-
+hotkey_info = "Default Ctrl+Alt+V. When shared with the clipboard shortcut, pending private content is typed once; otherwise history opens. A separate shortcut with symbols such as ?, / or ; can be recorded."
+send_shortcut = "Private send shortcut"
+send_mode = "Private sending"
+send_info = "Automatically send copies marked sensitive, or send manually from the tray or shortcut. Online paired receivers only; no history or offline retry."
+mode_auto = "Automatic and manual"
+mode_manual = "Manual only"
+mode_off = "Off"
+send_hotkey_info = "Default Ctrl+Alt+Shift+V. Letters, digits and symbols such as Ctrl+Shift+? are supported. Sending must use a different shortcut from input and history."
+auto_fill = "Automatically fill password fields"
+auto_fill_info = "Automatically fill a recognized focused password field when private content arrives. Other fields can be armed from the tray; changing focus cancels waiting."

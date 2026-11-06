@@ -285,6 +285,12 @@ fn clipboard_process_reads_the_same_keys() {
             relay_revision: String::new(),
             private_hotkey: Hotkey::DEFAULT,
             private_receive: true,
+            private_auto_fill: true,
+            private_send_mode: "auto".into(),
+            private_send_hotkey: Hotkey {
+                shift: true,
+                ..Hotkey::DEFAULT
+            },
             sync_neon: false,
             device_name: "坚强的高松灯".to_owned(),
             excluded_apps: vec!["Secret".to_owned()],

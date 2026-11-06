@@ -43,8 +43,8 @@
     <string name="sync_relay_disconnected">Disconnected: check URL, token and network</string>
     <string name="sync_relay_devices">Devices on relay</string>
     <string name="sync_relay_device">Relay device #%1$s</string>
-    <string name="private_sent">Private content sent to online PCs. Type it once with the private input shortcut within two minutes.</string>
-    <string name="private_failed">Private send failed. Enable sync and private receiving on an online paired PC. No offline retry.</string>
+    <string name="private_sent">Private content sent to online paired receivers. Type it once with the private input shortcut within two minutes.</string>
+    <string name="private_failed">Private send failed. Enable sync and private receiving on an online, unlocked paired device. No offline retry.</string>
     <string name="private_disabled">Private sending is disabled. Enable it in clipboard sync settings.</string>
     <string name="private_empty">The clipboard has no private text to send.</string>
     <string name="private_title">Private sending</string>
@@ -52,5 +52,19 @@
     <string name="private_manual">Manual only</string>
     <string name="private_off">Off</string>
     <string name="private_send">Send privately</string>
-    <string name="private_note">Online paired PCs only. Excluded from history. Single input within two minutes.</string>
+    <string name="private_note">Online unlocked paired receivers only. Excluded from history. Single input within two minutes.</string>
+    <string name="private_input">Private input</string>
+    <string name="private_received">Private content received. Open the target field and tap the private content suggestion above the keyboard to fill it.</string>
+    <string name="private_input_empty">No private content is pending. It may have been used or expired.</string>
+    <string name="private_input_unavailable">Enable private receiving and use it in an input field while the device is unlocked.</string>
+    <string name="private_input_failed">Input failed and private content was cleared. Send it again.</string>
+    <string name="private_receive_enabled">Receive private content from paired devices</string>
+    <string name="private_receive_note">Receive from phones and PCs while unlocked. Kept in memory for two minutes and typed once with the unlock icon. Cleared when the screen turns off or receiving is disabled.</string>
+    <string name="private_fill_hint">Private content ready · Tap to fill</string>
+    <string name="private_wait_hint">Waiting to fill this field · Tap to cancel</string>
+    <string name="private_wait_started">Ready to fill this field automatically. Send from another device within two minutes.</string>
+    <string name="private_wait_cancelled">Automatic filling cancelled.</string>
+    <string name="private_finish_composing">Finish composition or close the editor before using private input.</string>
+    <string name="private_auto_fill">Automatically fill password fields</string>
+    <string name="private_auto_fill_note">When the keyboard is open on a password field, fill it as private content arrives. Other fields use the suggestion or can be armed with the unlock icon.</string>
 </resources>

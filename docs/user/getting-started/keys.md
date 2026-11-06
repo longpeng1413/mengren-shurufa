@@ -118,3 +118,8 @@ Windows 上小键盘数字缺省也是选候选；在「设置 → 候选」把�
 ## 猛人 v0.3.6 剪贴板与私密输入
 
 单条图片小于 100,000,000 字节；文字最多 100 万字符，Windows 图片另限 4000 万像素。跨网络部署与使用见 [剪贴板说明](https://github.com/longpeng1413/mengren-shurufa/blob/main/docs/user/help/mengren-relay.md)。Windows 默认 Ctrl+Alt+V：有私密内容时单次直接输入，否则打开历史；可在实验功能分别录制快捷键。私密内容两分钟过期，不入历史，不离线补传；锁屏、休眠、退出、解绑清除。
+
+
+## 猛人 v0.3.7
+
+Windows 私密输入与私密发送可在实验功能分别自定义，支持 Ctrl+Shift+? 等符号。默认输入 Ctrl+Alt+V，发送 Ctrl+Alt+Shift+V。独立输入键在无内容时可准备当前框等待，密码框自动填入不要求按键。手机使用键盘上方提示或解锁图标。

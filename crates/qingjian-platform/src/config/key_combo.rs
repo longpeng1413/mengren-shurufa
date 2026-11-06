@@ -12,7 +12,7 @@ pub struct KeyCombo {
     /// 修饰键，至少一个。
     pub modifiers: Modifiers,
 
-    /// 字母、数字或句号键（小写）。
+    /// 字母、数字或可打印 ASCII 符号（字母小写）。
     pub key: char,
 }
 
@@ -85,16 +85,19 @@ impl FromStr for KeyCombo {
     type Err = String;
 
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        let (modifiers, key) = text
-            .trim()
-            .rsplit_once('+')
-            .ok_or_else(|| format!("expected modifiers+key, got {text:?}"))?;
+        let trimmed = text.trim();
+        let (modifiers, key) = if let Some(prefix) = trimmed.strip_suffix("++") {
+            Some((prefix, "+"))
+        } else {
+            trimmed.rsplit_once('+')
+        }
+        .ok_or_else(|| format!("expected modifiers+key, got {text:?}"))?;
         let mut chars = key.trim().chars();
         let (Some(key), None) = (chars.next(), chars.next()) else {
             return Err(format!("key must be a single character: {key:?}"));
         };
-        if !key.is_ascii_alphanumeric() && key != '.' {
-            return Err(format!("key must be a letter, digit or period: {key:?}"));
+        if !key.is_ascii_graphic() {
+            return Err(format!("key must be a printable ASCII character: {key:?}"));
         }
         Ok(Self {
             modifiers: modifiers.parse()?,
@@ -135,7 +138,7 @@ mod tests {
         assert_eq!(combo.key_string(), "control+option+t");
         assert!("t".parse::<KeyCombo>().is_err());
         assert!("option+tt".parse::<KeyCombo>().is_err());
-        assert!("option+-".parse::<KeyCombo>().is_err());
+        assert!("control+shift+?".parse::<KeyCombo>().is_ok());
         for option in ["control+shift+t", "control+option+e", "shift+command+9"] {
             assert_eq!(option.parse::<KeyCombo>().unwrap().key_string(), option);
         }
