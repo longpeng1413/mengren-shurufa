@@ -29,6 +29,31 @@ struct Running {
 
 static RUNNING: Mutex<Option<Running>> = Mutex::new(None);
 
+/// 私密内容不进入历史，JNI 参数只在本次发送的内存对象里停留。
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncPrivateSend<
+    'local,
+>(
+    mut env: JNIEnv<'local>,
+    _this: JObject<'local>,
+    text: JString<'local>,
+) -> jboolean {
+    let Ok(text) = env.get_string(&text).map(String::from) else {
+        return JNI_FALSE;
+    };
+    let Some(secret) = qingjian_clipboard_sync::private::Secret::new(text) else {
+        return JNI_FALSE;
+    };
+    if running()
+        .as_ref()
+        .is_some_and(|running| running.service.send_private(secret))
+    {
+        JNI_TRUE
+    } else {
+        JNI_FALSE
+    }
+}
+
 fn running() -> MutexGuard<'static, Option<Running>> {
     RUNNING.lock().unwrap_or_else(PoisonError::into_inner)
 }
@@ -222,6 +247,9 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncCh
 
 fn event_json(event: SyncEvent, reader: Option<&HistoryReplica>) -> serde_json::Value {
     match event {
+        SyncEvent::PrivateReceived => json!({"type":"private_received"}),
+        SyncEvent::PrivateSent { count } => json!({"type":"private_sent", "count":count}),
+        SyncEvent::PrivateFailed => json!({"type":"private_failed"}),
         SyncEvent::NearbyChanged => json!({"type": "nearby"}),
         SyncEvent::Paired { name } => json!({"type": "paired", "name": name}),
         SyncEvent::PairFailed => json!({"type": "pair_failed"}),
@@ -230,12 +258,16 @@ fn event_json(event: SyncEvent, reader: Option<&HistoryReplica>) -> serde_json::
             bytes_per_second, ..
         } => json!({"type": "progress", "speed": bytes_per_second}),
         SyncEvent::ReceiveFinished { newest, .. } => {
-            // 文字直接带给壳放上系统剪贴板
             let text = newest
+                .as_ref()
                 .filter(|item| item.kind == RecordKind::Text)
                 .and_then(|item| reader?.record(&item.id).ok()?)
                 .map(|record| record.text);
-            json!({"type": "finished", "text": text})
+            let image = newest
+                .as_ref()
+                .filter(|item| item.kind == RecordKind::Image)
+                .and_then(|item| reader?.image_path(&item.id));
+            json!({"type": "finished", "text": text, "image": image})
         }
         SyncEvent::ReceiveFailed { .. } | SyncEvent::SendFailed { .. } => {
             json!({"type": "failed"})

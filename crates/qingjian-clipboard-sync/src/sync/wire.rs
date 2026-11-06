@@ -32,20 +32,21 @@ pub(super) fn encode_record(record: &Record) -> Result<Vec<u8>, SyncError> {
     Ok(message)
 }
 
-pub(super) fn decode_record(message: &[u8]) -> Result<Record, SyncError> {
+pub(super) fn decode_record(mut message: Vec<u8>) -> Result<Record, SyncError> {
     let truncated = || SyncError::Protocol("truncated record".to_owned());
     let (length, rest) = message.split_first_chunk::<4>().ok_or_else(truncated)?;
     let length = u32::from_be_bytes(*length) as usize;
     if length > rest.len() {
         return Err(truncated());
     }
-    let (header, image) = rest.split_at(length);
+    let (header, _) = rest.split_at(length);
     let header: Header = serde_json::from_slice(header)?;
+    message.drain(..4 + length);
     Ok(Record {
         stamp: header.stamp,
         kind: header.kind,
         text: header.text,
-        image: image.to_vec(),
+        image: message,
         extension: header.extension,
     })
 }

@@ -41,9 +41,14 @@ fn handle(
     broker: &Arc<Broker>,
     stop: &std::sync::atomic::AtomicBool,
 ) {
+    // Windows 接受的 socket 可能继承 listener 的非阻塞状态；HTTP/TLS 握手必须先阻塞。
+    if tcp.set_nonblocking(false).is_err() {
+        return;
+    }
     let mut route = String::new();
+    let _ = tcp.set_nodelay(true);
     let _ = tcp.set_read_timeout(Some(Duration::from_secs(5)));
-    let _ = tcp.set_write_timeout(Some(Duration::from_secs(3)));
+    let _ = tcp.set_write_timeout(Some(Duration::from_secs(30)));
     let mut prefix = [0u8; 256];
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
@@ -78,6 +83,8 @@ fn handle(
         }
     }
     let limits = tungstenite::protocol::WebSocketConfig::default()
+        .write_buffer_size(0)
+        .max_write_buffer_size(2 * super::MAX_FRAME + 1024)
         .max_message_size(Some(super::MAX_FRAME))
         .max_frame_size(Some(super::MAX_FRAME));
     let accepted = tungstenite::accept_hdr_with_config(
@@ -252,26 +259,78 @@ fn bridge(
     mut b: WebSocket<TcpStream>,
     stop: &std::sync::atomic::AtomicBool,
 ) {
-    let _ = a.get_ref().set_read_timeout(Some(Duration::from_millis(2)));
-    let _ = b.get_ref().set_read_timeout(Some(Duration::from_millis(2)));
+    let _ = a.get_ref().set_nonblocking(true);
+    let _ = b.get_ref().set_nonblocking(true);
     let start = Instant::now();
     let mut bytes = 0usize;
-    'session: while start.elapsed() < Duration::from_secs(30) && !stop.load(Ordering::Relaxed) {
+    let mut active = Instant::now();
+    'session: while start.elapsed() < Duration::from_secs(600)
+        && active.elapsed() < Duration::from_secs(30)
+        && !stop.load(Ordering::Relaxed)
+    {
+        let before = bytes;
         if !pump(&mut a, &mut b, &mut bytes) || !pump(&mut b, &mut a, &mut bytes) {
             break 'session;
+        }
+        if bytes != before {
+            active = Instant::now();
+        } else {
+            std::thread::sleep(Duration::from_millis(1));
         }
     }
     let _ = a.close(None);
     let _ = b.close(None);
+    finish(&mut a);
+    finish(&mut b);
+}
+
+fn finish(socket: &mut WebSocket<TcpStream>) {
+    let deadline = Instant::now() + Duration::from_millis(200);
+    while Instant::now() < deadline {
+        let _ = socket.flush();
+        match socket.read() {
+            Err(error) if super::socket::timeout(&error) => {
+                std::thread::sleep(Duration::from_millis(1))
+            }
+            Err(_) => break,
+            Ok(_) => {}
+        }
+    }
+    let _ = socket.get_ref().shutdown(std::net::Shutdown::Write);
+    // 丢弃关闭时在途的密文，避免带着未读数据销毁 TCP 导致 reset。
+    let mut discarded = [0u8; 1024];
+    while Instant::now() < deadline {
+        match socket.get_mut().read(&mut discarded) {
+            Ok(0) => break,
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(Duration::from_millis(1))
+            }
+            Err(_) => break,
+        }
+    }
 }
 
 fn pump(from: &mut WebSocket<TcpStream>, to: &mut WebSocket<TcpStream>, bytes: &mut usize) -> bool {
+    // 先排空目标的有界待写缓冲；慢接收端反压到源，不能把整张图片攒在服务器上。
+    match to.flush() {
+        Ok(()) => {}
+        Err(error) if super::socket::timeout(&error) => return true,
+        Err(_) => return false,
+    }
     match from.read() {
         Ok(Message::Binary(data)) => {
             *bytes = bytes.saturating_add(data.len());
-            *bytes <= 16 * 1024 * 1024 && to.send(Message::Binary(data)).is_ok()
+            *bytes <= 512 * 1024 * 1024
+                && match to.send(Message::Binary(data)) {
+                    Ok(()) => true,
+                    Err(error) => super::socket::timeout(&error),
+                }
         }
-        Ok(Message::Ping(_)) => from.flush().is_ok(),
+        Ok(Message::Ping(_)) => match from.flush() {
+            Ok(()) => true,
+            Err(error) => super::socket::timeout(&error),
+        },
         Ok(Message::Pong(_)) => true,
         Err(error) if super::socket::timeout(&error) => true,
         _ => false,

@@ -10,6 +10,7 @@ mod hello;
 mod link;
 mod locked;
 mod options;
+mod private;
 mod received_item;
 pub(crate) mod round;
 mod scan;
@@ -222,7 +223,9 @@ impl SyncService {
 
     /// 解除配对。只影响本机名单，对方再连会被拒。
     pub fn unpair(&self, device_id: &str) -> Result<(), SyncError> {
-        lock(&self.shared.book).remove(device_id)
+        let result = lock(&self.shared.book).remove(device_id);
+        self.shared.private_vault.clear();
+        result
     }
 
     pub fn device_id(&self) -> String {
@@ -261,7 +264,10 @@ impl SyncService {
                         let _ = commands.send(Command::SyncAll);
                         SyncEvent::Paired { name }
                     }
-                    Err(_) => SyncEvent::PairFailed,
+                    Err(error) => {
+                        tracing::debug!(%error, "Relay pairing failed");
+                        SyncEvent::PairFailed
+                    }
                 };
                 shared.emit(event);
             });
@@ -277,6 +283,8 @@ impl SyncService {
 
 impl Drop for SyncService {
     fn drop(&mut self) {
+        self.shared.private_receiver.store(false, Ordering::SeqCst);
+        self.shared.private_vault.suspend();
         self.stop.store(true, Ordering::Relaxed);
         for handle in self.threads.drain(..) {
             let _ = handle.join();

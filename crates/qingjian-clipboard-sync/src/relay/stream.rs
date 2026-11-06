@@ -75,5 +75,18 @@ impl Write for RelayStream {
 impl Drop for RelayStream {
     fn drop(&mut self) {
         let _ = self.socket.close(None);
+        // 完成关闭握手，避免 Windows 在尚有控制帧未读时用 TCP reset 丢掉末条响应。
+        let _ = self
+            .socket
+            .get_ref()
+            .tcp()
+            .set_read_timeout(Some(Duration::from_millis(200)));
+        let end = std::time::Instant::now() + Duration::from_millis(200);
+        while std::time::Instant::now() < end {
+            match self.socket.read() {
+                Ok(Message::Close(_)) | Err(_) => break,
+                Ok(_) => {}
+            }
+        }
     }
 }

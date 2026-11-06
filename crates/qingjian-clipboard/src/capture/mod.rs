@@ -18,7 +18,7 @@ pub const MAX_FORMAT_BYTES: usize = 8 * 1024 * 1024;
 pub const MAX_FILE_LIST_BYTES: usize = 4 * 1024 * 1024;
 
 /// 图片编码后最多多大（字节）。
-pub const MAX_IMAGE_BYTES: usize = 32 * 1024 * 1024;
+pub const MAX_IMAGE_BYTES: usize = 99_999_999;
 
 /// [`ClipFormat::name`] 的取值。
 pub const FORMAT_HTML: &str = "html";

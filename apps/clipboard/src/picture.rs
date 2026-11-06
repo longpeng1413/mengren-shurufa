@@ -53,6 +53,16 @@ fn thumbnail(source: &Pixmap) -> Option<Pixmap> {
 
 /// 别的设备发来的图片文件转成 PNG 与缩略图。本来就是 PNG 的不重新编码：字节变了同步 id 就对不上了。
 pub fn from_file(bytes: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
+    if bytes.len() > MAX_IMAGE_BYTES {
+        return None;
+    }
+    let reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .ok()?;
+    let (width, height) = reader.into_dimensions().ok()?;
+    if u64::from(width) * u64::from(height) > MAX_PIXELS {
+        return None;
+    }
     let decoded = image::load_from_memory(bytes).ok()?.into_rgba8();
     let (width, height) = decoded.dimensions();
     let (png, thumbnail) = encode(width, height, decoded.as_raw())?;

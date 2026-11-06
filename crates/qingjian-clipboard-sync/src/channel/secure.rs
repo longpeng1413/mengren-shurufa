@@ -15,8 +15,8 @@ const TAG_LENGTH: usize = 16;
 
 const MAX_CHUNK: usize = MAX_NOISE_MESSAGE - TAG_LENGTH;
 
-/// 一条消息的上限：比最大的图片（32 MB）留些余量，防对方报一个巨大的长度把内存撑爆。
-pub(crate) const MAX_MESSAGE: usize = 48 * 1024 * 1024;
+/// 图片原始字节外留出记录头空间，接收仍按分块增长，不按远端长度预分配。
+pub(crate) const MAX_MESSAGE: usize = crate::relay::MAX_CONTENT_BYTES + 1024 * 1024;
 
 pub struct SecureChannel<S> {
     stream: S,
@@ -95,22 +95,39 @@ impl<S: Read + Write> SecureChannel<S> {
         self.receive_with(&mut |_, _| {})
     }
 
+    pub(crate) fn receive_limited(&mut self, limit: usize) -> Result<Vec<u8>, SyncError> {
+        self.receive_bounded(limit, &mut |_, _| {})
+    }
+
     /// 同 [`Self::receive`]，每收一块报一次（已收，总共）。
     pub fn receive_with(
         &mut self,
         progress: &mut dyn FnMut(u64, u64),
     ) -> Result<Vec<u8>, SyncError> {
-        let mut buffer = vec![0_u8; MAX_NOISE_MESSAGE];
+        self.receive_bounded(MAX_MESSAGE, progress)
+    }
+
+    fn receive_bounded(
+        &mut self,
+        limit: usize,
+        progress: &mut dyn FnMut(u64, u64),
+    ) -> Result<Vec<u8>, SyncError> {
+        let mut buffer = zeroize::Zeroizing::new(vec![0_u8; MAX_NOISE_MESSAGE]);
         let header = self.receive_chunk(&mut buffer)?;
         let header: [u8; 4] = buffer[..header]
             .try_into()
             .map_err(|_| SyncError::Protocol("bad message header".to_owned()))?;
         let total = u32::from_be_bytes(header) as usize;
-        if total > MAX_MESSAGE {
+        if total > limit {
             return Err(SyncError::Protocol("message too large".to_owned()));
         }
         // 不按对方报的长度预留：内容到了才长
-        let mut message = Vec::new();
+        let capacity = if limit <= crate::private::MAX_SECRET_BYTES + 8 {
+            total
+        } else {
+            0
+        };
+        let mut message = zeroize::Zeroizing::new(Vec::with_capacity(capacity));
         while message.len() < total {
             let length = self.receive_chunk(&mut buffer)?;
             if length == 0 || message.len() + length > total {
@@ -119,7 +136,10 @@ impl<S: Read + Write> SecureChannel<S> {
             message.extend_from_slice(&buffer[..length]);
             progress(message.len() as u64, total as u64);
         }
-        Ok(message)
+        if message.as_slice() == super::NOT_PAIRED {
+            let _ = self.send(super::NOT_PAIRED_ACK);
+        }
+        Ok(std::mem::take(&mut *message))
     }
 
     fn receive_chunk(&mut self, buffer: &mut [u8]) -> Result<usize, SyncError> {

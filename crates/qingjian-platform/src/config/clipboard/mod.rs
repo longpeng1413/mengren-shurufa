@@ -36,6 +36,8 @@ pub struct ClipboardConfig {
 
     pub relay_enabled: bool,
 
+    pub private_receive: bool,
+
     pub relay_url: String,
 
     /// 令牌变更只用版本标记通知剪贴板进程，不暴露密钥。
@@ -57,6 +59,7 @@ impl Default for ClipboardConfig {
             paused: false,
             sync_enabled: false,
             relay_enabled: false,
+            private_receive: true,
             relay_url: String::new(),
             relay_revision: String::new(),
             sync_neon: true,

@@ -25,6 +25,54 @@ fn limit(value: jint) -> usize {
     usize::try_from(value).unwrap_or(qingjian_learning::DEFAULT_CLIPBOARD_LIMIT)
 }
 
+/// 壳将图片限长流式写入专用暂存目录，避免 JNI 同时保留整张 Java 数组。
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardAddImageFile<'local>(
+    mut env: JNIEnv<'local>,
+    _this: JObject<'local>,
+    user_dir: JString<'local>,
+    path: JString<'local>,
+    extension: JString<'local>,
+    max: jint,
+) -> ::jni::sys::jboolean {
+    let (Ok(user_dir), Ok(path), Ok(extension)) = (
+        env.get_string(&user_dir).map(String::from),
+        env.get_string(&path).map(String::from),
+        env.get_string(&extension).map(String::from),
+    ) else {
+        return ::jni::sys::JNI_FALSE;
+    };
+    let accepted = catch_unwind(|| {
+        use std::io::Read;
+        let staging = Path::new(&user_dir)
+            .join("clipboard-import")
+            .canonicalize()
+            .ok()?;
+        let path = Path::new(&path).canonicalize().ok()?;
+        if path.parent() != Some(staging.as_path()) {
+            return None;
+        }
+        let file = std::fs::File::open(path).ok()?;
+        let size = file.metadata().ok()?.len();
+        let maximum = qingjian_clipboard_sync::relay::MAX_CONTENT_BYTES;
+        if size == 0 || size >= maximum as u64 {
+            return None;
+        }
+        let mut bytes = Vec::with_capacity(size as usize);
+        file.take(maximum as u64).read_to_end(&mut bytes).ok()?;
+        if bytes.len() >= maximum {
+            return None;
+        }
+        crate::clipboard_add_image(Path::new(&user_dir), &bytes, &extension, limit(max));
+        Some(())
+    });
+    if matches!(accepted, Ok(Some(()))) {
+        ::jni::sys::JNI_TRUE
+    } else {
+        ::jni::sys::JNI_FALSE
+    }
+}
+
 /// [`crate::clipboard`]：`request` 是 [`ClipboardRequest`] 的 JSON，`limit` 是设置里的最大条数。
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboard<'local>(

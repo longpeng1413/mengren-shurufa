@@ -8,6 +8,10 @@ class QingjianApp : Application() {
     override fun onCreate() {
         super.onCreate()
         AppLog.init(this)
+        // 上次进程中断遗留的普通图片暂存；应用尚未开始监听，当前没有导入任务。
+        java.io.File(filesDir, "user/clipboard-import").listFiles()?.filter {
+            it.isFile && it.name.startsWith("image-") && it.name.endsWith(".tmp")
+        }?.forEach { it.delete() }
         app.qingjian.inputmethod.update.Updates.start(this)
         app.qingjian.inputmethod.cloud.MemberAccount.start(this)
     }

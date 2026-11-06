@@ -16,7 +16,7 @@ pub const CLIPBOARD_IMAGE_DIR: &str = "clipboard-images";
 pub const DEFAULT_CLIPBOARD_LIMIT: usize = 1000;
 
 /// 一条文字最多存多少字符；再长的截断（整篇文章复制进来不该撑大文件）。
-pub const MAX_CLIPBOARD_TEXT_CHARS: usize = 20_000;
+pub const MAX_CLIPBOARD_TEXT_CHARS: usize = 1_000_000;
 
 #[derive(Debug)]
 pub struct ClipboardHistory {

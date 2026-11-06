@@ -8,7 +8,7 @@ use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 fn wait(condition: impl Fn() -> bool) -> Result<(), Box<dyn std::error::Error>> {
-    let end = Instant::now() + Duration::from_secs(45);
+    let end = Instant::now() + Duration::from_secs(300);
     while !condition() {
         if Instant::now() > end {
             return Err("Live relay check timed out".into());
@@ -86,6 +86,55 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .all(|service| service.peer_states()[0].via_relay)
         })?;
         println!("Bidirectional encrypted text via relay only: verified");
+        let image_size = std::env::var("MENGREN_IME_PROBE_IMAGE_BYTES")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(2 * 1024 * 1024);
+        if image_size >= qingjian_clipboard_sync::relay::MAX_CONTENT_BYTES {
+            return Err("Probe image exceeds content limit".into());
+        }
+        let image = Record::image(vec![0x42; image_size], "png".into(), 300);
+        let image_id = image.stamp.id.clone();
+        replicas[0]
+            .0
+            .lock()
+            .unwrap()
+            .insert(image_id.clone(), image);
+        services[0].notify_changed();
+        wait(|| replicas[1].0.lock().unwrap().contains_key(&image_id))?;
+        println!("Encrypted image payload ({image_size} bytes): verified");
+        services[0].set_private_receiver(true);
+        if !services[1].send_private(
+            qingjian_clipboard_sync::private::Secret::new(
+                "synthetic-one-time-private-probe".into(),
+            )
+            .ok_or("Invalid synthetic secret")?,
+        ) {
+            return Err("Private send not started".into());
+        }
+        wait(|| services[0].private_vault().pending())?;
+        let secret = services[0]
+            .private_vault()
+            .take()
+            .ok_or("Missing private payload")?;
+        if secret.as_str() != "synthetic-one-time-private-probe"
+            || services[0].private_vault().pending()
+        {
+            return Err("Private payload mismatch".into());
+        }
+        if replicas.iter().any(|replica| {
+            replica
+                .0
+                .lock()
+                .unwrap()
+                .values()
+                .any(|record| record.text.contains("synthetic-one-time-private"))
+        }) {
+            return Err("Private payload leaked into replica".into());
+        }
+        println!(
+            "Authenticated private single-use memory delivery, excluded from history: verified"
+        );
         services[0].unpair(&services[1].device_id())?;
         services[1].notify_changed();
         wait(|| services[1].peers().is_empty())?;

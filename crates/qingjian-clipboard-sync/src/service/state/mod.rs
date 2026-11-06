@@ -59,6 +59,12 @@ pub(crate) struct Shared {
 
     pub relay_active: AtomicUsize,
 
+    pub private_receiver: AtomicBool,
+
+    pub private_sending: AtomicBool,
+
+    pub private_vault: std::sync::Arc<crate::private::PrivateVault>,
+
     events: Sender<SyncEvent>,
 }
 
@@ -90,6 +96,9 @@ impl Shared {
             relay_connected: AtomicBool::new(false),
             routes: Mutex::new(HashMap::new()),
             relay_active: AtomicUsize::new(0),
+            private_receiver: AtomicBool::new(false),
+            private_sending: AtomicBool::new(false),
+            private_vault: std::sync::Arc::new(crate::private::PrivateVault::default()),
             events,
         }
     }

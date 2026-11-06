@@ -419,4 +419,14 @@
     <string name="sync_relay_disconnected">未连接：检查地址、令牌和网络</string>
     <string name="sync_relay_devices">中转在线设备</string>
     <string name="sync_relay_device">中转设备 #%1$s</string>
+    <string name="private_sent">私密内容已发送到在线电脑，两分钟内用私密输入快捷键输入一次。</string>
+    <string name="private_failed">私密发送失败：请确认同步已开启，电脑在线且允许接收；内容不会补发。</string>
+    <string name="private_disabled">私密发送已关闭，请到剪贴板同步设置开启。</string>
+    <string name="private_empty">当前剪贴板没有可发送的私密文字。</string>
+    <string name="private_title">私密发送方式</string>
+    <string name="private_auto">自动发送敏感内容，也可手动发送</string>
+    <string name="private_manual">仅手动发送</string>
+    <string name="private_off">关闭私密发送</string>
+    <string name="private_send">私密发送</string>
+    <string name="private_note">只发给在线且已配对的电脑，不进历史；电脑两分钟内单次输入。</string>
 </resources>

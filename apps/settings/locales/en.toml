@@ -710,3 +710,10 @@ clear = "Delete relay token"
 manage = "Phone setup"
 show_info = "Show only when setting up your phone; hidden again when the field loses focus"
 cleared = "Relay token deleted"
+
+[private]
+shortcut = "Private input shortcut"
+receive = "Receive private content from phones"
+info = "Paired devices only. Kept in memory for two minutes, excluded from history, cleared on lock, sleep or exit."
+hotkey_info = "Default Ctrl+Alt+V. When shared with the clipboard shortcut, pending private content is typed once; otherwise history opens. A separate shortcut can be recorded."
+

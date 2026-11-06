@@ -78,7 +78,8 @@ class ToolbarPanel(
         val cy = top + cellHeight * (index / columns + 0.5f)
         val highlighted = badge == Badge.PLACED
         ink.icon(canvas, tool.icon, cx, cy - ink.dp(10f), 26f, if (highlighted) palette.brand else palette.text)
-        ink.text(canvas, tool.label, 12f, if (highlighted) palette.brand else palette.gloss, cx, cy + ink.dp(18f), maxWidth = cellWidth() - ink.dp(4f))
+        val label = if (tool == ToolbarTool.PRIVATE_SEND) context.getString(app.qingjian.inputmethod.R.string.private_send) else tool.label
+        ink.text(canvas, label, 12f, if (highlighted) palette.brand else palette.gloss, cx, cy + ink.dp(18f), maxWidth = cellWidth() - ink.dp(4f))
         val bx = cx + ink.dp(17f)
         val by = cy - ink.dp(24f)
         ink.fill.color = if (highlighted) palette.brand else palette.functionalKey

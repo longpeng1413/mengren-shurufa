@@ -184,6 +184,24 @@ pub fn read_capture(records: impl Fn(&str) -> bool) -> Option<Capture> {
         if image_with_files && let Some((png, thumbnail)) = read_image() {
             return Some(Capture::image_with_files(png, thumbnail, raw, source));
         }
+        if paths.len() == 1 {
+            let path = Path::new(&paths[0]);
+            let extension = path
+                .extension()
+                .and_then(|value| value.to_str())
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            if matches!(
+                extension.as_str(),
+                "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp"
+            ) && path.metadata().is_ok_and(|meta| {
+                meta.is_file() && meta.len() <= qingjian_clipboard::MAX_IMAGE_BYTES as u64
+            }) && let Ok(bytes) = std::fs::read(path)
+                && let Some((png, thumbnail)) = picture::from_file(&bytes)
+            {
+                return Some(Capture::image_with_files(png, thumbnail, raw, source));
+            }
+        }
         let size = total_size(&paths);
         return Some(Capture::files(&paths, raw, source, size));
     }

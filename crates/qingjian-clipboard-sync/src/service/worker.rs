@@ -37,6 +37,7 @@ pub(super) fn spawn_accept(
 ) -> JoinHandle<()> {
     thread::spawn(move || {
         while !stop.load(Ordering::Relaxed) {
+            shared.private_vault.expire();
             match listener.accept() {
                 Ok((stream, address)) => {
                     let shared = shared.clone();

@@ -16,6 +16,7 @@ pub enum Shortcut {
     TranslatePanel,
     /// 呼出剪贴板面板（全局快捷键）。
     Clipboard,
+    PrivateInput,
     /// 辅码触发键（单个符号，不带修饰键）。
     AuxCodeKey,
     /// 组句时上屏高亮候选的键（空格、回车或一个符号键，可加 Shift）。
@@ -26,13 +27,14 @@ pub enum Shortcut {
 
 impl Shortcut {
     #[cfg(test)]
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Translation,
         Self::TranslationSecond,
         Self::TranslateSelection,
         Self::Predict,
         Self::TranslatePanel,
         Self::Clipboard,
+        Self::PrivateInput,
         Self::AuxCodeKey,
         Self::CommitCandidate,
         Self::CommitRaw,
@@ -46,6 +48,7 @@ impl Shortcut {
             Self::Predict => tr("shortcut.predict"),
             Self::TranslatePanel => tr("shortcut.translate_panel"),
             Self::Clipboard => tr("shortcut.clipboard"),
+            Self::PrivateInput => tr("private.shortcut"),
             Self::AuxCodeKey => tr("shortcut.aux_code_key"),
             Self::CommitCandidate => tr("shortcut.commit_candidate"),
             Self::CommitRaw => tr("shortcut.commit_raw"),
@@ -61,6 +64,7 @@ impl Shortcut {
             Self::Predict => ("shortcut", "predict"),
             Self::TranslatePanel => ("shortcut", "translate_panel"),
             Self::Clipboard => ("shortcut", "clipboard"),
+            Self::PrivateInput => ("shortcut", "private_input"),
             Self::AuxCodeKey => ("general", "aux_code_key"),
             Self::CommitCandidate => ("shortcut", "commit_candidate"),
             Self::CommitRaw => ("shortcut", "commit_raw"),
@@ -71,9 +75,11 @@ impl Shortcut {
     pub fn prompt(self) -> &'static str {
         match self {
             Self::Translation | Self::TranslationSecond => tr("shortcut.prompt_digit"),
-            Self::TranslateSelection | Self::Predict | Self::TranslatePanel | Self::Clipboard => {
-                tr("shortcut.prompt_combo")
-            }
+            Self::TranslateSelection
+            | Self::Predict
+            | Self::TranslatePanel
+            | Self::Clipboard
+            | Self::PrivateInput => tr("shortcut.prompt_combo"),
             Self::AuxCodeKey => tr("shortcut.prompt_symbol"),
             Self::CommitCandidate | Self::CommitRaw => tr("shortcut.prompt_commit"),
         }
@@ -90,6 +96,7 @@ impl Shortcut {
             Self::Predict => combo_label(shortcut.predict),
             Self::TranslatePanel => combo_label(shortcut.translate_panel),
             Self::Clipboard => combo_label(shortcut.clipboard),
+            Self::PrivateInput => combo_label(shortcut.private_input),
             Self::AuxCodeKey => config.general.aux_code_key().to_string(),
             Self::CommitCandidate => shortcut.commit_candidate.label(),
             Self::CommitRaw => shortcut.commit_raw.label(),
@@ -99,9 +106,10 @@ impl Shortcut {
     /// 录下的全局快捷键被别的程序占着。与现在的相同时不算：多半是剪贴板自己占着。
     pub fn taken(self, value: &str, config: &Config) -> bool {
         #[cfg(windows)]
-        if self == Self::Clipboard
+        if matches!(self, Self::Clipboard | Self::PrivateInput)
             && let Ok(combo) = value.parse::<KeyCombo>()
             && combo != config.shortcut.clipboard
+            && combo != config.shortcut.private_input
         {
             return !crate::system::hotkey::combo_available(combo);
         }
@@ -116,6 +124,7 @@ impl Shortcut {
             Self::Predict => config.shortcut.predict,
             Self::TranslatePanel => config.shortcut.translate_panel,
             Self::Clipboard => config.shortcut.clipboard,
+            Self::PrivateInput => config.shortcut.private_input,
             _ => config.shortcut.translate_selection,
         }
     }
@@ -188,7 +197,7 @@ impl Shortcut {
                 }
                 Ok(key.key_string())
             }
-            Self::Clipboard => {
+            Self::Clipboard | Self::PrivateInput => {
                 let key = match &press.key {
                     KeyCode::Character(text) => {
                         single(text).filter(|key| key.is_ascii_alphanumeric() || *key == '.')

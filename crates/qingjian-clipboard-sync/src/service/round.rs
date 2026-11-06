@@ -15,6 +15,7 @@ use crate::peers::Peer;
 use crate::sync::{Progress, Replica, run_initiator, run_responder};
 
 pub(super) fn handle_incoming(stream: TcpStream, address: SocketAddr, shared: &Shared) {
+    let _ = stream.set_nodelay(true);
     if stream
         .set_nonblocking(false)
         .and_then(|()| stream.set_read_timeout(Some(IO_TIMEOUT)))
@@ -33,6 +34,8 @@ pub(crate) fn handle_stream<S: std::io::Read + std::io::Write>(
     let result = (|| match read_opening(&mut stream)? {
         Opening::Pair => host_pairing(stream, address, shared),
         Opening::Sync => respond(stream, address, shared),
+        Opening::Capabilities => super::private::respond(stream, shared, false),
+        Opening::Private => super::private::respond(stream, shared, true),
         Opening::Info if address.is_some() => scan::answer(&mut stream, shared),
         Opening::Info => Err(SyncError::Handshake),
     })();
@@ -91,7 +94,7 @@ fn respond<S: std::io::Read + std::io::Write>(
     let mut replica = shared.replica.clone();
     let before = newest_at(&replica);
     let mut watcher = Watcher::new(shared, peer);
-    let mut filtered = crate::relay::TextReplica(&mut replica);
+    let mut filtered = crate::relay::BoundedReplica(&mut replica);
     let selected: &mut dyn Replica = if address.is_none() {
         &mut filtered
     } else {
@@ -184,7 +187,7 @@ fn initiate<S: std::io::Read + std::io::Write>(
     let mut replica = shared.replica.clone();
     let before = newest_at(&replica);
     let mut watcher = Watcher::new(shared, peer.name.clone());
-    let mut filtered = crate::relay::TextReplica(&mut replica);
+    let mut filtered = crate::relay::BoundedReplica(&mut replica);
     let selected: &mut dyn Replica = if relay { &mut filtered } else { filtered.0 };
     let result = run_initiator(&mut channel, selected, &mut |progress| {
         watcher.observe(progress)

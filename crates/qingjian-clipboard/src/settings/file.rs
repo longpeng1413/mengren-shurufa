@@ -35,6 +35,8 @@ pub(super) struct ClipboardSection {
 
     pub(super) relay_enabled: Option<toml::Value>,
 
+    pub(super) private_receive: Option<toml::Value>,
+
     pub(super) relay_url: Option<toml::Value>,
 
     pub(super) relay_revision: Option<toml::Value>,
@@ -47,5 +49,7 @@ pub(super) struct ClipboardSection {
 #[derive(Default, Deserialize)]
 #[serde(default)]
 pub(super) struct ShortcutSection {
+    pub(super) private_input: Option<toml::Value>,
+
     pub(super) clipboard: Option<toml::Value>,
 }

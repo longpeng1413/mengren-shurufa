@@ -139,6 +139,26 @@ pub fn remove(window: HWND) {
     let _ = unsafe { Shell_NotifyIconW(NIM_DELETE, &data(window)) };
 }
 
+pub fn notice(window: HWND, message: &str) {
+    let mut icon_data = data(window);
+    icon_data.uFlags = windows::Win32::UI::Shell::NIF_INFO;
+    for (out, unit) in icon_data
+        .szInfo
+        .iter_mut()
+        .zip(message.encode_utf16().take(255))
+    {
+        *out = unit;
+    }
+    for (out, unit) in icon_data
+        .szInfoTitle
+        .iter_mut()
+        .zip(tr("tray.tip").encode_utf16().take(63))
+    {
+        *out = unit;
+    }
+    let _ = unsafe { Shell_NotifyIconW(NIM_MODIFY, &icon_data) };
+}
+
 /// 弹出右键菜单，等用户选完。
 pub fn show_menu(window: HWND, state: &MenuState) -> Option<Choice> {
     let menu = unsafe { CreatePopupMenu() }.ok()?;

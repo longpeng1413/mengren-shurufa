@@ -50,11 +50,17 @@ fn unpaired_device_is_refused() {
     let (host, stranger) = (Identity::generate().unwrap(), Identity::generate().unwrap());
     let host_public = host.public;
     let (client, mut server) = tcp_pair();
+    let (finished, wait) = std::sync::mpsc::channel();
     let hosting = thread::spawn(move || {
         read_opening(&mut server).unwrap();
-        accept(server, &host, |_| false).err()
+        let error = accept(server, &host, |_| false).err();
+        wait.recv().unwrap();
+        error
     });
-    let _ = connect(client, &stranger, |key| key == &host_public);
+    let mut channel = connect(client, &stranger, |key| key == &host_public).unwrap();
+    channel.send(b"[]").unwrap();
+    assert_eq!(channel.receive().unwrap(), NOT_PAIRED);
+    finished.send(()).unwrap();
     assert!(matches!(
         hosting.join().unwrap(),
         Some(SyncError::UnknownPeer)
@@ -66,13 +72,17 @@ fn a_forgotten_peer_is_told_it_is_no_longer_paired() {
     let (host, phone) = (Identity::generate().unwrap(), Identity::generate().unwrap());
     let host_public = host.public;
     let (client, mut server) = tcp_pair();
+    let (finished, wait) = std::sync::mpsc::channel();
     let hosting = thread::spawn(move || {
         read_opening(&mut server).unwrap();
-        accept(server, &host, |_| false).err()
+        let error = accept(server, &host, |_| false).err();
+        wait.recv().unwrap();
+        error
     });
     let mut channel = connect(client, &phone, |key| key == &host_public).unwrap();
     channel.send(b"[]").unwrap();
     assert_eq!(channel.receive().unwrap(), NOT_PAIRED);
+    finished.send(()).unwrap();
     assert!(matches!(
         hosting.join().unwrap(),
         Some(SyncError::UnknownPeer)

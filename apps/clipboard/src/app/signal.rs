@@ -23,6 +23,7 @@ impl ClipboardApp {
             Signal::Sync(event) => self.handle_sync(event),
             Signal::Settings(settings) => {
                 let sync_changed = settings.relay_enabled != self.settings.relay_enabled
+                    || settings.private_receive != self.settings.private_receive
                     || settings.relay_url != self.settings.relay_url
                     || settings.relay_revision != self.settings.relay_revision
                     || settings.sync_enabled != self.settings.sync_enabled
@@ -82,6 +83,11 @@ impl ClipboardApp {
 
     fn handle_sync(&mut self, event: SyncEvent) {
         match event {
+            SyncEvent::PrivateReceived => {
+                #[cfg(windows)]
+                crate::system::windows::listener::notice("private.received");
+            }
+            SyncEvent::PrivateSent { .. } | SyncEvent::PrivateFailed => {}
             SyncEvent::NearbyChanged => {}
             SyncEvent::Paired { name } => {
                 self.pairing = Pairing::Idle;

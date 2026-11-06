@@ -116,6 +116,20 @@ pub(super) fn mark_deleted(directory: &Path, index: usize) {
 }
 
 impl HistoryReplica {
+    /// 返回已保存图片的路径，避免通过 JNI 再复制整张图片。
+    pub fn image_path(&self, id: &str) -> Option<PathBuf> {
+        let _guard = LOCK.lock().unwrap_or_else(|poison| poison.into_inner());
+        let history = self.open().ok()?;
+        let mut state = load_state(&self.directory);
+        for entry in history.entries() {
+            if entry.image.is_some() && entry_id(&history, entry, &mut state).as_deref() == Some(id)
+            {
+                return history.image_path(entry);
+            }
+        }
+        None
+    }
+
     pub fn new(directory: &Path, limit: usize) -> Self {
         Self {
             directory: directory.to_owned(),

@@ -150,7 +150,7 @@ clipboard_sync_info = "和同一网络里配对的设备互传复制的文字和
 clipboard_neon = "同步时显示霓虹灯"
 clipboard_neon_info = "收到内容时屏幕边缘亮一圈光，成功转绿后收起，失败转红并闪两下。Windows 上全屏游戏时不显示。"
 clipboard_paused = "暂停记录"
-clipboard_paused_info = "暂停时新复制的内容不会记录，已有的历史照常能用。"
+clipboard_paused_info = "暂停时新复制的内容不会记录或发送；仍可接收其他设备内容、使用已有历史。"
 clipboard_excluded = "不记录这些程序"
 clipboard_excluded_info = "从这些程序复制的内容不会记录。系统和密码管理器标记为敏感的内容也不会记录。"
 clipboard_add_app = "添加程序"
@@ -710,3 +710,10 @@ clear = "删除中转令牌"
 manage = "手机配置"
 show_info = "需要在手机填写时，点击显示；离开输入框后重新隐藏"
 cleared = "中转令牌已删除"
+
+[private]
+shortcut = "私密输入快捷键"
+receive = "接收手机私密内容"
+info = "仅接收已配对设备的私密文字，保存于内存两分钟，不进历史。锁屏、休眠或退出后清除。"
+hotkey_info = "默认 Ctrl+Alt+V。与剪贴板快捷键相同时，有私密内容先单次输入，否则打开历史面板；也可录制不同组合。"
+

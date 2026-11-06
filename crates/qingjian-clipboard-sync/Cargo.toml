@@ -25,3 +25,4 @@ thiserror.workspace = true
 tracing.workspace = true
 tungstenite.workspace = true
 webpki-roots.workspace = true
+zeroize.workspace = true

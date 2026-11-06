@@ -64,11 +64,12 @@ pub enum Feature {
     TranslatePanel,
     InAppUpdate,
     ClipboardRelay,
+    PrivateInput,
 }
 
 impl Feature {
     #[cfg(test)]
-    pub const ALL: [Self; 31] = [
+    pub const ALL: [Self; 32] = [
         Self::AuxCode,
         Self::Schemes,
         Self::SwitchKeys,
@@ -100,6 +101,7 @@ impl Feature {
         Self::TranslatePanel,
         Self::InAppUpdate,
         Self::ClipboardRelay,
+        Self::PrivateInput,
     ];
 
     /// 当前平台显示这一项。
@@ -152,6 +154,7 @@ impl Feature {
             Self::TranslatePanel => [Yes, Yes, No],
             Self::InAppUpdate => [No, Yes, No],
             Self::ClipboardRelay => [No, Yes, No],
+            Self::PrivateInput => [No, Yes, No],
             Self::KeyHint => [Yes, Yes, Todo],
             // Fcitx 面板与应用里的行内拼音共用一串，还没分开
             Self::ShowTones => [Yes, Yes, Todo],
@@ -199,6 +202,7 @@ impl Feature {
             Self::TranslatePanel => "打开符号面板的翻译组",
             Self::InAppUpdate => "应用内下载安装更新",
             Self::ClipboardRelay => "公网剪贴板中转",
+            Self::PrivateInput => "私密输入",
         }
     }
 
@@ -250,7 +254,8 @@ impl Feature {
             | Self::ExperimentalModels
             | Self::Clipboard
             | Self::InAppUpdate
-            | Self::ClipboardRelay => &[],
+            | Self::ClipboardRelay
+            | Self::PrivateInput => &[],
         }
     }
 }

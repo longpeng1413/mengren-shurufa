@@ -113,3 +113,8 @@ Windows 上小键盘数字缺省也是选候选；在「设置 → 候选」把�
 | `u` + 拼音 | 问字（需开启 AI 服务） |
 
 三个平台相同，详见 [日期、算式与特殊字符](../input/shortcuts.md)。双拼与混输下 `v`、`u` 改为 `Shift + V`、`Shift + U`。
+
+
+## 猛人 v0.3.6 剪贴板与私密输入
+
+单条图片小于 100,000,000 字节；文字最多 100 万字符，Windows 图片另限 4000 万像素。跨网络部署与使用见 [剪贴板说明](https://github.com/longpeng1413/mengren-shurufa/blob/main/docs/user/help/mengren-relay.md)。Windows 默认 Ctrl+Alt+V：有私密内容时单次直接输入，否则打开历史；可在实验功能分别录制快捷键。私密内容两分钟过期，不入历史，不离线补传；锁屏、休眠、退出、解绑清除。

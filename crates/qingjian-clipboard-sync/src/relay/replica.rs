@@ -1,11 +1,11 @@
-//! 公网只同步不超过 1 MiB 的文字；图片与大文件仍走快传。过滤清单不修改本地记录。
+//! 公网同步文字和图片，单条内容限制为 100 MB；过滤清单不修改本地记录。
 
 use crate::record::Stamp;
 use crate::{Record, RecordKind, Replica, SyncError};
 
-pub(crate) struct TextReplica<'a>(pub &'a mut dyn Replica);
+pub(crate) struct BoundedReplica<'a>(pub &'a mut dyn Replica);
 
-impl Replica for TextReplica<'_> {
+impl Replica for BoundedReplica<'_> {
     fn stamps(&self) -> Result<Vec<Stamp>, SyncError> {
         self.0
             .stamps()?
@@ -18,19 +18,39 @@ impl Replica for TextReplica<'_> {
             .collect()
     }
     fn record(&self, id: &str) -> Result<Option<Record>, SyncError> {
-        Ok(self.0.record(id)?.filter(|record| {
-            record.kind == RecordKind::Text
-                && record.text.len() <= super::MAX_TEXT
-                && record.image.is_empty()
-        }))
+        Ok(self.0.record(id)?.filter(allowed))
     }
     fn apply(&mut self, record: Record) -> Result<(), SyncError> {
-        if record.kind != RecordKind::Text
-            || record.text.len() > super::MAX_TEXT
-            || !record.image.is_empty()
-        {
+        if !allowed(&record) {
             return Err(super::invalid());
         }
         self.0.apply(record)
+    }
+}
+
+fn allowed(record: &Record) -> bool {
+    match record.kind {
+        RecordKind::Text => record.image.is_empty() && record.text.len() < super::MAX_CONTENT_BYTES,
+        RecordKind::Image => {
+            record.text.is_empty() && record.image.len() < super::MAX_CONTENT_BYTES
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::allowed;
+    use crate::Record;
+
+    #[test]
+    fn image_boundary_is_decimal_one_hundred_megabytes() {
+        let mut record = Record::image(
+            vec![7; crate::relay::MAX_CONTENT_BYTES - 1],
+            "png".into(),
+            1,
+        );
+        assert!(allowed(&record));
+        record.image.push(7);
+        assert!(!allowed(&record));
     }
 }

@@ -110,7 +110,7 @@ fn receive_records<S: Read + Write>(
         if message.is_empty() {
             continue;
         }
-        let record = decode_record(&message)?;
+        let record = decode_record(message)?;
         let announced = remote.iter().any(|stamp| &stamp.id == id);
         if &record.stamp.id != id || !announced || !record.is_consistent() {
             return Err(SyncError::Protocol("record does not match".to_owned()));

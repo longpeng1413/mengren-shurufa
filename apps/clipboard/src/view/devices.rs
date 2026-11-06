@@ -185,6 +185,9 @@ pub(super) fn devices(ui: &mut Ui<Message>, context: &Context) -> Result<Vec<Nod
     let theme = &context.theme;
     let app = context.app;
     let mut body = vec![heading(ui, context, tr("devices.this_device"))?];
+    if app.paused {
+        body.push(note(ui, context, tr("private.paused_hint"))?);
+    }
     let name = TextField::new(&app.name_edit).build(
         ui,
         theme,

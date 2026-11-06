@@ -28,6 +28,10 @@ pub struct ClipSettings {
 
     pub hotkey: Hotkey,
 
+    pub private_hotkey: Hotkey,
+
+    pub private_receive: bool,
+
     /// 最多留多少条。
     pub history_limit: usize,
 
@@ -78,6 +82,8 @@ impl Default for ClipSettings {
             enabled: false,
             edge: Edge::Bottom,
             hotkey: Hotkey::DEFAULT,
+            private_hotkey: Hotkey::DEFAULT,
+            private_receive: true,
             language: String::new(),
             history_limit: DEFAULT_HISTORY_LIMIT,
             paused: false,
@@ -164,6 +170,15 @@ impl ClipSettings {
             hotkey: text_of(&file.shortcut.clipboard)
                 .and_then(|hotkey| Hotkey::parse(&hotkey))
                 .unwrap_or(defaults.hotkey),
+            private_hotkey: text_of(&file.shortcut.private_input)
+                .and_then(|value| Hotkey::parse(&value))
+                .unwrap_or(defaults.private_hotkey),
+            private_receive: file
+                .clipboard
+                .private_receive
+                .as_ref()
+                .and_then(toml::Value::as_bool)
+                .unwrap_or(true),
             language: text_of(&file.general.ui_language).unwrap_or(defaults.language),
             history_limit: file
                 .clipboard

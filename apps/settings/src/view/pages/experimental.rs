@@ -205,6 +205,24 @@ fn clipboard(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, RenderErr
             rows.push(paragraph(ui, theme, message, None)?);
         }
     }
+    if Feature::PrivateInput.here() {
+        rows.push(toggle_info(
+            ui,
+            page,
+            tr("private.receive"),
+            Some(tr("private.info")),
+            ("clipboard", "private_receive"),
+            config.private_receive,
+            !on || !config.sync_enabled,
+        )?);
+        rows.push(recorder(
+            ui,
+            page,
+            Shortcut::PrivateInput,
+            tr("private.hotkey_info"),
+            !on || !config.sync_enabled || !config.private_receive,
+        )?);
+    }
     for app in &config.excluded_apps {
         let kept: Vec<String> = config
             .excluded_apps

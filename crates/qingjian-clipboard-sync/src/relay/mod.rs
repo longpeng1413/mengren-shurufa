@@ -9,11 +9,11 @@ mod socket;
 mod stream;
 
 pub use config::RelayConfig;
-pub(crate) use replica::TextReplica;
+pub(crate) use replica::BoundedReplica;
 pub(crate) use stream::RelayStream;
 
 pub const MAX_FRAME: usize = 64 * 1024;
-pub const MAX_TEXT: usize = 1024 * 1024;
+pub const MAX_CONTENT_BYTES: usize = 100_000_000;
 
 pub fn valid_id(id: &str) -> bool {
     id.len() == 64

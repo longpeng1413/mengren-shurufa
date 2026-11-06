@@ -1,10 +1,11 @@
 //! 和 Windows 打交道的部分：消息窗口线程收剪贴板变化与全局快捷键，读写系统剪贴板，粘贴回原窗口，托盘与霓虹灯的窗口。
 
 mod clipboard;
-mod listener;
+pub(crate) mod listener;
 mod neon_strip;
 mod neon_strips;
 mod paste;
+pub(crate) mod private;
 mod source;
 mod tray;
 

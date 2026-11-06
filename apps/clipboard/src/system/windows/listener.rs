@@ -40,6 +40,8 @@ static OUTBOX: OnceLock<(Sender<Signal>, Waker)> = OnceLock::new();
 
 const HOTKEY_ID: i32 = 1;
 
+const PRIVATE_HOTKEY_ID: i32 = 2;
+
 const WATCH_TIMER: usize = 1;
 
 /// 托盘图标挂的窗口。
@@ -104,6 +106,10 @@ fn virtual_key(hotkey: Hotkey) -> u32 {
 
 /// 注册呼出快捷键。被别的程序占着不算致命：照样记录，换个键再注册。
 fn register(window: HWND, hotkey: Hotkey) {
+    register_id(window, hotkey, HOTKEY_ID);
+}
+
+fn register_id(window: HWND, hotkey: Hotkey, id: i32) {
     let mut modifiers: HOT_KEY_MODIFIERS = MOD_NOREPEAT;
     for (held, modifier) in [
         (hotkey.control, MOD_CONTROL),
@@ -116,8 +122,9 @@ fn register(window: HWND, hotkey: Hotkey) {
         }
     }
     let key = virtual_key(hotkey);
-    if let Err(error) = unsafe { RegisterHotKey(Some(window), HOTKEY_ID, modifiers, key) } {
+    if let Err(error) = unsafe { RegisterHotKey(Some(window), id, modifiers, key) } {
         tracing::warn!(%error, ?hotkey, "clipboard hotkey is taken");
+        notice("private.hotkey_taken");
     }
 }
 
@@ -150,11 +157,18 @@ fn check_config(window: HWND) {
         let _ = unsafe { UnregisterHotKey(Some(window), HOTKEY_ID) };
         register(window, next.hotkey);
     }
+    if previous.private_hotkey != next.private_hotkey || previous.hotkey != next.hotkey {
+        let _ = unsafe { UnregisterHotKey(Some(window), PRIVATE_HOTKEY_ID) };
+        if next.private_hotkey != next.hotkey {
+            register_id(window, next.private_hotkey, PRIVATE_HOTKEY_ID);
+        }
+    }
     send(Signal::Settings(next));
 }
 
 /// 收掉托盘图标再退出，不然图标要等鼠标划过才消失。
 fn quit_now() -> ! {
+    super::private::lock();
     let icon = HWND(TRAY_WINDOW.load(Ordering::Relaxed) as *mut _);
     if !icon.is_invalid() {
         tray::remove(icon);
@@ -293,6 +307,17 @@ fn run(watch: Watch) -> windows::core::Result<()> {
             None,
         )?;
         TRAY_WINDOW.store(icon_window.0 as isize, Ordering::Relaxed);
+        use windows::Win32::System::RemoteDesktop::{
+            NOTIFY_FOR_THIS_SESSION, WTSRegisterSessionNotification,
+        };
+        if WTSRegisterSessionNotification(icon_window, NOTIFY_FOR_THIS_SESSION).is_err() {
+            super::private::lock();
+            tracing::warn!("Private input disabled: session notifications unavailable");
+        } else if super::private::session_unlocked() {
+            super::private::unlock();
+        } else {
+            super::private::lock();
+        }
         TASKBAR_CREATED.store(
             RegisterWindowMessageW(w!("TaskbarCreated")),
             Ordering::Relaxed,
@@ -301,6 +326,9 @@ fn run(watch: Watch) -> windows::core::Result<()> {
         set_owner(window);
         AddClipboardFormatListener(window)?;
         register(window, watch.settings.hotkey);
+        if watch.settings.private_hotkey != watch.settings.hotkey {
+            register_id(window, watch.settings.private_hotkey, PRIVATE_HOTKEY_ID);
+        }
         if watch.path.is_some() {
             SetTimer(
                 Some(window),
@@ -362,8 +390,44 @@ unsafe extern "system" fn procedure(
             LRESULT(0)
         }
         WM_HOTKEY => {
-            send(hotkey_signal());
+            let shared = WATCH.with_borrow(|state| {
+                state.as_ref().is_some_and(|(watch, _)| {
+                    watch.settings.private_hotkey == watch.settings.hotkey
+                })
+            });
+            if wparam.0 == PRIVATE_HOTKEY_ID as usize {
+                if !super::private::input() {
+                    notice("private.empty");
+                }
+            } else if !shared || !super::private::input() {
+                send(hotkey_signal());
+            }
             LRESULT(0)
+        }
+        0x02B1 => {
+            match wparam.0 {
+                2 | 4 | 6 | 7 => super::private::lock(),
+                8 => super::private::unlock(),
+                _ => {}
+            }
+            LRESULT(0)
+        }
+        0x0218 => {
+            match wparam.0 {
+                4 => super::private::suspend(),
+                7 | 18 => {
+                    if !super::private::session_unlocked() {
+                        super::private::lock();
+                    }
+                    super::private::resume();
+                }
+                _ => {}
+            }
+            LRESULT(1)
+        }
+        0x0011 | 0x0016 => {
+            super::private::lock();
+            LRESULT(1)
         }
         _ => unsafe { DefWindowProcW(window, message, wparam, lparam) },
     }
@@ -384,6 +448,13 @@ fn send(signal: Signal) {
         && sender.send(signal).is_ok()
     {
         waker.wake();
+    }
+}
+
+pub(crate) fn notice(key: &'static str) {
+    let window = HWND(TRAY_WINDOW.load(Ordering::Relaxed) as *mut _);
+    if !window.is_invalid() {
+        tray::notice(window, crate::i18n::tr(key));
     }
 }
 

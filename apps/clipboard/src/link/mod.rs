@@ -89,7 +89,7 @@ impl SyncLink {
                     }
                 })?;
         }
-        Ok(SyncService::start(
+        let service = SyncService::start(
             SyncOptions {
                 directory,
                 name: self.name.clone(),
@@ -103,7 +103,13 @@ impl SyncLink {
             },
             Box::new(replica),
             sender,
-        )?)
+        )?;
+        #[cfg(windows)]
+        {
+            service.set_private_receiver(settings.private_receive);
+            crate::system::windows::private::attach(service.private_vault());
+        }
+        Ok(service)
     }
 
     /// 本机内容变了。

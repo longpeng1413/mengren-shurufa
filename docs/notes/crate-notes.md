@@ -818,3 +818,8 @@ Windows 的后台任务集中在 `apps/settings/src/jobs/update/`，只把校验
 `qingjian-clipboard-sync::relay` 增加 WSS 字节流、登记与接入、文字过滤和有界服务端；`SyncOptions.relay` 默认关闭。原 PAKE、Noise、内容 ID 与对账规则不变。Windows 的 `ClipSettings` 与平台配置同步读取 `relay_enabled`、`relay_url`、`relay_revision`，令牌只从 DPAPI 注入；安卓通过 Keystore 解密后在内存经 JNI 传递。中转路径与局域网路径都保留最近成功路线。服务入口、systemd 与 Caddy 模板在 `mengren/relay`，详细规格见 `docs/design/clipboard-relay.md`，用户设置见 `docs/user/help/mengren-relay.md`。公网验证工具 `probe` 只使用合成记录与临时身份。
 
 回环 TCP 协议测试不启动 mDNS，避免本机虚拟网卡改变指定的测试地址；加密测试和同步测试以完成信号等待接收方读完，避免 Windows 在测试线程过早退出时重置最后一条响应。生产协议未为此增加消息。
+
+
+## 猛人 v0.3.6 剪贴板与私密输入
+
+单条图片小于 100,000,000 字节；文字最多 100 万字符，Windows 图片另限 4000 万像素。跨网络部署与使用见 [剪贴板说明](https://github.com/longpeng1413/mengren-shurufa/blob/main/docs/user/help/mengren-relay.md)。Windows 默认 Ctrl+Alt+V：有私密内容时单次直接输入，否则打开历史；可在实验功能分别录制快捷键。私密内容两分钟过期，不入历史，不离线补传；锁屏、休眠、退出、解绑清除。

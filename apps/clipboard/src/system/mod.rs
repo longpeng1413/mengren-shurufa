@@ -6,7 +6,7 @@ mod payload;
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(windows)]
-mod windows;
+pub(crate) mod windows;
 
 /// 当前平台的实现，平台无关的模块（霓虹灯）从这里取窗口。
 #[cfg(target_os = "macos")]

@@ -30,6 +30,8 @@ const PAIR_CONFIRM: &[u8] = b"paired";
 /// 同步的消息都是 JSON 或以记录头开头，不会是这几个字节。
 pub(crate) const NOT_PAIRED: &[u8] = b"\0not-paired";
 
+pub(super) const NOT_PAIRED_ACK: &[u8] = b"\0not-paired-received";
+
 /// SPAKE2 消息的长度上限，正常是 33 字节。
 const MAX_SPAKE_MESSAGE: usize = 256;
 
@@ -39,6 +41,8 @@ pub enum Opening {
     Sync,
     Pair,
     Info,
+    Capabilities,
+    Private,
 }
 
 pub(crate) fn noise_params(with_psk: bool) -> NoiseParams {
@@ -63,11 +67,24 @@ pub fn generate_pair_code() -> Result<String, SyncError> {
 
 /// 主动连已配对的设备。`known` 判断对方公钥在不在名单里。
 pub fn connect<S: Read + Write>(
-    mut stream: S,
+    stream: S,
     identity: &Identity,
     known: impl Fn(&[u8; 32]) -> bool,
 ) -> Result<SecureChannel<S>, SyncError> {
-    stream.write_all(&[MODE_SYNC])?;
+    connect_mode(stream, identity, known, Opening::Sync)
+}
+
+pub(crate) fn connect_mode<S: Read + Write>(
+    mut stream: S,
+    identity: &Identity,
+    known: impl Fn(&[u8; 32]) -> bool,
+    mode: Opening,
+) -> Result<SecureChannel<S>, SyncError> {
+    stream.write_all(&[match mode {
+        Opening::Capabilities => 4,
+        Opening::Private => 5,
+        _ => MODE_SYNC,
+    }])?;
     let channel = SecureChannel::handshake(stream, identity, None, true)?;
     if known(channel.remote()) {
         Ok(channel)
@@ -84,6 +101,8 @@ pub fn read_opening<S: Read>(stream: &mut S) -> Result<Opening, SyncError> {
         MODE_SYNC => Ok(Opening::Sync),
         MODE_PAIR => Ok(Opening::Pair),
         MODE_INFO => Ok(Opening::Info),
+        4 => Ok(Opening::Capabilities),
+        5 => Ok(Opening::Private),
         other => Err(SyncError::Protocol(format!("unknown mode {other}"))),
     }
 }
@@ -102,6 +121,8 @@ pub fn accept<S: Read + Write>(
     // 直接断开时对方的数据还在路上，系统会重置连接，对方可能读不到这句
     if channel.send(NOT_PAIRED).is_ok() {
         let _ = channel.receive();
+        // 新端确认已读拒绝消息后再断，防 Windows reset 抢在对方读取之前；旧端关闭连接也可退出。
+        let _ = channel.receive_limited(NOT_PAIRED_ACK.len());
     }
     Err(SyncError::UnknownPeer)
 }

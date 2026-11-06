@@ -12,7 +12,7 @@ pub(super) struct Device {
 
     pub events: Receiver<SyncEvent>,
 
-    directory: PathBuf,
+    pub directory: PathBuf,
 }
 
 impl Device {
@@ -57,8 +57,9 @@ impl Device {
             .insert(record.stamp.id.clone(), record);
         self.service().notify_changed();
     }
+    #[track_caller]
     pub fn wait(&self, test: impl Fn(&SyncEvent) -> bool) -> SyncEvent {
-        let end = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        let end = std::time::Instant::now() + std::time::Duration::from_secs(30);
         loop {
             let event = self
                 .events

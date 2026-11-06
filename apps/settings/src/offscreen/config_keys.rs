@@ -283,6 +283,8 @@ fn clipboard_process_reads_the_same_keys() {
             relay_enabled: false,
             relay_url: String::new(),
             relay_revision: String::new(),
+            private_hotkey: Hotkey::DEFAULT,
+            private_receive: true,
             sync_neon: false,
             device_name: "坚强的高松灯".to_owned(),
             excluded_apps: vec!["Secret".to_owned()],

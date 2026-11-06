@@ -1,15 +1,18 @@
 //! 回环公网中转集成测试，明确不提供 LAN 地址，保证数据实际经过中转。
 
 mod device;
+mod large;
 mod memory;
+mod private;
 use crate::{Record, SyncEvent};
 use device::Device;
 use std::time::{Duration, Instant};
 
 const TOKEN: &str = "synthetic-relay-test-token-123456789";
 
+#[track_caller]
 fn until(condition: impl Fn() -> bool) {
-    let end = Instant::now() + Duration::from_secs(15);
+    let end = Instant::now() + Duration::from_secs(45);
     while !condition() {
         assert!(Instant::now() < end, "condition in time");
         std::thread::sleep(Duration::from_millis(50));
@@ -30,7 +33,7 @@ fn token_comparison_rejects_wrong_and_short_values() {
 }
 
 #[test]
-fn relay_pairs_syncs_both_directions_filters_images_and_recovers() {
+fn relay_pairs_syncs_text_images_and_recovers() {
     let mut server =
         Some(super::RelayServer::start("127.0.0.1:0".parse().unwrap(), TOKEN.into()).unwrap());
     let address = server.as_ref().unwrap().address();
@@ -70,13 +73,12 @@ fn relay_pairs_syncs_both_directions_filters_images_and_recovers() {
             .unwrap()
             .contains_key(&second.stamp.id)
     });
-    let image = Record::image(vec![1, 2, 3], "png".into(), 300);
-    let large = Record::text("x".repeat(super::super::MAX_TEXT + 1), 400);
+    let image = Record::image(vec![7; 2 * 1024 * 1024], "png".into(), 300);
+    let large = Record::text("x".repeat(2 * 1024 * 1024), 400);
     host.add(image.clone());
     host.add(large.clone());
-    std::thread::sleep(Duration::from_secs(2));
-    assert!(!phone.memory.0.lock().unwrap().contains_key(&image.stamp.id));
-    assert!(!phone.memory.0.lock().unwrap().contains_key(&large.stamp.id));
+    until(|| phone.memory.0.lock().unwrap().contains_key(&image.stamp.id));
+    until(|| phone.memory.0.lock().unwrap().contains_key(&large.stamp.id));
     server.take();
     until(|| !host.service().relay_connected());
     let offline = Record::text("queued on device only".into(), 500);

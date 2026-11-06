@@ -74,6 +74,19 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
             ),
         )
         if (!on) return views
+        val privateModes = arrayOf(getString(R.string.private_auto), getString(R.string.private_manual), getString(R.string.private_off))
+        val privateIndex = app.qingjian.inputmethod.clipboard.sync.PrivateSend.MODES.indexOf(app.qingjian.inputmethod.clipboard.sync.PrivateSend.mode(this)).coerceAtLeast(0)
+        views += ui.group(null,
+            ui.row(getString(R.string.private_title), privateModes[privateIndex]).apply {
+                setOnClickListener { AlertDialog.Builder(this@ClipboardSyncActivity).setTitle(R.string.private_title)
+                    .setSingleChoiceItems(privateModes, privateIndex) { dialog, index ->
+                        prefs.edit().putString(app.qingjian.inputmethod.clipboard.sync.PrivateSend.KEY_MODE, app.qingjian.inputmethod.clipboard.sync.PrivateSend.MODES[index]).apply()
+                        dialog.dismiss(); rebuild()
+                    }.setNegativeButton(android.R.string.cancel, null).show() }
+            },
+            ui.row(getString(R.string.private_send), getString(R.string.private_note)).apply {
+                setOnClickListener { app.qingjian.inputmethod.clipboard.sync.PrivateSend.manual(this@ClipboardSyncActivity) }
+            })
         // 配对结果放在最上面：放到页面最后要滚动才看得见，以为没配上
         status?.let { views += ui.footnote(it) }
         val name = ClipboardSync.deviceName(this)

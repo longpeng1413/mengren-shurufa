@@ -123,7 +123,19 @@ object ClipboardSync {
             val event = runCatching { JSONObject(json) }.getOrNull() ?: continue
             val type = event.optString("type")
             if (type == "finished" && !event.isNull("text")) putOnClipboard(context, event.getString("text"))
+            if (type == "finished" && !event.isNull("image")) {
+                val uri = app.qingjian.inputmethod.clipboard.ClipboardImageProvider.uriOf(event.getString("image"))
+                main.post { runCatching {
+                    context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(
+                        ClipData.newUri(context.contentResolver, "猛人输入法", uri))
+                } }
+            }
             main.post { listeners.toList().forEach { it.onSyncEvent(type, event) } }
+            if (type == "private_sent" || type == "private_failed") {
+                main.post { android.widget.Toast.makeText(context,
+                    if (type == "private_sent") app.qingjian.inputmethod.R.string.private_sent else app.qingjian.inputmethod.R.string.private_failed,
+                    android.widget.Toast.LENGTH_LONG).show() }
+            }
         }
     }
 

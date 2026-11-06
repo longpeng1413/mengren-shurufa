@@ -43,4 +43,14 @@
     <string name="sync_relay_disconnected">Disconnected: check URL, token and network</string>
     <string name="sync_relay_devices">Devices on relay</string>
     <string name="sync_relay_device">Relay device #%1$s</string>
+    <string name="private_sent">Private content sent to online PCs. Type it once with the private input shortcut within two minutes.</string>
+    <string name="private_failed">Private send failed. Enable sync and private receiving on an online paired PC. No offline retry.</string>
+    <string name="private_disabled">Private sending is disabled. Enable it in clipboard sync settings.</string>
+    <string name="private_empty">The clipboard has no private text to send.</string>
+    <string name="private_title">Private sending</string>
+    <string name="private_auto">Automatically send sensitive copies; manual also available</string>
+    <string name="private_manual">Manual only</string>
+    <string name="private_off">Off</string>
+    <string name="private_send">Send privately</string>
+    <string name="private_note">Online paired PCs only. Excluded from history. Single input within two minutes.</string>
 </resources>

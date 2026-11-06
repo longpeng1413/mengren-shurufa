@@ -529,6 +529,7 @@ class QingjianInputMethodService :
         ToolbarTool.VOICE -> voiceInput()
         ToolbarTool.SYMBOLS -> openPanel(PanelKind.SYMBOLS)
         ToolbarTool.CLIPBOARD -> clipboard()
+        ToolbarTool.PRIVATE_SEND -> app.qingjian.inputmethod.clipboard.sync.PrivateSend.manual(this)
         ToolbarTool.TRANSLATE -> toggleTranslate()
         ToolbarTool.RESIZE -> startResize()
         ToolbarTool.PHRASES -> openPanel(PanelKind.PHRASES)

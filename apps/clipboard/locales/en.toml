@@ -73,3 +73,11 @@ bad_address = "That address is not valid"
 [editor]
 save = "Save"
 cancel = "Cancel"
+
+[private]
+received = "Private content received. Use the private input shortcut in the target field within two minutes. Single use."
+failed = "Private input failed or was blocked. The content was cleared. Send it again."
+empty = "No private content is pending. It may have expired or been used."
+hotkey_taken = "A shortcut is in use by another application. Change it in settings."
+paused_hint = "Recording paused: new desktop copies are not sent. Receiving and existing history remain available. Resume from the tray menu."
+
