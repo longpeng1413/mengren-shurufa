@@ -28,6 +28,12 @@ def gh_json(*args):
     return json.loads(run("gh", "api", *args, capture=True))
 
 
+def find_release(version):
+    # GitHub 的按标签查询不返回未发布草稿；草稿必须从仓库发布列表按 tag_name 定位。
+    releases = gh_json(f"repos/{REPO}/releases?per_page=100")
+    return next((item for item in releases if item["tag_name"] == f"v{version}"), None)
+
+
 def digest(path):
     value = hashlib.sha256()
     with path.open("rb") as stream:
@@ -169,30 +175,37 @@ def main():
     print(f"Prepared {version}: {commit}, {len(manifest)} files", flush=True)
     if not args.publish:
         return
+    prior_pending=json.loads(pending_path.read_text(encoding="utf-8")) if pending_path.exists() else None
+    release=find_release(version)
+    if release and not release["draft"]:
+        raise SystemExit("该版本已经公开发布，禁止替换；请递增版本")
     save(pending_path,{"version":version,"commit":commit,"manifest":manifest})
     run("git", "push", "origin", "main", cwd=public)
     tag_probe=subprocess.run(["git","rev-parse",f"refs/tags/v{version}"],cwd=public,stdout=subprocess.PIPE,stderr=subprocess.PIPE,encoding="utf-8")
-    if tag_probe.returncode==0:
-        if tag_probe.stdout.strip()!=commit:
-            raise SystemExit("已有标签指向另一提交，禁止覆盖")
-    else:
+    if tag_probe.returncode==0 and tag_probe.stdout.strip()!=commit:
+        if not (release and release["draft"] and prior_pending and prior_pending.get("commit")==tag_probe.stdout.strip()):
+            raise SystemExit("已有标签不属于本次未发布草稿，禁止覆盖")
+        # 仅恢复本工具刚创建、尚未公开的草稿；正式版本标签永不改写。
+        run("git","tag","-d",f"v{version}",cwd=public)
+        run("git","push","origin","--delete",f"v{version}",cwd=public)
+        tag_probe=None
+    if tag_probe is None or tag_probe.returncode!=0:
         run("git", "tag", f"v{version}", cwd=public)
     run("git", "push", "origin", f"v{version}", cwd=public)
-    probe=subprocess.run(["gh","api",f"repos/{REPO}/releases/tags/v{version}"],stdout=subprocess.PIPE,stderr=subprocess.PIPE,encoding="utf-8")
-    if probe.returncode==0:
-        if not json.loads(probe.stdout)["draft"]:
-            raise SystemExit("该版本已经公开发布，禁止替换；请递增版本")
+    if release:
         run("gh","release","upload",f"v{version}","--repo",REPO,"--clobber",*uploads)
     else:
         run("gh", "release", "create", f"v{version}", "--repo", REPO, "--verify-tag", "--draft", "--title", f"猛人输入法 v{version} 正式版", "--notes-file", args.notes.resolve(), *uploads)
-    release = gh_json(f"repos/{REPO}/releases/tags/v{version}")
+    release=find_release(version)
+    if not release or not release["draft"]:
+        raise SystemExit("未找到本次发布草稿，停止发布")
     uploaded = {asset["name"]: asset for asset in release["assets"]}
     if set(uploaded) != {path.name for path in uploads}:
         raise SystemExit("草稿发布附件列表不一致，未公开 Release")
     for path in uploads:
         if uploaded[path.name]["size"] != path.stat().st_size or uploaded[path.name].get("digest") != "sha256:" + digest(path):
             raise SystemExit("草稿附件校验不一致，未公开 Release")
-    run("gh", "release", "edit", f"v{version}", "--repo", REPO, "--draft=false", "--latest")
+    gh_json("--method","PATCH",f"repos/{REPO}/releases/{release['id']}","-F","draft=false","-f","make_latest=true")
     save(state_path, {"version": version, "commit": commit, "manifest": manifest})
     save(dist / "published.json", {"version": version, "commit": commit, "url": f"https://github.com/{REPO}/releases/tag/v{version}", "verified_uploads": len(uploads)})
     print(f"Published https://github.com/{REPO}/releases/tag/v{version}", flush=True)

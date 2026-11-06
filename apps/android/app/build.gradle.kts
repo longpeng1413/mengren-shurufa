@@ -123,3 +123,7 @@ val stageData by tasks.registering(Sync::class) {
 tasks.named("preBuild") {
     dependsOn(cargoNdk, stageData)
 }
+
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+}

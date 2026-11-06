@@ -20,7 +20,15 @@ object Updates {
     private var started = false
     fun prefs(context: Context) = context.getSharedPreferences("mengren-updates", Context.MODE_PRIVATE)
     fun cache(context: Context) = File(context.cacheDir, "updates")
-    fun pending(context: Context): File? = prefs(context).getString("package", null)?.let(::File)?.takeIf { it.isFile && it.parentFile?.canonicalPath == cache(context).canonicalPath && it.name.matches(Regex("[0-9a-f]{64}\\.apk")) }
+    fun pending(context: Context): File? {
+        val store = prefs(context)
+        val offer = offer(context) ?: return null
+        val hash = offer.optJSONObject("asset")?.optString("sha256").orEmpty().lowercase()
+        return store.getString("package", null)?.let(::File)?.takeIf {
+            it.isFile && it.parentFile?.canonicalPath == cache(context).canonicalPath &&
+                matchesUpdatePackage(it.name, hash, store.getString("package_version", "").orEmpty(), offer.optString("version"))
+        }
+    }
     fun offer(context: Context): JSONObject? = runCatching { JSONObject(prefs(context).getString("offer", null) ?: return null) }.getOrNull()
     fun status(context: Context, value: String) { prefs(context).edit().putString("status", value).apply() }
     fun fail(context: Context, code: String) = status(context, "error_$code")
@@ -81,7 +89,7 @@ object Updates {
             try {
                 val result = JSONObject(Native.updateDownload(BuildConfig.VERSION_NAME, version, proxy(app), cache(app).absolutePath) ?: "{}")
                 val path = result.optString("path")
-                if (path.isNotEmpty()) prefs(app).edit().putString("package", path).putString("status", "ready").apply()
+                if (path.isNotEmpty()) prefs(app).edit().putString("package", path).putString("package_version", version).putString("status", "ready").apply()
                 else { prefs(app).edit().putBoolean("install_requested", false).apply(); fail(app, result.optString("error", "network")) }
             } catch (_: Exception) { fail(app, "network") }
             finally { busy.set(false); main.removeCallbacks(poll) }
