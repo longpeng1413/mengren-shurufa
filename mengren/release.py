@@ -112,7 +112,7 @@ def main():
     if staged not in (0,1):
         raise SystemExit("无法检查待提交源码")
     if staged == 1:
-        run("git", "-c", "user.name=longpeng1413", "-c", "user.email=295510274+longpeng1413@users.noreply.github.com", "commit", "-m", f"feat(update): 发布 v{version} 两端内置更新", cwd=public)
+        run("git", "-c", "user.name=longpeng1413", "-c", "user.email=295510274+longpeng1413@users.noreply.github.com", "commit", "-m", f"chore(release): 发布 v{version} 正式版", cwd=public)
     commit = run("git", "rev-parse", "HEAD", cwd=public, capture=True)
     dist = ROOT / "target/release-dist" / version
     dist.mkdir(parents=True, exist_ok=True)
