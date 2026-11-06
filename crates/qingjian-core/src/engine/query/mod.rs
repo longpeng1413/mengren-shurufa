@@ -1,0 +1,168 @@
+//! 候选生成：按输入模式分派查询。各模式的实现在兄弟文件里，共用的候选构造留在这里。
+
+use std::time::Instant;
+
+use converting::trim_sentence_alternates;
+
+use crate::engine::{Learner, is_raw};
+use crate::ranking::{self, Scored};
+use crate::{Candidate, CandidateKind, Engine, ParseError};
+
+mod code;
+mod converting;
+mod diagnosing;
+mod english_tail;
+mod generating;
+mod lookup;
+mod modes;
+mod nine_key;
+mod phonetic;
+mod result;
+mod snapshot;
+
+pub(crate) use english_tail::EnglishTail;
+pub use result::Query;
+pub(super) use result::{join_marked, join_spelled};
+pub(super) use snapshot::QuerySnapshot;
+
+impl Engine {
+    /// 解析当前缓冲区并生成排好序的候选。**不带译文**，译文由 [`Self::annotate`] 补。
+    ///
+    /// 光标停在拼音中间时只按光标前的那段算候选（`ni|hao` 出 你），光标后的拼音留着，
+    /// 上屏之后接着组句；见 [`crate::Composition::scope`]。
+    pub fn query(&self) -> Result<Query, ParseError> {
+        self.last_rescored.set(false);
+        self.last_choice.set(None);
+        self.last_choice_scores.borrow_mut().clear();
+        self.corrected_alternates.borrow_mut().clear();
+        self.forget_stale_compose();
+        let mut query = match self.query_inner() {
+            Ok(query) => query,
+            Err(error) => {
+                if !self
+                    .custom_phrases
+                    .iter()
+                    .any(|p| p.enabled && p.code == self.composition.scope())
+                {
+                    return Err(error);
+                }
+                Query::custom_only(
+                    &self.composition.typed_text(),
+                    self.composition.cursor(),
+                    self.shuangpin.is_some() || self.zhuyin,
+                    self.shuangpin.is_some() && self.shuangpin_raw_preedit,
+                    self.shuangpin.is_some() && self.shuangpin_raw_window,
+                    self.composition.scope(),
+                    self.marked_rest(self.composition.rest()),
+                )
+            }
+        };
+        query.aux = self.aux_segment();
+        query.held = self.held_text();
+        self.apply_demotions(&mut query.candidates.items);
+        // 辅码态只出命中码的词：自定义短语没有码，不出
+        if self.aux_filter().is_none() {
+            self.insert_custom_phrases(&mut query.candidates.items);
+        }
+        self.rerank_choices(&mut query.candidates.items);
+        trim_sentence_alternates(&mut query.candidates.items);
+        // 整句截完、重排完才数得准第一页上排了什么（截之前可能还有十几条整句）；只有拼音输入有切分。
+        // 辅码筛词时顺序按码的匹配程度排过，不再挪
+        let several = self.aux_filter().is_none()
+            && query
+                .segmentations
+                .first()
+                .is_some_and(|best| best.syllables.len() > 1);
+        // 选过的词不挪：盖住的是输入的哪一段这里不知道，开头每一段都问一遍（只问单字前面那几个词）
+        let letters: String = self
+            .composition
+            .scope()
+            .chars()
+            .filter(|&c| c != '\'')
+            .collect();
+        ranking::keep_single_char_on_first_page(&mut query.candidates.items, several, |c| {
+            letters
+                .char_indices()
+                .map(|(at, ch)| at + ch.len_utf8())
+                .any(|end| self.learner.choice_weight(&letters[..end], &c.text) > 0)
+        });
+        query.spelled = result::spelling_for(&query.segmentations, query.candidates.items.first());
+        // 给输入日志留个摘要：上屏时才知道选了什么，这里才知道看到了什么
+        // 九宫格没有切分，拼音取拼音行（首选读到的写法），云联想也用它问
+        let pinyin = match (&query.correction, &query.typed_display) {
+            (Some(correction), _) => correction.segmentation.joined("'"),
+            (None, Some(display)) if self.nine_key => display.clone(),
+            (None, _) => join_marked(&query.segmentations, &query.tail),
+        };
+        *self.last_query.borrow_mut() = Some(QuerySnapshot {
+            scope: self.composition.scope().to_owned(),
+            pinyin,
+            corrected: query.correction.is_some(),
+            candidates: query
+                .candidates
+                .items
+                .iter()
+                .take(QuerySnapshot::MAX_CANDIDATES)
+                .map(|c| c.text.clone())
+                .collect(),
+            rescored: self.last_rescored.get(),
+            choice: self.last_choice.get(),
+        });
+        // 繁体输出：出 Core 的最后一步才换，并记下「繁体 → 简体」给上屏还原用。
+        // 放在输入日志摘要之后，日志与学习数据一律记简体
+        self.traditional.apply(&mut query.candidates);
+        Ok(query)
+    }
+
+    pub(super) fn query_inner(&self) -> Result<Query, ParseError> {
+        let start = Instant::now();
+        let keys = self.composition.scope();
+        let rest = self.marked_rest(self.composition.rest());
+        if self.english_mode {
+            return Ok(self.query_english(keys, rest, start));
+        }
+        // 九宫格的数字不是英文直输段，要赶在原样上屏那条路之前分岔
+        if self.nine_key {
+            return Ok(self.query_nine_key(keys, rest, start));
+        }
+        if self.modes().is_expression(keys, self.zhuyin) {
+            return Ok(self.query_expression(keys, rest, start));
+        }
+        if self.modes().is_question(keys, self.zhuyin) {
+            return Ok(self.query_question(keys, rest, start));
+        }
+        if is_raw(keys, self.modes(), self.shuangpin.as_deref(), self.zhuyin) {
+            return Ok(self.query_raw(keys, rest, start));
+        }
+        // 形码与拼音是两条平行的管线，在进切分之前分岔。放在这里是为了让 `?` 问字与
+        // `-` 直输段仍然先分派出去：形码下 `v` / `u` / `i` 是字根键，模式键已由 `modes()` 让位。
+        match self.code.is_some() {
+            // 只用形码：拼音侧整个不走（`[general] scheme = "none"`）
+            true if !self.phonetic => Ok(self.query_code(keys, rest, start)),
+            // 混输：两边都出候选
+            true => self.query_mixed(keys, rest, start),
+            false => self.query_phonetic(keys, rest, start),
+        }
+    }
+}
+
+/// 词库命中的中文候选。`aux_code` 是给壳显示的辅码：筛码时是命中当前码段的那条，没在筛码
+/// （纯拼音态、辅码态空码段）时是词的首条码；没装码表或这个词没有码时是 `None`。
+pub(super) fn chinese_candidate(item: &Scored<'_>, aux_code: Option<&str>) -> Candidate {
+    Candidate {
+        text: item.hit.text.to_owned(),
+        kind: CandidateKind::Chinese,
+        syllables: item.hit.syllables().map(str::to_owned).collect(),
+        reading: None,
+        translation: None,
+        aux_code: aux_code.map(str::to_owned),
+    }
+}
+
+/// 排在开头的英文候选有几条（整段是英文词、不像拼音带出的英文补全）：整句插在它们后面。
+pub(super) fn leading_english(items: &[Candidate]) -> usize {
+    items
+        .iter()
+        .take_while(|c| c.kind == CandidateKind::English)
+        .count()
+}

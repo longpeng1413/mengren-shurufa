@@ -1,0 +1,30 @@
+[package]
+name = "qingjian-platform"
+description = "平台相关但不依赖系统 API 的部分：配置文件读写"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+bamboo-slip-i18n.workspace = true
+qingjian-core.workspace = true
+qingjian-dictionary.workspace = true
+qingjian-format.workspace = true
+qingjian-predict.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+toml_edit.workspace = true
+tracing.workspace = true
+
+# Linux 的 socket 路径要按 euid 隔离私有临时目录；只有这一处用得到
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2.189"
+
+[target."cfg(windows)".dependencies]
+windows = { version = "0.62.2", features = ["Win32_Security_Cryptography", "Win32_System_Memory", "Win32_Foundation"] }

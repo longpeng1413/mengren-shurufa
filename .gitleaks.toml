@@ -1,0 +1,11 @@
+title = "Mengren source secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Exact dummy key used by the upstream log-redaction regression test"
+condition = "AND"
+paths = ['''(^|/)crates/qingjian-platform/src/logs/secrets/mod\.rs$''']
+regexTarget = "match"
+regexes = ['''KEY=sk-test-0123456789abcdef''']

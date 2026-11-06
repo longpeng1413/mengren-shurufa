@@ -1,0 +1,361 @@
+//! 附加候选：日期时间等快捷项、中英混输的英文词与补全、emoji 与颜文字、符号。
+
+use super::{
+    EMOJI_PER_WORD, EMOJI_SCAN, ENGLISH_COMPLETIONS, Engine, KAOMOJI_PER_WORD, KEYWORD_SCAN,
+    Learner, MIN_COMPLETION_LETTERS,
+};
+use crate::candidate::{Candidate, CandidateKind};
+use crate::custom_phrase::{CustomPhrase, expand_variables};
+use crate::emoji::EmojiTable;
+use crate::shortcut;
+use qingjian_dictionary::WordList;
+
+impl Engine {
+    /// 叹词的标准音（嗯 ng、哼 hng、噷 hm）不是拼音音节（音节表不收叹词写法，`n` / `m` 要留给简拼），
+    /// 整段正好是这几个键时按快捷候选给（#880）。双拼里 `ng` 是 neng，能 留在第一、嗯 排第二；
+    /// hm / hng 在双拼里是别的音、注音里不是这些键，都不给。
+    fn insert_interjection(&self, items: &mut Vec<Candidate>, scope: &str) {
+        if self.zhuyin {
+            return;
+        }
+        let shuangpin = self.shuangpin.is_some();
+        let (text, at) = match scope {
+            "ng" => ("嗯", usize::from(shuangpin)),
+            "hng" if !shuangpin => ("哼", 0),
+            // hm 也是 好吗 一类的简拼
+            "hm" if !shuangpin => ("噷", 1),
+            _ => return,
+        };
+        // 已经有这个字（九宫格选定了 ng、或词库按别的读音带出来排在后面）就挪上来，不另插一个
+        let candidate = match items.iter().position(|c| c.text == text) {
+            Some(found) if found <= at => return,
+            Some(found) => items.remove(found),
+            None => Candidate {
+                text: text.to_owned(),
+                kind: CandidateKind::Shortcut,
+                syllables: Vec::new(),
+                reading: None,
+                translation: None,
+                aux_code: None,
+            },
+        };
+        items.insert(at.min(items.len()), candidate);
+    }
+
+    /// 精确匹配自定义输入码时，数字键应选择候选。
+    pub(super) fn has_custom_phrase(&self) -> bool {
+        !self.english_mode
+            && self
+                .custom_phrases
+                .iter()
+                .any(|p| p.enabled && p.code == self.composition.scope())
+    }
+
+    /// 所有普通候选完成排序后，这个输入码的短语按权重从高到低占最前面几位（权重相同的按列表顺序），
+    /// 后面跟短语同字的候选去掉，免得同一个词出两遍。
+    ///
+    /// 英文模式下只出内容不含汉字的短语：`dont` → `don't` 该生效，但中文短语（含在中文模式里右键
+    /// 「置顶」按拼音加的那条，如 `he` → 和）在英文模式按空格上屏就是中文，与英文候选的语义冲突（#763）。
+    /// 时间变量（`{year}` 这类）在这里按当时的时间换掉，候选窗显示与上屏的是同一串。
+    pub(super) fn insert_custom_phrases(&self, items: &mut Vec<Candidate>) {
+        let now = jiff::Zoned::now();
+        let texts: Vec<String> = self
+            .scope_phrases()
+            .into_iter()
+            .map(|phrase| expand_variables(&phrase.text, &now).into_owned())
+            .collect();
+        items.retain(|c| !texts.contains(&c.text));
+        items.splice(
+            0..0,
+            texts.into_iter().enumerate().map(|(i, text)| Candidate {
+                text,
+                kind: CandidateKind::Custom(i + 1),
+                syllables: Vec::new(),
+                reading: None,
+                translation: None,
+                aux_code: None,
+            }),
+        );
+    }
+
+    /// 当前输入码下出候选的短语，按出现的先后：权重从高到低，相同的按列表顺序。第 i 个就是 `CandidateKind::Custom(i + 1)`。
+    pub(super) fn scope_phrases(&self) -> Vec<&CustomPhrase> {
+        let mut phrases: Vec<_> = self
+            .custom_phrases
+            .iter()
+            .filter(|p| {
+                p.enabled
+                    && p.code == self.composition.scope()
+                    && (!self.english_mode || !p.text.chars().any(crate::sentence::is_han))
+            })
+            .collect();
+        phrases.sort_by_key(|p| std::cmp::Reverse(p.weight));
+        phrases
+    }
+
+    /// 日期 / 时间 / 星期这类快捷候选插在本地首选之后：`rq` 首选仍是词库里的词，快捷写法紧随其后。
+    pub(super) fn insert_shortcuts(&self, items: &mut Vec<Candidate>, scope: &str) {
+        let expression_char =
+            if self.zhuyin && crate::zhuyin::layout::map_key(self.modes().expression).is_some() {
+                '\0'
+            } else {
+                self.modes().expression
+            };
+        self.insert_interjection(items, scope);
+        let shortcuts = shortcut::candidates(scope, expression_char, &jiff::Zoned::now());
+        if shortcuts.is_empty() {
+            return;
+        }
+        let position = items.len().min(1);
+        items.splice(position..position, shortcuts);
+    }
+
+    /// 全拼打出了「日期 / 时间 / 星期」（排在前 [`KEYWORD_SCAN`] 个词里，配的 emoji 这些不算）：对应的快捷写法
+    /// 紧跟在这个词后面、排在它的 emoji 之前，所以要在配 emoji 之后调。
+    /// 已经有快捷候选（`rq` 出的）就不再加，免得同一组写法出两遍。
+    pub(super) fn insert_keyword_shortcuts(&self, items: &mut Vec<Candidate>) {
+        if items.iter().any(|c| c.kind == CandidateKind::Shortcut) {
+            return;
+        }
+        let now = jiff::Zoned::now();
+        let found = items
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| {
+                !matches!(
+                    c.kind,
+                    CandidateKind::Emoji | CandidateKind::Kaomoji | CandidateKind::Symbol
+                )
+            })
+            .take(KEYWORD_SCAN)
+            .find_map(|(i, c)| {
+                let forms = shortcut::keyword_forms(&c.text, &now);
+                (!forms.is_empty()).then_some((i, forms))
+            });
+        if let Some((index, forms)) = found {
+            let position = index + 1;
+            items.splice(position..position, shortcut::as_candidates(forms));
+        }
+    }
+
+    /// 中英混输：整段输入是英文词就把它加进候选。
+    /// 缺省作为拼音「不像话」（切不动、或除末尾外还有声母缩写 / 残缺音节）时排第一，否则排第二；
+    /// 开了中文优先（`chinese_first`）整句 / 首个中文候选已经在前，英文词排第二。没有中文候选时总在第一。
+    /// 两字母的全大写缩写（`mp` → MP、`bm` → BM）是个例外：整段太短、几乎总是在打中文（门票 / 编码），
+    /// 这种让中文先；超过两个字母的正文英文（cargo / rust）照旧——按词频一刀切会把它们一起挤掉。
+    /// 例外只管**没选过**的英文词：用户选过的照旧排第一（选过 OK，下次敲 `ok` 还是 OK 在前）。
+    pub(super) fn insert_english(&self, items: &mut Vec<Candidate>, unlikely_pinyin: bool) {
+        if !self.english_in_chinese {
+            return;
+        }
+        let lists = self.english_lists();
+        if lists.is_empty() {
+            return;
+        }
+        let text = self.composition.scope();
+        if text.contains('\'') {
+            return;
+        }
+        let english_candidate = |word: &str| Candidate {
+            text: word.to_owned(),
+            kind: CandidateKind::English,
+            syllables: Vec::new(),
+            reading: None,
+            translation: None,
+            aux_code: None,
+        };
+        let word = lists.iter().find_map(|words| words.get(text));
+        // 这段字母下用户选中文词（`key` → 可以）比选英文词的次数多：中文词留在第一，英文让到后面；
+        // 拼音再不像话也是他自己教的
+        // 仲裁只看字面键：`wenti` 下选的 问题 不能隔着 `went` 把英文词顶下去，
+        // 打的正是这个英文时它得留在第一——同一段字母上选过中文的照旧算。
+        let chosen = items
+            .first()
+            .filter(|c| c.kind == CandidateKind::Chinese)
+            .map_or(0, |c| self.learner.choice_weight(text, &c.text));
+        let english_weight = word.map_or(0, |w| self.learner.weight(w));
+        // 两字母全大写缩写（mp → MP、bm → BM）让中文先：整段太短，几乎总是在打中文。
+        // 但**不压过学习记录**：`ok` / `pc` / `ll` 同样满足「两个字母的全大写缩写」，一刀切会把它们一起
+        // 翻成中文；而且选过 OK 的用户下次敲 `ok` 本该还是它排第一。所以这条只对用户**没选过**的英文词生效
+        //（`record` 对英文候选也记次数，所以 `english_weight` 就是「选过没有」）。
+        let short_acronym = english_weight == 0
+            && text.len() <= 2
+            && word.is_some_and(|word| word.chars().all(|c| c.is_ascii_uppercase()));
+        let english_first =
+            !self.chinese_first && unlikely_pinyin && chosen <= english_weight && !short_acronym;
+        let mut position = if items.is_empty() || english_first {
+            0
+        } else {
+            1
+        };
+        let mut budget = self.english_max_in_chinese;
+        if let Some(word) = word {
+            items.insert(position, english_candidate(word));
+            position += 1;
+            budget -= 1;
+        }
+        // 英文补全：拼音不像话时（`compa` 切成 co'm'pa），整段多半是在打英文词的前面几个字母，补全紧跟在精确词之后；
+        // 个人词表在前，两张表里都有的只出一次。
+        if unlikely_pinyin && budget > 0 && text.len() >= MIN_COMPLETION_LETTERS {
+            let mut budget = budget.min(ENGLISH_COMPLETIONS);
+            for words in &lists {
+                for word in words.complete(text, budget) {
+                    if items
+                        .iter()
+                        .any(|c| c.kind == CandidateKind::English && c.text == word)
+                    {
+                        continue;
+                    }
+                    items.insert(position, english_candidate(word));
+                    position += 1;
+                    budget -= 1;
+                }
+                if budget == 0 {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// 有中文候选时把英文块挪到第 `english_min_position` 位（配置 `[general] english_min_position`，
+    /// 缺省 1 即不限制）。等整句也插进来之后再调：整句本身是中文，`cargo` 这类只有整句能读通时也得让位。
+    /// 没有中文候选（`github`）时英文照旧在最前。
+    pub(super) fn place_english(&self, items: &mut Vec<Candidate>) {
+        if self.english_min_position <= 1 || !items.iter().any(|c| c.kind == CandidateKind::Chinese)
+        {
+            return;
+        }
+        let mut english = Vec::new();
+        items.retain(|c| {
+            if c.kind != CandidateKind::English {
+                return true;
+            }
+            english.push(c.clone());
+            false
+        });
+        if english.is_empty() {
+            return;
+        }
+        let position = (self.english_min_position - 1).min(items.len());
+        items.splice(position..position, english);
+    }
+
+    /// 给英文候选用的词表，个人的在前、随包的在后；一张都没有就是空。
+    /// 整段作用域本身就是个英文词（`database`、`agent`）：用户多半在打那个词。
+    pub(in crate::engine) fn scope_is_english_word(&self) -> bool {
+        let scope = self.composition.scope();
+        self.english_in_chinese
+            && !scope.is_empty()
+            && self
+                .english_lists()
+                .iter()
+                .any(|words| words.get(scope).is_some())
+    }
+
+    pub(super) fn english_lists(&self) -> Vec<&WordList> {
+        self.learner
+            .user_english()
+            .into_iter()
+            .chain(self.english.as_ref())
+            .collect()
+    }
+
+    /// emoji、颜文字、符号候选：前几个中文候选里有配的，紧跟在那个词后面，右侧标注它对应的词。
+    /// 同一个词后面按 emoji、颜文字、符号的顺序排，三样各有各的名额；前面已经有的（CLDR 也配了的符号）不重复出。
+    pub(super) fn insert_emoji(&self, items: &mut Vec<Candidate>) {
+        if let Some(table) = self.emoji.as_ref() {
+            insert_following(
+                items,
+                table,
+                CandidateKind::Emoji,
+                EMOJI_PER_WORD,
+                self.emoji_limit,
+            );
+        }
+        if let Some(table) = self.kaomoji {
+            insert_following(
+                items,
+                table,
+                CandidateKind::Kaomoji,
+                KAOMOJI_PER_WORD,
+                self.kaomoji_limit,
+            );
+        }
+        if let Some(table) = self.symbols {
+            insert_following(
+                items,
+                table,
+                CandidateKind::Symbol,
+                EMOJI_PER_WORD,
+                self.symbol_limit,
+            );
+        }
+    }
+}
+
+/// 给前 [`EMOJI_SCAN`] 个词配 `table` 里的条目，插在词（以及紧挨着它的英文词、已经配上的条目）后面。
+/// 词后面紧挨着的英文词候选（中文优先时 `key` → 可以、key）不被挤开，配的条目排在它之后。
+fn insert_following(
+    items: &mut Vec<Candidate>,
+    table: &EmojiTable,
+    kind: CandidateKind,
+    per_word: usize,
+    limit: usize,
+) {
+    let mut inserted = 0;
+    let mut index = 0;
+    let mut scanned = 0;
+    while index < items.len() && scanned < EMOJI_SCAN && inserted < limit {
+        let item = &items[index];
+        index += 1;
+        if !matches!(
+            item.kind,
+            CandidateKind::Chinese | CandidateKind::Sentence | CandidateKind::English
+        ) {
+            continue;
+        }
+        scanned += 1;
+        // 英文词按小写查英文表（smile → 😀）
+        let key = if item.kind == CandidateKind::English {
+            item.text.to_lowercase()
+        } else {
+            item.text.clone()
+        };
+        let fresh: Vec<String> = table
+            .lookup(&key)
+            .filter(|entry| !items.iter().any(|c| c.text == *entry))
+            .take(per_word)
+            .map(str::to_owned)
+            .collect();
+        if fresh.is_empty() {
+            continue;
+        }
+        let word = items[index - 1].text.clone();
+        let syllables = items[index - 1].syllables.clone();
+        let own_kind = items[index - 1].kind;
+        while items.get(index).is_some_and(|next| {
+            (own_kind != CandidateKind::English && next.kind == CandidateKind::English)
+                || (next.kind.follows_word() && next.reading.as_deref() == Some(word.as_str()))
+        }) {
+            index += 1;
+        }
+        for entry in fresh {
+            if inserted >= limit {
+                break;
+            }
+            items.insert(
+                index,
+                Candidate {
+                    text: entry,
+                    kind,
+                    syllables: syllables.clone(),
+                    reading: Some(word.clone()),
+                    translation: None,
+                    aux_code: None,
+                },
+            );
+            index += 1;
+            inserted += 1;
+        }
+    }
+}

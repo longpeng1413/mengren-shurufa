@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# 启用：git config core.hooksPath .githooks；跳过：git commit --no-verify
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+# 装饰性分隔注释（`// ====` / `// ────`）不要：只做视觉分组、不带任何「为什么」，用空行加语义排序分组
+staged_rs="$(git diff --cached --name-only --diff-filter=ACM -- '*.rs')"
+if [[ -n "$staged_rs" ]]; then
+  matches="$(echo "$staged_rs" | xargs grep -nE '^\s*//[/!]?\s*[=─-]{3,}\s*$' 2>/dev/null || true)"
+  if [[ -n "$matches" ]]; then
+    echo "$matches"
+    echo "装饰性分隔注释不要，用空行 + 语义排序分组" >&2
+    exit 1
+  fi
+fi
+
+cargo fmt --all --check
+
+# clippy 要按平台排除编不了的壳，划分与 ci.yml 的三个 job 一致。
+# IMK 壳依赖 objc2，非 Apple 平台上是硬 compile_error!，排除不掉就只能整条命令失败；
+# 其余平台排除它之后，Windows 三件套在本机也编得过（已在 Windows 上验过）。
+case "$(uname -s)" in
+  Darwin) clippy_scope=(--workspace) ;;
+  *) clippy_scope=(--workspace --exclude qingjian-macos) ;;
+esac
+cargo clippy "${clippy_scope[@]}" --all-targets -- -D warnings
+
+# 非 Apple 平台上 IMK 壳编不了，但对 darwin 目标做类型检查是可以的（不链接、不产出可执行文件）。
+# 不做的话在 Linux 上改它等于盲改（见 docs/notes/crate-notes.md 的 apps/macos 一节）。
+# **只在本机装了 aarch64-apple-darwin target 时才跑**，没装的人流程不变；
+# 也只在这次提交碰了 macOS 壳、共享 crate 或依赖时才跑，改 Windows / Linux / 文档不付这个时间。
+if [[ "$(uname -s)" != Darwin ]] \
+  && rustup target list --installed 2>/dev/null | grep -qx aarch64-apple-darwin \
+  && git diff --cached --name-only | grep -qE '^(apps/macos/|crates/|Cargo\.(toml|lock)$)'; then
+  # onig_sys（candle → tokenizers 带进来的 C 库）要编 C；给它一个假的 pkg-config 条目让它改走「系统库」，
+  # cargo check / clippy 不链接，库在不在无所谓
+  onig="$PWD/target/darwin-check/onig"
+  if [[ ! -f "$onig/oniguruma.pc" ]]; then
+    mkdir -p "$onig/include"
+    : > "$onig/include/oniguruma.h"
+    printf 'prefix=%s\nincludedir=${prefix}/include\nName: oniguruma\nDescription: only for cargo check, never linked\nVersion: 6.9.9\nLibs: -lonig\nCflags: -I${includedir}\n' \
+      "$onig" > "$onig/oniguruma.pc"
+  fi
+  PKG_CONFIG_PATH="$onig" PKG_CONFIG_ALLOW_CROSS=1 RUSTONIG_SYSTEM_LIBONIG=1 \
+    cargo clippy --target aarch64-apple-darwin -p qingjian-macos --all-targets -- -D warnings
+fi

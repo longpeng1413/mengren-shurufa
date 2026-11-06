@@ -1,0 +1,34 @@
+[package]
+name = "qingjian-predict"
+description = "云联想：OpenAI 兼容接口的候选词、整句补全、问字、翻译与释义兜底"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+async-openai.workspace = true
+qingjian-core.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+reqwest.workspace = true
+uuid.workspace = true
+jiff.workspace = true
+rustls = { workspace = true, optional = true }
+webpki-roots = { workspace = true, optional = true }
+sha2 = "0.11"
+base64.workspace = true
+jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
+
+[features]
+# 加密连接用哪套：桌面走系统 TLS（Windows SChannel、macOS Security、Linux OpenSSL）；
+# 安卓没有可链的系统 TLS，走 rustls（ring + 内置 Mozilla 根证书，不要 Java 侧组件）
+default = ["native-tls"]
+native-tls = ["async-openai/native-tls"]
+rustls = ["async-openai/rustls-no-provider", "dep:rustls", "dep:webpki-roots"]

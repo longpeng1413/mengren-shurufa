@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 猛人输入法：由 mengren/rebrand.py 生成。自适应图标的背景色（赤焰黑金的底色） -->
+<resources>
+    <color name="mengren_launcher_background">#1A0503</color>
+</resources>

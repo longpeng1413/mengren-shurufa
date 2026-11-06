@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 猛人输入法：由 mengren/rebrand.py 生成。键盘工具栏、首页、关于页的品牌标，指向 drawable-nodpi/mengren_brand.png -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/mengren_brand"
+    android:filter="true"
+    android:gravity="fill" />

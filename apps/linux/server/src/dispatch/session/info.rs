@@ -1,0 +1,66 @@
+//! 单个 Fcitx 输入上下文保存的输入状态。
+use crate::dispatch::composed::Composed;
+use qingjian_core::EngineSession;
+
+pub(crate) struct SessionInfo {
+    /// 应用标识。
+    pub(crate) app: Option<String>,
+
+    /// 新 Linux 客户端已协商显示回报。
+    pub(crate) display_identity: Option<qingjian_platform::protocol::linux::DisplayIdentity>,
+
+    /// 待确认的当前候选帧。
+    pub(crate) display_frame: Option<qingjian_platform::protocol::Frame>,
+
+    /// 上次发给插件的帧；插件定时 Poll 时内容没变就沿用展示身份，不算新的展示。
+    pub(crate) last_frame: Option<qingjian_platform::protocol::Frame>,
+
+    /// Server 持有的中英模式。
+    pub(crate) english: bool,
+
+    /// 按下、还没松开的单击切换键（Shift / Ctrl 的虚拟键码）；中间按了别的键就作废。
+    pub(crate) switch_tap: Option<u32>,
+
+    /// 最近的框架能力，首次报告前为未知。
+    pub(crate) capabilities: Option<qingjian_platform::protocol::linux::Capabilities>,
+
+    pub(crate) disabled: bool,
+
+    /// 焦点事实；只有当前聚焦帧允许展示回报。
+    pub(crate) active: bool,
+
+    /// 新会话默认私密，收到能力通知后才允许学习。
+    pub(crate) private: bool,
+
+    /// 挂起的 Engine 输入状态。
+    pub(crate) engine: EngineSession,
+
+    /// 挂起的候选列表。
+    pub(crate) composed: Option<Composed>,
+
+    /// 高亮下标。
+    pub(crate) highlight: usize,
+
+    /// 本轮是否移动候选。
+    pub(crate) navigated: bool,
+}
+impl SessionInfo {
+    pub(crate) fn new(app: Option<String>, english: bool) -> Self {
+        Self {
+            app,
+            english,
+            switch_tap: None,
+            capabilities: None,
+            disabled: false,
+            active: true,
+            display_identity: None,
+            display_frame: None,
+            last_frame: None,
+            private: true,
+            engine: EngineSession::default(),
+            composed: None,
+            highlight: 0,
+            navigated: false,
+        }
+    }
+}

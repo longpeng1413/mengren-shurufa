@@ -1,0 +1,9 @@
+/target
+**/*.rs.bk
+.DS_Store
+*.app
+.env
+/logs
+/data
+.playwright-mcp/
+__pycache__/

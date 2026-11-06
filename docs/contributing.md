@@ -1,0 +1,110 @@
+# 开发约定
+
+改代码前先看这一页：架构上不能越的线、代码怎么组织、版本号与提交信息怎么写、改了行为要同步哪些文档。
+设计的来龙去脉在 [design/architecture.md](design/architecture.md)，各 crate 的实现要点在 [notes/crate-notes.md](notes/crate-notes.md)。
+
+## 架构约束（不要违反）
+
+长版与理由见 [design/architecture.md](design/architecture.md)。
+
+- **Core 与平台层严格解耦。** `qingjian-core` 及其兄弟 crate 必须平台无关：词库、拼音解析、候选生成、排序、学习、翻译、文本变换全部属于 Core。
+  平台层（IMK / TSF / IBus-Fcitx）只做两件事：把系统输入事件翻译成 Core 的输入，把 Core 返回的帧画到候选窗口。
+  **平台层里不允许出现排序逻辑、词库访问、翻译调用或文本变换。** 判断标准：把 IMK 换成 TSF，不应该需要改 Core 的任何一行。
+- **一个候选词只显示一种辅助语言。** 用户配置 Primary Language + 单个 Learning Language。不要设计成 `translations: Vec<Translation>` 或
+  `HashMap<Lang, String>` 这类多语言并列的数据结构，那会在 API 层面把「一次只学一种语言」这条产品原则给破坏掉。翻译是候选词的 annotation（可选、单条）。
+- **输入优先于学习。** 任何为学习功能增加的延迟、弹窗、UI 干扰都是设计错误。翻译查询不能阻塞候选生成，Core 必须能在翻译尚未就绪时先返回候选。
+- **输入方案是配置项，不是模式。** 双拼、注音这类键盘方案放 `[general]` 里当设置，中 / 英切换始终是布尔；新方案不能改变别的方案的既定按键行为（[user/getting-started/keys.md](user/getting-started/keys.md)）。
+- **显示面与设置程序自绘，菜单与安装器原生。** 候选窗、拼音行、状态条这类显示面由渲染器出位图各平台贴图（主题靠它）；设置程序 `apps/settings` 三平台共用一份，画在同一个引擎上；
+  输入法菜单、系统托盘、安装器用各平台原生控件。见 [design/rendering.md](design/rendering.md) 与 [design/settings.md](design/settings.md)。
+- **移动端的屏幕键盘与面板将来统一到 Rust。** Android 现在由 Kotlin 自绘键盘与面板，这是过渡状态；做第二个移动平台（iOS / iPadOS / HarmonyOS）时统一到 Rust，见 [plan/roadmap.md](plan/roadmap.md) Phase 5。
+  在那之前，能跨平台共享的规则（主题推导出的配色、键位与尺寸计算）放 Rust，不在平台壳里新写一份；不为单个平台另起一套键盘或 UI 框架。
+  Kotlin 里现存、统一时要一起搬的规则：键位表与尺寸（`KeyboardLayout` / `KeyboardMetrics`）、滑行起判阈值（`SwipeTrail.START_KEYS`）、
+  面板与 App 里写死的颜色（剪贴板代码高亮的数字色、生词标签色、失败与危险操作的红）。清单在 roadmap Phase 5，搬走一项划掉一项。
+
+## 代码组织
+
+- **一个类型一个文件。** 一个 struct / enum / trait 及其 impl 单独一个文件；模块文件只做 `mod` 声明、re-export 与自由函数，不把一个 crate 平铺在 `lib.rs` 里。
+- **子模块用目录。** 有子模块的模块用 `foo/mod.rs`，**不用** `foo.rs` + `foo/` 并列。
+- **同词干的兄弟文件收进目录，绝不用文件名前缀分组。** `key_event.rs` + `key_outcome.rs` → `key/mod.rs` + `key/{event,outcome}.rs`，哪怕没有 `key.rs` 这个共同父文件；
+  `query/` + `querying.rs` 这种也不行。判断：两个及以上文件名共享一段前缀且同属一个概念，就收进以那段前缀命名的目录。
+- **一个职责连带它专用的类型收进一个目录。** `engine/commit/mod.rs` 放上屏部分，`chain.rs` / `last.rs` 放只有它用的类型。
+- **大类型的 `impl` 按职责拆成子模块。** 每个文件一个 `impl Foo { … }`（`host/settings.rs` 这样），结构体与构造留在 `mod.rs`，跨文件用到的私有方法标 `pub(super)`。
+- **文件长度。** 单文件不超过 800 行，目标 500 行以内；测试超过 200 行搬到 `tests.rs`（多时 `tests/` 按主题分文件）。
+- **导入写精确路径。** 不用 `use super::*` / `use foo::*`（`#[cfg(test)] mod tests` 里的 `use super::*` 除外）。
+  子文件从父模块拿的类型写 `use super::{Engine, Candidate};`，父模块没定义的直接 `use crate::…` 或 `use <crate>::…`，不绕 `super::` 转手。
+  存量的 glob 改到那个文件时顺手换掉，不专门清扫。
+
+## 命名与注释
+
+- 代码标识符一律英文，注释与文档用中文；`thiserror` 的 `#[error]` 文案用英文。
+- **界面文字不写死在代码里**：写进所在 crate 的 `locales/`（简体中文与英文两份必填，其余语言可以先空着），代码里用 `tr("节.键")`，见 [notes/crate-notes.md](notes/crate-notes.md) 的 bamboo-slip-i18n 一节。日志与 `#[error]` 不进文案表。
+- **新写的日志用英文**（消息正文与字段值），已有的中文日志保持不动。日志是给开发者排查用的：
+  字段名、`#[error]` 与系统给的值（进程名、bundle identifier、系统错误信息）本来就是英文，一行里不中英混着读；排查时人或 AI 按 `commit`、`backspace` 这类英文关键词就能搜到，不用先猜当初写的是哪个中文词；日文、韩文、英文用户报问题也会附日志，自己得看得懂。
+- 新文件都要有 `//!` 文件头；结构体 / 枚举字段之间空一行，字段名说不清的加 `///`（`r` / `g` / `b`、`width` 这类不用，`a`「255 为不透明」这类要）。
+- 注释只写维护时用得上的：文件头一两句说它是什么、怎么用；代码里只解释读代码看不出来的约束与原因（平台怪癖、协议约定、踩过的坑），一两句说完。
+  不写复述代码的教学性注释，不写改动经过、调试过程这类日志型注释；较长的设计理由写进 `docs/`，注释里留一句指过去。
+- 不写装饰性分隔注释（`// ====`），提交钩子会拦。
+
+## 依赖与配置
+
+- 依赖用 `cargo add` 加，共用包提到根 `[workspace.dependencies]`；错误用 `thiserror` 不用 `anyhow`；日志用 `tracing` 门面。
+- 快捷键一律进 `[shortcut]` 可配置，不写死键码。
+- 设置项只有部分平台的输入法读时，在设置程序的 `apps/settings/src/support/` 表里登记三个平台各是「支持 / 不适用 / 待实现」，页面按表显示，不直接写 `cfg!`；「待实现」的同步列进 `docs/plan/todo.md` 的「设置项的平台缺口」。
+
+## 版本号
+
+- `crates/*` 用 `version.workspace = true`；**`apps/*` 各壳是独立发布的产品，写死自己的 `version`**（Windows 读 `server/Cargo.toml`）。
+- 发版之间带 `-dev`（两端都是 `0.1.3-dev`），打包脚本再接 git 短哈希成 `0.1.3-dev-1a2b3c4`（脏加 `+`，Cargo.toml 里只写 `-dev`）。
+- 发版提交去掉 `-dev` 打标签 `v<版本>`（三个平台共用一个 Release；单平台补丁用 `macos-v` / `windows-v` / `linux-v<版本>`），标签后再改成下一个 `-dev`；带 `-dev` 的标签 CI 拒绝；pkg / Inno 只认数字点号。
+
+## 提交信息
+
+- [Conventional Commits](https://www.conventionalcommits.org/zh-hans/)：第一行 `<类型>(<范围>): <说明>`，类型与范围英文小写，说明用中文，例如
+  `fix(core): 修自绘输入框吞数字`、`feat(windows): 三进程日志统一到 %LOCALAPPDATA%\Qingjian\logs`、`docs(changelog): 补 0.1.3 条目`。
+  - 类型：`feat` 新功能 / `fix` 修 bug / `docs` 只改文档 / `refactor` 不改行为的整理 / `perf` 性能 / `test` 只改测试 /
+    `build` 打包与构建脚本 / `ci` 工作流 / `chore` 版本号、依赖、仓库杂务 / `style` 只改格式 / `revert` 还原。
+  - 范围：crate 或壳的名字——`core` `platform` `render` `dictionary` `translate` `learning` `predict` `lm` `neural` `format` `cli`
+    `macos` `windows`（Server / DLL / 设置程序细分时用 `server` `tsf` `settings`）`installer` `linux` `android` `tools` `docs` `ci` `deps` `release`；
+    跨好几处的可以省略。不兼容的改动在范围后加 `!`。
+  - 正文写「为什么」与取舍，一行一条。`.githooks/commit-msg` 会拦第一行不合格式的提交，合并提交也一样（`git merge --no-ff -m "feat: …"`）。
+  - 2026-09-16 之前的历史是「`macOS：……` / `Core：……`」的中文冒号格式，不重写。
+
+## 文档同步
+
+- 实现与规划分歧时以代码为准并改文档。技术方向写 `docs/design/`，计划写 `docs/plan/`，工程记录写 `docs/notes/`；不往 README 里加技术内容。
+- **用户能感知的行为改了（按键、菜单、设置程序、配置文件、数据文件），同一个提交里改 `docs/user/` 对应的页**，按键改动同时改 `keys.md`。
+- 改了某个 crate 的实现要点（数据文件、常数、生成命令），同步 `docs/notes/crate-notes.md`。
+
+## 提交前检查
+
+- 钩子：`.githooks/pre-commit`（禁装饰性分隔注释 + fmt + clippy）、`.githooks/commit-msg`（提交信息格式）、`.githooks/pre-push`（全 workspace 测试）；`git config core.hooksPath .githooks` 启用一次。
+  两个跑编译的钩子按 `uname` 划平台范围：**非 Apple 平台排除 `qingjian-macos`**（IMK 壳依赖 objc2，在别的平台上是硬 `compile_error!`，
+  排除不掉就整条命令失败），与 [ci.yml](../.github/workflows/ci.yml) 里 core / macos / windows 三个 Rust job 的划分一致；Server 的 uiAccess 缺省不带
+  （没签名的 exe 带 uiAccess=true 起不来，os error 740），只有 `build.ps1 -Sign` 设 `QINGJIAN_UIACCESS=1` 打开。
+- **在 Linux / Windows 上改 macOS 壳**：排除之后等于盲改，编译错误要到 CI 才看得到。
+  `rustup target add aarch64-apple-darwin` 一次，之后 pre-commit 在「这次提交碰了 `apps/macos/`、`crates/` 或依赖」时
+  会对 darwin 目标跑一遍 clippy（只做类型检查、不链接，与 CI 的 macOS job 同一道门；第一次约半分钟，之后一两秒）；
+  没装这个 target 的人流程不变。
+  原理与手动跑法见 [notes/crate-notes.md](notes/crate-notes.md) 的 apps/macos 一节。
+- 排序 / 整句 / 纠错的改动先跑 `apps/cli` 再合。
+
+## CI 与发版
+
+- CI 七个 job，全部 `--locked`：`core`（Linux 全量：fmt / 文档 / clippy / rustdoc / test / 两个 Fcitx 壳 / 安装脚本，外加 Android 那条 rustls TLS 路径的 lint 与测试）、
+  `release`（release profile 下的 clippy）、`shellcheck`、`macos`（IMK 壳）、`linux-22_04`（最老受支持发行版）、`android`（debug APK）、
+  `windows`（Windows 五个 crate（含青简剪贴板）+ `qingjian-platform` + 32 位 DLL）。Dependabot 升 actions。
+- 依赖门禁分两处，同一份豁免清单：`cargo deny check` 在 `core` job 里当**合并门禁**（每个 PR 查许可证 / 来源 / 重复版本 / RustSec 漏洞 / yanked），
+  `audit.yml` 的 `audit-check` 每周一次定时查漏洞并开 issue（没人提 PR 时也能发现新披露的）。两处的 `RUSTSEC-*` 清单由 CI 机械校验必须一致。
+- 发版：推 `<平台>-v<版本>` 标签触发 `release.yml`，门禁是版本号 = 标签且不带 -dev、标签在 main 上、产品数据按 SHA256SUMS 校验。
+- CHANGELOG 手写、发版时由维护者统一改（PR 不动它）。流程与 Secrets 见 [notes/release.md](notes/release.md)。
+
+## 外部 PR
+
+- 从 main 开分支，一个 PR 只做一件事、只碰一个平台（Core 改动单独一个）。
+- 维护者对着 main 审，squash 合并保留作者署名。PR 模板里的合并前清单就是审核标准。
+- **修 bug、改壳里行为（按键、上屏、候选窗位置）的 PR 必须真机验过**：先在自己机器上复现问题，改完在同一个应用里确认修好，
+  PR 的「怎么验证的」写明系统版本、应用与操作步骤。编译与 CI 通过不算验证。没验过的修复发出去，报 issue 的人升级后还得再报一次。
+  复现不了的（没有那个应用或系统）不提修复：把分析写在 issue 里，或者提只加日志、不改行为的 PR。
+- 新功能涉及几个平台时，验你手上有的平台；没有机器的平台在「怎么验证的」里写明没验，由维护者在真机上测。
+  不改行为的改动（日志、注释、文档）与有测试 / 回放兜底的 Core 逻辑不受此限。
+- `crates/qingjian-render`、`crates/bamboo-slip` 与 `crates/bamboo-slip-i18n` 是双许可（GPL-3.0-or-later 或商业许可，见各自目录的 `LICENSE.md`）。**向这几个目录提交改动，即表示你同意以 [MIT-0](https://opensource.org/license/mit-0) 许可你的这部分贡献**：版权仍归你，你也可以照常以任何许可在别处使用它；这样维护者才能把它一起放进 GPL 与商业许可。贡献里有别人的代码或素材时，在 PR 里写清来源与许可。仓库其他部分的贡献只按 GPL-3.0-or-later。

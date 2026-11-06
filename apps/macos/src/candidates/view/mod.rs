@@ -1,0 +1,726 @@
+//! 候选窗口的内容视图：自绘顶部拼音行与若干候选，竖排一行一个、横排排成一行，一项高亮。
+//!
+//! 有两条画法：缺省交给 `qingjian-render` 出位图再贴（[`BitmapPainter`]），配置 `[general] renderer = "system"`
+//! 走下面用 AppKit 逐项绘制的旧路径（过渡期的退路，渲染器稳定一个版本后删）。
+
+mod click;
+mod context_menu;
+mod matrix;
+mod panel;
+mod size;
+
+use std::cell::{Cell, RefCell};
+
+use objc2::rc::Retained;
+use objc2::runtime::AnyObject;
+use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send};
+use objc2_app_kit::{
+    NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
+    NSAttributedStringNSStringDrawing, NSBezierPath, NSColor, NSEvent, NSEventModifierFlags,
+    NSFont, NSFontAttributeName, NSForegroundColorAttributeName, NSStrikethroughStyleAttributeName,
+    NSView,
+};
+use objc2_foundation::{
+    NSArray, NSAttributedString, NSDictionary, NSNumber, NSPoint, NSRect, NSSize, NSString,
+};
+use qingjian_platform::{CandidateRenderer, LayoutMode};
+
+use super::animation::AnimationTimer;
+use super::bitmap::{BitmapPainter, PanelPainter};
+use super::bounds::ViewBounds;
+use super::cloud_icon::CloudIcon;
+use super::frame::Frame;
+use super::preedit::Preedit;
+use super::preedit::PreeditStyle;
+use super::row::{Row, Tone};
+use super::theme::Theme;
+
+pub use click::{ClickHandler, PanelMouseHandler};
+pub use context_menu::MenuHandlers;
+
+/// 视图状态。
+pub struct Ivars {
+    /// 当前显示的一帧。
+    frame: RefCell<Frame>,
+
+    /// 深浅看谁的外观：垫着会随背后内容变深变浅的系统玻璃时是玻璃里的探针，否则看自己。
+    appearance_source: RefCell<Option<Retained<NSView>>>,
+
+    /// 竖排 / 横排。
+    layout: Cell<LayoutMode>,
+
+    /// 云联想的小云朵。
+    cloud: CloudIcon,
+
+    /// 主题。
+    theme: Theme,
+
+    /// 位图渲染器；`None` 走 AppKit 逐项绘制。按配置建或丢。
+    bitmap: RefCell<Option<BitmapPainter>>,
+
+    /// 符号面板的位图；第一次打开面板时建，建不起来留空（面板不显示）。
+    panel: RefCell<Option<PanelPainter>>,
+
+    /// 用户选的字族名（空为系统字体），换了要重建渲染器。
+    font: RefCell<String>,
+
+    /// 渲染器用的主题（浅色那一份），重建渲染器时要带上。
+    render_theme: RefCell<qingjian_render::Theme>,
+
+    /// 动画定时器：位图渲染器说有动画在播时跳。
+    animation: RefCell<AnimationTimer>,
+
+    /// 点中候选或译词时交给谁（host 注册）。
+    on_click: RefCell<Option<ClickHandler>>,
+
+    /// 符号面板里点中格子或标签时交给谁（host 注册）。
+    on_panel_mouse: RefCell<Option<PanelMouseHandler>>,
+
+    /// 触控板滚动攒下还不够一行的距离（点）。
+    scroll_rest: Cell<f64>,
+
+    /// 正在翻译框里拖选：上一次报出去的光标位置，没动就不再报。
+    drag: Cell<Option<usize>>,
+
+    /// 右键菜单的两头（host 注册）。
+    on_menu: RefCell<Option<MenuHandlers>>,
+
+    /// 右键菜单的面板，第一次右键时建。
+    menu: RefCell<Option<super::menu::MenuPanel>>,
+}
+
+/// preedit 光标的宽度。
+const CARET_WIDTH: f64 = 1.5;
+
+/// 云朵图标边长。
+const CLOUD_SIZE: f64 = 13.0;
+
+/// 云朵与后面文字的间距。
+const CLOUD_GAP: f64 = 4.0;
+
+/// 拿不到 SF Symbol 时的文字云朵。
+const CLOUD_FALLBACK: &str = "☁︎";
+
+/// preedit 与右侧整句补全之间的间距。
+const SENTENCE_GAP: f64 = 16.0;
+
+/// 横排时序号与候选词之间的间距。
+const INDEX_GAP: f64 = 3.0;
+
+/// 横排时高亮底色在候选两侧多出的宽度。
+const HIGHLIGHT_INSET: f64 = 5.0;
+
+/// `NSUnderlineStyleSingle`：删除线用单线。
+const STRIKE_SINGLE: isize = 1;
+
+/// 竖排的列宽与行高。
+struct Columns {
+    index_width: f64,
+    text_width: f64,
+    annotation_width: f64,
+    row_height: f64,
+}
+
+/// 横排时每一项的尺寸。
+struct Item {
+    index_width: f64,
+    text_width: f64,
+}
+
+define_class!(
+    // SAFETY: NSView 允许子类化；没有实现 Drop。
+    #[unsafe(super(NSView))]
+    #[thread_kind = MainThreadOnly]
+    #[ivars = Ivars]
+    pub struct CandidateView;
+
+    impl CandidateView {
+        /// 用左上角为原点的坐标系，行从上往下画。
+        #[unsafe(method(isFlipped))]
+        fn is_flipped(&self) -> bool {
+            true
+        }
+
+        /// 面板不激活，第一下点击就要算数（否则先被当成「激活窗口」吃掉）。
+        #[unsafe(method(acceptsFirstMouse:))]
+        fn accepts_first_mouse(&self, _event: Option<&NSEvent>) -> bool {
+            true
+        }
+
+        #[unsafe(method(mouseDown:))]
+        fn mouse_down(&self, event: &NSEvent) {
+            if event.modifierFlags().contains(NSEventModifierFlags::Control) {
+                self.right_clicked(event);
+            } else {
+                self.close_menu();
+                self.clicked(event);
+            }
+        }
+
+        #[unsafe(method(mouseDragged:))]
+        fn mouse_dragged(&self, event: &NSEvent) {
+            self.panel_dragged(event);
+        }
+
+        #[unsafe(method(mouseUp:))]
+        fn mouse_up(&self, _event: &NSEvent) {
+            self.ivars().drag.set(None);
+        }
+
+        #[unsafe(method(rightMouseDown:))]
+        fn right_mouse_down(&self, event: &NSEvent) {
+            self.right_clicked(event);
+        }
+
+        #[unsafe(method(scrollWheel:))]
+        fn scroll_wheel(&self, event: &NSEvent) {
+            self.scrolled(event);
+        }
+
+        #[unsafe(method(drawRect:))]
+        fn draw_rect(&self, _dirty: NSRect) {
+            if self.ivars().frame.borrow().is_panel() {
+                self.draw_panel();
+            } else if let Some(bitmap) = &mut *self.ivars().bitmap.borrow_mut() {
+                bitmap.draw(self.is_dark(), self.backing_scale());
+            } else {
+                self.draw();
+            }
+        }
+    }
+);
+
+impl CandidateView {
+    pub fn new(mtm: MainThreadMarker, theme: Theme) -> Retained<Self> {
+        let cloud = CloudIcon::new(&theme.cloud_color, CLOUD_SIZE);
+        let this = mtm.alloc::<Self>().set_ivars(Ivars {
+            frame: RefCell::new(Frame::default()),
+            appearance_source: RefCell::new(None),
+            layout: Cell::new(LayoutMode::default()),
+            cloud,
+            theme,
+            bitmap: RefCell::new(None),
+            panel: RefCell::new(None),
+            font: RefCell::new(String::new()),
+            render_theme: RefCell::new(qingjian_render::Theme::light()),
+            animation: RefCell::new(AnimationTimer::default()),
+            on_click: RefCell::new(None),
+            on_panel_mouse: RefCell::new(None),
+            scroll_rest: Cell::new(0.0),
+            drag: Cell::new(None),
+            on_menu: RefCell::new(None),
+            menu: RefCell::new(None),
+        });
+        unsafe { msg_send![super(this), initWithFrame: NSRect::ZERO] }
+    }
+
+    /// 候选窗字体（字族名，空为系统字体）。渲染器在用就当场重建。
+    pub fn set_font(&self, font: &str) {
+        if *self.ivars().font.borrow() == font {
+            return;
+        }
+        *self.ivars().font.borrow_mut() = font.to_owned();
+        let mut bitmap = self.ivars().bitmap.borrow_mut();
+        if bitmap.is_some() {
+            *bitmap = self.new_bitmap();
+            drop(bitmap);
+            self.setNeedsDisplay(true);
+        }
+    }
+
+    /// 渲染器主题，只对青简渲染器生效。配置或主题文件变了才会调，每次都当场重画。
+    pub fn set_render_theme(&self, theme: qingjian_render::Theme) {
+        *self.ivars().render_theme.borrow_mut() = theme.clone();
+        if let Some(panel) = &mut *self.ivars().panel.borrow_mut() {
+            panel.set_theme(theme.clone());
+        }
+        if let Some(bitmap) = &mut *self.ivars().bitmap.borrow_mut() {
+            bitmap.set_theme(theme);
+            self.setNeedsDisplay(true);
+        }
+        self.sync_animation();
+    }
+
+    /// 新建位图渲染器并带上当前主题。
+    fn new_bitmap(&self) -> Option<BitmapPainter> {
+        let mut bitmap = BitmapPainter::new(&self.ivars().font.borrow())?;
+        bitmap.set_theme(self.ivars().render_theme.borrow().clone());
+        Some(bitmap)
+    }
+
+    /// 青简渲染器 / 系统绘制。渲染器字体库加载失败就留在系统绘制。
+    pub fn set_renderer(&self, renderer: CandidateRenderer) {
+        let mut bitmap = self.ivars().bitmap.borrow_mut();
+        match renderer {
+            CandidateRenderer::Qingjian if bitmap.is_none() => {
+                *bitmap = self.new_bitmap();
+            }
+            CandidateRenderer::System if bitmap.is_some() => {
+                tracing::info!("候选窗切回 AppKit 绘制");
+                *bitmap = None;
+            }
+            _ => return,
+        }
+        drop(bitmap);
+        self.setNeedsDisplay(true);
+    }
+
+    /// 深浅改看这个视图的外观（`None` 看自己）；外观变了重画。
+    pub fn set_appearance_source(&self, source: Option<Retained<NSView>>) {
+        *self.ivars().appearance_source.borrow_mut() = source;
+        self.setNeedsDisplay(true);
+    }
+
+    /// 当前生效的外观是不是深色。
+    fn is_dark(&self) -> bool {
+        // SAFETY: 只读 AppKit 导出的常量名
+        let names =
+            unsafe { NSArray::from_slice(&[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]) };
+        let appearance = match &*self.ivars().appearance_source.borrow() {
+            Some(source) => source.effectiveAppearance(),
+            None => self.effectiveAppearance(),
+        };
+        let matched = appearance.bestMatchFromAppearancesWithNames(&names);
+        // SAFETY: 同上
+        matched.is_some_and(|name| unsafe { name.isEqualToString(NSAppearanceNameDarkAqua) })
+    }
+
+    /// 所在屏幕的倍数；还没进窗口时按 Retina 算。
+    fn backing_scale(&self) -> f32 {
+        self.window()
+            .map_or(2.0, |window| window.backingScaleFactor() as f32)
+    }
+
+    pub fn theme(&self) -> &Theme {
+        &self.ivars().theme
+    }
+
+    pub fn set_layout(&self, layout: LayoutMode) {
+        self.ivars().layout.set(layout);
+    }
+
+    /// 更新内容并返回视图该有的尺寸与内容区。
+    pub fn set_frame(&self, frame: &Frame) -> ViewBounds {
+        *self.ivars().frame.borrow_mut() = frame.clone();
+        self.setNeedsDisplay(true);
+        if let Some(panel) = &frame.panel {
+            self.stop_animation();
+            return self
+                .set_panel_frame(panel)
+                .unwrap_or_else(|| ViewBounds::filled(objc2_foundation::NSSize::ZERO));
+        }
+        let bounds = self.ivars().bitmap.borrow_mut().as_mut().map(|bitmap| {
+            bitmap.set_frame(
+                frame,
+                self.ivars().layout.get(),
+                self.is_dark(),
+                self.backing_scale(),
+            )
+        });
+        match bounds {
+            Some(bounds) => {
+                self.sync_animation();
+                bounds
+            }
+            None => ViewBounds::filled(self.preferred_size()),
+        }
+    }
+
+    /// 位图渲染器说有动画在播就起定时器。
+    fn sync_animation(&self) {
+        let next_frame = self
+            .ivars()
+            .bitmap
+            .borrow()
+            .as_ref()
+            .and_then(BitmapPainter::next_frame);
+        if let (Some(interval), Some(mtm)) = (next_frame, MainThreadMarker::new()) {
+            self.ivars()
+                .animation
+                .borrow_mut()
+                .start(mtm, self, interval);
+        }
+    }
+
+    /// 定时器每跳：要动画的下一帧并重画；播完就停。
+    pub fn animation_frame(&self) {
+        let next_frame = self
+            .ivars()
+            .bitmap
+            .borrow_mut()
+            .as_mut()
+            .and_then(BitmapPainter::tick);
+        self.setNeedsDisplay(true);
+        match (next_frame, MainThreadMarker::new()) {
+            // 过渡播完只剩循环动画时，间隔从 16 ms 换成 33 ms
+            (Some(interval), Some(mtm)) => self
+                .ivars()
+                .animation
+                .borrow_mut()
+                .start(mtm, self, interval),
+            _ => self.ivars().animation.borrow_mut().stop(),
+        }
+    }
+
+    /// 窗口收起：停动画、忘掉上一帧。
+    pub fn stop_animation(&self) {
+        self.ivars().animation.borrow_mut().stop();
+        if let Some(bitmap) = &mut *self.ivars().bitmap.borrow_mut() {
+            bitmap.forget();
+        }
+    }
+
+    /// 这一帧要在内容区底下垫的系统材质（圆角已换成点）；符号面板与 AppKit 逐项绘制都不垫。
+    pub fn material(&self) -> Option<qingjian_render::MaterialBacking> {
+        if self.ivars().frame.borrow().is_panel() {
+            return None;
+        }
+        self.ivars()
+            .bitmap
+            .borrow()
+            .as_ref()
+            .and_then(BitmapPainter::material)
+    }
+
+    /// 这一帧是位图（阴影画在位图里）：青简渲染器画的候选窗与符号面板；否则是 AppKit 逐项绘制，要系统阴影。
+    pub fn uses_bitmap(&self) -> bool {
+        self.ivars().frame.borrow().is_panel() || self.ivars().bitmap.borrow().is_some()
+    }
+
+    /// 画云朵，返回占用宽度（含间距）。`top` 是所在行文字的顶边，`line_height` 用来垂直居中。
+    fn draw_cloud(&self, x: f64, top: f64, line_height: f64) -> f64 {
+        let cloud = &self.ivars().cloud;
+        if cloud.is_symbol() {
+            cloud.draw(x, top + (line_height - cloud.width()) / 2.0);
+        } else {
+            let theme = self.theme();
+            let size = self.measure(CLOUD_FALLBACK, &theme.annotation_font);
+            self.draw_text(
+                CLOUD_FALLBACK,
+                &theme.annotation_font,
+                &theme.cloud_color,
+                top + (line_height - size.height) / 2.0,
+                x,
+            );
+        }
+        self.cloud_width()
+    }
+
+    fn columns(&self, rows: &[Row]) -> Columns {
+        let theme = self.theme();
+        let mut columns = Columns {
+            index_width: 0.0,
+            text_width: 0.0,
+            annotation_width: 0.0,
+            row_height: 0.0,
+        };
+        for row in rows {
+            let index = self.measure(&row.index, &theme.index_font);
+            let mut text = self.measure(&row.text, &theme.text_font);
+            if row.cloud {
+                text.width += self.cloud_width();
+            }
+            let annotation: f64 = row
+                .annotation
+                .iter()
+                .map(|(s, _)| self.measure(s, &theme.annotation_font).width)
+                .sum();
+            columns.index_width = columns.index_width.max(index.width);
+            columns.text_width = columns.text_width.max(text.width);
+            columns.annotation_width = columns.annotation_width.max(annotation);
+            columns.row_height = columns
+                .row_height
+                .max(text.height + theme.row_padding * 2.0);
+        }
+        columns
+    }
+
+    /// 横排各项的尺寸与统一行高。
+    fn items(&self, rows: &[Row]) -> (Vec<Item>, f64) {
+        let theme = self.theme();
+        let mut row_height: f64 = 0.0;
+        let items = rows
+            .iter()
+            .map(|row| {
+                let index = self.measure(&row.index, &theme.index_font);
+                let mut text = self.measure(&row.text, &theme.text_font);
+                if row.cloud {
+                    text.width += self.cloud_width();
+                }
+                row_height = row_height.max(text.height + theme.row_padding * 2.0);
+                Item {
+                    index_width: index.width,
+                    text_width: text.width,
+                }
+            })
+            .collect();
+        (items, row_height)
+    }
+
+    fn draw(&self) {
+        let theme = self.theme();
+        let frame = self.ivars().frame.borrow();
+        let bounds = self.bounds();
+
+        // 背景
+        theme.background.set();
+        NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(
+            bounds,
+            theme.corner_radius,
+            theme.corner_radius,
+        )
+        .fill();
+
+        let mut y = theme.padding;
+        y += self.draw_top_line(&frame, y);
+        match self.ivars().layout.get() {
+            LayoutMode::Vertical => self.draw_vertical(&frame, y, bounds),
+            LayoutMode::Horizontal if frame.columns > 0 => self.draw_matrix(&frame, y, bounds),
+            LayoutMode::Horizontal => self.draw_horizontal(&frame, y, bounds),
+        }
+    }
+
+    /// 顶部拼音行：各段按样式画、我们自己画光标（不依赖应用画插入点）、右侧整句补全。返回占用高度。
+    fn draw_top_line(&self, frame: &Frame, y: f64) -> f64 {
+        if !frame.has_top_line() {
+            return 0.0;
+        }
+        let theme = self.theme();
+        let line_height = self.measure("x", &theme.annotation_font).height;
+        let top = y + theme.row_padding;
+        let mut x = theme.padding;
+        if let Some(preedit) = &frame.preedit {
+            x += self.draw_preedit(preedit, x, top, line_height);
+            if frame.trailing().is_some() {
+                x += SENTENCE_GAP;
+            }
+        }
+        // 整句补全：云朵 + 句子，颜色与本地候选区分；临时状态灰字、不带云朵
+        if let Some((text, cloud)) = frame.trailing() {
+            let color = if cloud {
+                x += self.draw_cloud(x, top, line_height);
+                &theme.cloud_color
+            } else {
+                &theme.gloss_color
+            };
+            self.draw_text(text, &theme.annotation_font, color, top, x);
+        }
+        line_height + theme.row_padding * 2.0
+    }
+
+    /// 画拼音行的各段与光标，返回占用宽度（含光标）。
+    fn draw_preedit(&self, preedit: &Preedit, x: f64, top: f64, line_height: f64) -> f64 {
+        let theme = self.theme();
+        let mut cursor_x = x;
+        for segment in &preedit.segments {
+            let (color, strike) = match segment.style {
+                PreeditStyle::Typed => (&theme.gloss_color, false),
+                PreeditStyle::Rest => (&theme.pos_color, false),
+                PreeditStyle::Struck => (&theme.pos_color, true),
+            };
+            let string = self.attributed(&segment.text, &theme.annotation_font, color, strike);
+            string.drawAtPoint(NSPoint::new(cursor_x, top));
+            cursor_x += string.size().width;
+        }
+        let caret_x = x + self
+            .measure(&preedit.before_cursor(), &theme.annotation_font)
+            .width;
+        theme.text_color.set();
+        NSBezierPath::fillRect(NSRect::new(
+            NSPoint::new(caret_x, top),
+            NSSize::new(CARET_WIDTH, line_height),
+        ));
+        cursor_x - x + CARET_WIDTH
+    }
+
+    fn draw_vertical(&self, frame: &Frame, mut y: f64, bounds: NSRect) {
+        let theme = self.theme();
+        let columns = self.columns(&frame.rows);
+        let text_x = theme.padding + columns.index_width + theme.column_gap;
+        let annotation_x = text_x + columns.text_width + theme.column_gap;
+        for (i, row) in frame.rows.iter().enumerate() {
+            if i == frame.highlighted {
+                let rect = NSRect::new(
+                    NSPoint::new(theme.padding / 2.0, y),
+                    NSSize::new(bounds.size.width - theme.padding, columns.row_height),
+                );
+                self.fill_highlight(rect);
+            }
+            // 各列底部对齐到候选词基线附近：小字往下挪一点
+            let text_size = self.measure(&row.text, &theme.text_font);
+            let baseline = y + theme.row_padding;
+            let small_offset = self.small_offset(text_size.height);
+            self.draw_text(
+                &row.index,
+                &theme.index_font,
+                &theme.index_color,
+                baseline + small_offset,
+                theme.padding,
+            );
+            self.draw_word(row, text_x, baseline, text_size.height);
+            let mut x = annotation_x;
+            for (segment, tone) in &row.annotation {
+                x += self.draw_text(
+                    segment,
+                    &theme.annotation_font,
+                    self.tone_color(*tone),
+                    baseline + small_offset,
+                    x,
+                );
+            }
+            y += columns.row_height;
+        }
+        if let Some(footer) = frame.footer.as_deref() {
+            let size = self.measure(footer, &theme.index_font);
+            self.draw_text(
+                footer,
+                &theme.index_font,
+                &theme.index_color,
+                y + theme.row_padding,
+                bounds.size.width - theme.padding - size.width,
+            );
+        }
+    }
+
+    /// 横排：候选排成一行，高亮那个下面单独一行译文，页码在行尾。
+    fn draw_horizontal(&self, frame: &Frame, y: f64, bounds: NSRect) {
+        if frame.rows.is_empty() {
+            return;
+        }
+        let theme = self.theme();
+        let (items, row_height) = self.items(&frame.rows);
+        let baseline = y + theme.row_padding;
+        let mut x = theme.padding + HIGHLIGHT_INSET;
+        for (i, (row, item)) in frame.rows.iter().zip(&items).enumerate() {
+            let item_width = item.index_width + INDEX_GAP + item.text_width;
+            if i == frame.highlighted {
+                let rect = NSRect::new(
+                    NSPoint::new(x - HIGHLIGHT_INSET, y),
+                    NSSize::new(item_width + HIGHLIGHT_INSET * 2.0, row_height),
+                );
+                self.fill_highlight(rect);
+            }
+            let text_size = self.measure(&row.text, &theme.text_font);
+            self.draw_text(
+                &row.index,
+                &theme.index_font,
+                &theme.index_color,
+                baseline + self.small_offset(text_size.height),
+                x,
+            );
+            self.draw_word(
+                row,
+                x + item.index_width + INDEX_GAP,
+                baseline,
+                text_size.height,
+            );
+            x += item_width + theme.column_gap;
+        }
+        if let Some(footer) = frame.footer.as_deref() {
+            let size = self.measure(footer, &theme.index_font);
+            let text_height = self.measure("x", &theme.text_font).height;
+            self.draw_text(
+                footer,
+                &theme.index_font,
+                &theme.index_color,
+                baseline + self.small_offset(text_height),
+                bounds.size.width - theme.padding - size.width,
+            );
+        }
+        // 高亮候选的译文
+        if let Some(row) = frame.rows.get(frame.highlighted) {
+            let mut x = theme.padding + HIGHLIGHT_INSET;
+            let top = y + row_height + theme.row_padding / 2.0;
+            for (segment, tone) in &row.annotation {
+                x += self.draw_text(
+                    segment,
+                    &theme.annotation_font,
+                    self.tone_color(*tone),
+                    top,
+                    x,
+                );
+            }
+        }
+    }
+
+    /// 候选词本体：云端词前带云朵、换颜色。
+    fn draw_word(&self, row: &Row, x: f64, baseline: f64, text_height: f64) {
+        let theme = self.theme();
+        let mut word_x = x;
+        if row.cloud {
+            word_x += self.draw_cloud(word_x, baseline, text_height);
+        }
+        let color = if row.cloud {
+            &theme.cloud_color
+        } else {
+            &theme.text_color
+        };
+        self.draw_text(&row.text, &theme.text_font, color, baseline, word_x);
+    }
+
+    fn fill_highlight(&self, rect: NSRect) {
+        let theme = self.theme();
+        theme.highlight.set();
+        NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(
+            rect,
+            theme.corner_radius / 2.0,
+            theme.corner_radius / 2.0,
+        )
+        .fill();
+    }
+
+    /// 小字相对候选词往下挪多少，让两者底部对齐。
+    fn small_offset(&self, text_height: f64) -> f64 {
+        (text_height - self.measure("x", &self.theme().annotation_font).height).max(0.0)
+    }
+
+    fn tone_color(&self, tone: Tone) -> &NSColor {
+        match tone {
+            Tone::Gloss => &self.theme().gloss_color,
+            Tone::Fresh => &self.theme().fresh_color,
+            Tone::Faint | Tone::Pos | Tone::Separator => &self.theme().pos_color,
+        }
+    }
+
+    /// 画一段文字，返回它的宽度。参数顺序是 (顶边 y, 左边 x)，与画图时「先定行再定列」的习惯一致。
+    fn draw_text(&self, text: &str, font: &NSFont, color: &NSColor, y: f64, x: f64) -> f64 {
+        let string = self.attributed(text, font, color, false);
+        string.drawAtPoint(NSPoint::new(x, y));
+        string.size().width
+    }
+
+    fn measure(&self, text: &str, font: &NSFont) -> NSSize {
+        self.attributed(text, font, &self.theme().text_color, false)
+            .size()
+    }
+
+    fn attributed(
+        &self,
+        text: &str,
+        font: &NSFont,
+        color: &NSColor,
+        strike: bool,
+    ) -> Retained<NSAttributedString> {
+        let strike_style = NSNumber::new_isize(STRIKE_SINGLE);
+        // SAFETY: 只读 AppKit 导出的属性名常量
+        let (keys, objects): (Vec<&NSString>, Vec<&AnyObject>) = unsafe {
+            if strike {
+                (
+                    vec![
+                        NSFontAttributeName,
+                        NSForegroundColorAttributeName,
+                        NSStrikethroughStyleAttributeName,
+                    ],
+                    vec![font, color, &strike_style],
+                )
+            } else {
+                (
+                    vec![NSFontAttributeName, NSForegroundColorAttributeName],
+                    vec![font, color],
+                )
+            }
+        };
+        let attributes = NSDictionary::from_slices(&keys, &objects);
+        unsafe { NSAttributedString::new_with_attributes(&NSString::from_str(text), &attributes) }
+    }
+}
