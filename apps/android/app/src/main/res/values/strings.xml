@@ -403,4 +403,20 @@
     <string name="update_permission_title">允许安装更新</string>
     <string name="update_permission_note">请在系统设置中允许猛人输入法安装应用，返回后继续；系统仍会要求你确认本次更新。</string>
     <string name="update_permission_open">打开系统设置</string>
+
+    <string name="sync_relay_title">公网中转</string>
+    <string name="sync_relay_enabled">不在同一网络时使用中转</string>
+    <string name="sync_relay_note">局域网优先，只通过自己的中转同步文字和链接；内容端到端加密。两端需要同时在线。</string>
+    <string name="sync_relay_url">中转地址</string>
+    <string name="sync_relay_url_hint">wss://relay.example.com:8443/v1/clipboard</string>
+    <string name="sync_relay_token">中转访问令牌</string>
+    <string name="sync_relay_token_hint">填写两端相同的随机令牌（至少 24 位）</string>
+    <string name="sync_relay_keep">已加密保存（留空保留）</string>
+    <string name="sync_relay_bad_token">令牌未保存，请填写至少 24 位、不含空格的令牌</string>
+    <string name="sync_relay_clear_token">删除中转令牌</string>
+    <string name="sync_relay_status">中转连接</string>
+    <string name="sync_relay_connected">已连接</string>
+    <string name="sync_relay_disconnected">未连接：检查地址、令牌和网络</string>
+    <string name="sync_relay_devices">中转在线设备</string>
+    <string name="sync_relay_device">中转设备 #%1$s</string>
 </resources>

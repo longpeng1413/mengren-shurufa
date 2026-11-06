@@ -39,6 +39,8 @@ pub enum Message {
     /// Esc：扔掉没存的改动。
     Cancel(FieldId),
     TestCloud,
+    ShowRelayToken,
+    ClearRelayToken,
     /// 开始录这个快捷键。
     Record(Shortcut),
     /// 录制中按下的键。

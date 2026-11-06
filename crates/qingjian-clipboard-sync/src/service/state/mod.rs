@@ -5,7 +5,7 @@ mod pending_code;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::mpsc::Sender;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -19,7 +19,7 @@ use crate::peers::PeerBook;
 pub use nearby::Nearby;
 pub(super) use pending_code::PendingCode;
 
-pub(super) struct Shared {
+pub(crate) struct Shared {
     pub identity: Identity,
 
     pub name: String,
@@ -32,14 +32,14 @@ pub(super) struct Shared {
 
     pub book: Mutex<PeerBook>,
 
-    pub replica: LockedReplica,
+    pub(in crate::service) replica: LockedReplica,
 
     pub nearby: Mutex<HashMap<String, Nearby>>,
 
-    pub pending: Mutex<Option<PendingCode>>,
+    pub(in crate::service) pending: Mutex<Option<PendingCode>>,
 
     /// 各已配对设备的连接结果，按设备 id。
-    pub links: Mutex<HashMap<String, Link>>,
+    pub(in crate::service) links: Mutex<HashMap<String, Link>>,
 
     /// 设备页开着：对账勤一些，状态才是新的。
     pub watching: AtomicBool,
@@ -49,11 +49,21 @@ pub(super) struct Shared {
     /// 上次扫描找到的设备，下次扫不到就从附近设备里拿掉。
     pub scanned: Mutex<HashSet<String>>,
 
+    pub relay: Mutex<crate::relay::RelayConfig>,
+
+    pub relay_peers: Mutex<Vec<String>>,
+
+    pub relay_connected: AtomicBool,
+
+    pub routes: Mutex<HashMap<String, bool>>,
+
+    pub relay_active: AtomicUsize,
+
     events: Sender<SyncEvent>,
 }
 
 impl Shared {
-    pub fn new(
+    pub(in crate::service) fn new(
         identity: Identity,
         name: String,
         model: String,
@@ -75,6 +85,11 @@ impl Shared {
             watching: AtomicBool::new(false),
             scanning: AtomicBool::new(false),
             scanned: Mutex::new(HashSet::new()),
+            relay: Mutex::new(crate::relay::RelayConfig::default()),
+            relay_peers: Mutex::new(Vec::new()),
+            relay_connected: AtomicBool::new(false),
+            routes: Mutex::new(HashMap::new()),
+            relay_active: AtomicUsize::new(0),
             events,
         }
     }

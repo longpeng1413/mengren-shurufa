@@ -151,6 +151,9 @@ pub(super) fn spawn_worker(
 }
 
 fn resync_interval(shared: &Shared) -> Duration {
+    if lock(&shared.relay).enabled {
+        return Duration::from_secs(5);
+    }
     if shared.watching.load(Ordering::Relaxed) {
         WATCH_INTERVAL
     } else {

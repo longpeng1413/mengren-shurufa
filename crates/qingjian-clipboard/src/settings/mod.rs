@@ -40,6 +40,12 @@ pub struct ClipSettings {
     /// 同步到局域网里配对的设备。缺省关，关着时不监听端口、不公布自己。
     pub sync_enabled: bool,
 
+    pub relay_enabled: bool,
+
+    pub relay_url: String,
+
+    pub relay_revision: String,
+
     /// 同步时屏幕边缘亮霓虹灯。
     pub sync_neon: bool,
 
@@ -76,6 +82,9 @@ impl Default for ClipSettings {
             history_limit: DEFAULT_HISTORY_LIMIT,
             paused: false,
             sync_enabled: false,
+            relay_enabled: false,
+            relay_url: String::new(),
+            relay_revision: String::new(),
             sync_neon: true,
             device_name: String::new(),
             excluded_apps: DEFAULT_EXCLUDED
@@ -181,6 +190,14 @@ impl ClipSettings {
                 .as_ref()
                 .and_then(toml::Value::as_bool)
                 .unwrap_or(defaults.sync_neon),
+            relay_enabled: file
+                .clipboard
+                .relay_enabled
+                .as_ref()
+                .and_then(toml::Value::as_bool)
+                .unwrap_or(false),
+            relay_url: text_of(&file.clipboard.relay_url).unwrap_or_default(),
+            relay_revision: text_of(&file.clipboard.relay_revision).unwrap_or_default(),
             device_name: text_of(&file.clipboard.device_name).unwrap_or(defaults.device_name),
             excluded_apps: file
                 .clipboard

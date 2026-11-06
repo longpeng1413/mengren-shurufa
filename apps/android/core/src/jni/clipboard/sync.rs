@@ -79,6 +79,7 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncSt
     name: JString<'local>,
     model: JString<'local>,
     limit: jint,
+    relay: JString<'local>,
 ) -> jboolean {
     let (Ok(user_dir), Ok(name), Ok(model)) = (
         env.get_string(&user_dir).map(String::from),
@@ -86,6 +87,17 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncSt
         env.get_string(&model).map(String::from),
     ) else {
         return JNI_FALSE;
+    };
+    let relay = env
+        .get_string(&relay)
+        .map(String::from)
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .unwrap_or_default();
+    let relay = qingjian_clipboard_sync::relay::RelayConfig {
+        enabled: relay["enabled"].as_bool().unwrap_or(false),
+        url: relay["url"].as_str().unwrap_or_default().to_owned(),
+        token: relay["token"].as_str().unwrap_or_default().to_owned(),
     };
     let started = catch_unwind(|| {
         *running() = None;
@@ -98,6 +110,7 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncSt
                 name,
                 model,
                 own_discovery: false,
+                relay,
             },
             Box::new(HistoryReplica::new(directory, limit)),
             sender,
@@ -283,6 +296,7 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncDe
                     "id": state.peer.device_id,
                     "name": state.peer.name,
                     "status": status,
+                    "relay": state.via_relay,
                     "last_seen": state.peer.last_seen,
                 })
             })
@@ -298,7 +312,7 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncDe
                 })
             })
             .collect();
-        Some(json!({"peers": peers, "nearby": nearby}).to_string())
+        Some(json!({"peers": peers, "nearby": nearby, "relay_connected":service.relay_connected(), "relay_peers": service.relay_peers()}).to_string())
     });
     match devices {
         Ok(Some(json)) => to_java(&env, &json),
@@ -363,14 +377,13 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncJo
     ) else {
         return JNI_FALSE;
     };
-    let Ok(address) = address.trim().parse() else {
-        return JNI_FALSE;
-    };
     let joined = catch_unwind(|| {
         let guard = running();
         let running = guard.as_ref()?;
-        running.service.join_pairing(address, code);
-        Some(())
+        running
+            .service
+            .join_target(address.trim(), code)
+            .then_some(())
     });
     if matches!(joined, Ok(Some(()))) {
         JNI_TRUE

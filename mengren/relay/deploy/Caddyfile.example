@@ -1,0 +1,30 @@
+{
+    log default {
+        format filter {
+            wrap json
+            fields {
+                request delete
+            }
+        }
+    }
+    admin off
+    auto_https disable_redirects
+    servers {
+        protocols h1 h2
+    }
+}
+
+https://relay.example.com:8443 {
+    tls {
+        issuer acme {
+            disable_tlsalpn_challenge
+        }
+    }
+    @relay path /healthz /v1/clipboard/*
+    handle @relay {
+        reverse_proxy 127.0.0.1:18319
+    }
+    handle {
+        respond 404
+    }
+}

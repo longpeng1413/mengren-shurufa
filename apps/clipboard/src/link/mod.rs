@@ -95,6 +95,11 @@ impl SyncLink {
                 name: self.name.clone(),
                 model: computer_name(),
                 own_discovery: true,
+                relay: qingjian_clipboard_sync::relay::RelayConfig {
+                    enabled: settings.relay_enabled,
+                    url: settings.relay_url.clone(),
+                    token: relay_token(),
+                },
             },
             Box::new(replica),
             sender,
@@ -107,4 +112,14 @@ impl SyncLink {
             service.notify_changed();
         }
     }
+}
+
+#[cfg(windows)]
+fn relay_token() -> String {
+    qingjian_platform::member::load_relay_secret().unwrap_or_default()
+}
+
+#[cfg(not(windows))]
+fn relay_token() -> String {
+    String::new()
 }

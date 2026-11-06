@@ -1,4 +1,4 @@
-//! 青简剪贴板的设备间同步，不经过任何服务器。打开同步时才建 [`SyncService`]，平台只提供 [`Replica`]。
+//! 剪贴板设备间同步：局域网直连，或可选的自有公网中转；内容始终端到端加密。打开同步时才建 [`SyncService`]，平台只提供 [`Replica`]。
 //!
 //! 通道只要求一条可靠的字节流（[`std::io::Read`] + [`std::io::Write`]），换一种传输方式时配对、加密与合并都不用改：
 //! - 配对（[`channel::pair_host`]、[`channel::pair_join`]）：一台显示 6 位配对码，另一台输入。码经 SPAKE2 换出密钥，猜错就作废，抓包也算不出来。
@@ -12,6 +12,7 @@ pub mod error;
 pub mod identity;
 pub mod peers;
 pub mod record;
+pub mod relay;
 pub mod service;
 pub mod sync;
 

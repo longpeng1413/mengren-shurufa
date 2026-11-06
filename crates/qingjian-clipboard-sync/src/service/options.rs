@@ -14,4 +14,6 @@ pub struct SyncOptions {
 
     /// 自己用 mDNS 公布和发现。安卓关掉，由系统的 NsdManager 代劳，结果经 [`super::SyncService::report`] 交进来。
     pub own_discovery: bool,
+
+    pub relay: crate::relay::RelayConfig,
 }

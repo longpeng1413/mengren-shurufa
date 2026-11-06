@@ -14,23 +14,38 @@ use crate::error::SyncError;
 use crate::peers::Peer;
 use crate::sync::{Progress, Replica, run_initiator, run_responder};
 
-pub(super) fn handle_incoming(mut stream: TcpStream, address: SocketAddr, shared: &Shared) {
-    let result = (|| {
-        stream.set_nonblocking(false)?;
-        stream.set_read_timeout(Some(IO_TIMEOUT))?;
-        stream.set_write_timeout(Some(IO_TIMEOUT))?;
-        match read_opening(&mut stream)? {
-            Opening::Pair => host_pairing(stream, address, shared),
-            Opening::Sync => respond(stream, address, shared),
-            Opening::Info => scan::answer(&mut stream, shared),
-        }
-    })();
-    if let Err(error) = result {
-        tracing::info!(%error, %address, "incoming connection ended");
+pub(super) fn handle_incoming(stream: TcpStream, address: SocketAddr, shared: &Shared) {
+    if stream
+        .set_nonblocking(false)
+        .and_then(|()| stream.set_read_timeout(Some(IO_TIMEOUT)))
+        .and_then(|()| stream.set_write_timeout(Some(IO_TIMEOUT)))
+        .is_ok()
+    {
+        handle_stream(stream, Some(address), shared);
     }
 }
 
-fn host_pairing(stream: TcpStream, address: SocketAddr, shared: &Shared) -> Result<(), SyncError> {
+pub(crate) fn handle_stream<S: std::io::Read + std::io::Write>(
+    mut stream: S,
+    address: Option<SocketAddr>,
+    shared: &Shared,
+) {
+    let result = (|| match read_opening(&mut stream)? {
+        Opening::Pair => host_pairing(stream, address, shared),
+        Opening::Sync => respond(stream, address, shared),
+        Opening::Info if address.is_some() => scan::answer(&mut stream, shared),
+        Opening::Info => Err(SyncError::Handshake),
+    })();
+    if result.is_err() {
+        tracing::debug!(relay = address.is_none(), "Incoming sync ended");
+    }
+}
+
+fn host_pairing<S: std::io::Read + std::io::Write>(
+    stream: S,
+    address: Option<SocketAddr>,
+    shared: &Shared,
+) -> Result<(), SyncError> {
     // 先取走再握手：一个码只给一次机会，猜错就作废
     let pending = lock(&shared.pending).take();
     let code = pending
@@ -48,7 +63,7 @@ fn host_pairing(stream: TcpStream, address: SocketAddr, shared: &Shared) -> Resu
         lock(&shared.book).add(
             channel.remote(),
             hello.name.clone(),
-            Some(hello.address_from(address)),
+            address.map(|address| hello.address_from(address)),
         )?;
         shared.record_link(&device_id_of(channel.remote()), true);
         Ok(hello.name)
@@ -60,20 +75,35 @@ fn host_pairing(stream: TcpStream, address: SocketAddr, shared: &Shared) -> Resu
     result.map(drop)
 }
 
-fn respond(stream: TcpStream, address: SocketAddr, shared: &Shared) -> Result<(), SyncError> {
+fn respond<S: std::io::Read + std::io::Write>(
+    stream: S,
+    address: Option<SocketAddr>,
+    shared: &Shared,
+) -> Result<(), SyncError> {
     let mut channel = accept(stream, &shared.identity, |key| {
         lock(&shared.book).contains(key)
     })?;
     let device_id = device_id_of(channel.remote());
     let peer = peer_name(shared, &device_id);
-    remember_new_ip(shared, &device_id, address);
+    if let Some(address) = address {
+        remember_new_ip(shared, &device_id, address);
+    }
     let mut replica = shared.replica.clone();
     let before = newest_at(&replica);
     let mut watcher = Watcher::new(shared, peer);
-    let result = run_responder(&mut channel, &mut replica, &mut |progress| {
-        watcher.observe(progress);
+    let mut filtered = crate::relay::TextReplica(&mut replica);
+    let selected: &mut dyn Replica = if address.is_none() {
+        &mut filtered
+    } else {
+        filtered.0
+    };
+    let result = run_responder(&mut channel, selected, &mut |progress| {
+        watcher.observe(progress)
     });
     watcher.finish(&result, &replica, before);
+    if result.is_ok() {
+        lock(&shared.routes).insert(device_id.clone(), address.is_none());
+    }
     shared.record_link(&device_id, result.is_ok());
     result.map(drop)
 }
@@ -100,27 +130,27 @@ pub(super) fn sync_peer(shared: &Shared, peer: &Peer) {
     let online = lock(&shared.nearby)
         .get(&peer.device_id)
         .map(|nearby| nearby.address);
-    let Some(address) = online.or_else(|| peer.last_address.as_deref()?.parse().ok()) else {
-        shared.record_link(&peer.device_id, false);
-        return;
-    };
-    let result = (|| {
-        let stream = TcpStream::connect_timeout(&address, CONNECT_TIMEOUT)?;
-        stream.set_read_timeout(Some(IO_TIMEOUT))?;
-        stream.set_write_timeout(Some(IO_TIMEOUT))?;
-        let expected = peer.device_id.clone();
-        let mut channel = connect(stream, &shared.identity, |key| {
-            device_id_of(key) == expected
-        })?;
-        let mut replica = shared.replica.clone();
-        let before = newest_at(&replica);
-        let mut watcher = Watcher::new(shared, peer.name.clone());
-        let result = run_initiator(&mut channel, &mut replica, &mut |progress| {
-            watcher.observe(progress);
-        });
-        watcher.finish(&result, &replica, before);
-        result
-    })();
+    let address = online.or_else(|| peer.last_address.as_deref()?.parse().ok());
+    let mut result = address.map_or_else(
+        || Err(SyncError::Io(std::io::Error::other("No LAN address"))),
+        |address| {
+            let stream = TcpStream::connect_timeout(&address, CONNECT_TIMEOUT)?;
+            stream.set_read_timeout(Some(IO_TIMEOUT))?;
+            stream.set_write_timeout(Some(IO_TIMEOUT))?;
+            initiate(shared, peer, stream, false)
+        },
+    );
+    if result.is_err()
+        && !matches!(result, Err(SyncError::NotPaired))
+        && lock(&shared.relay_peers).contains(&peer.device_id)
+    {
+        let config = lock(&shared.relay).clone();
+        if config.enabled {
+            result =
+                crate::relay::client::dial(&config, &shared.identity.device_id(), &peer.device_id)
+                    .and_then(|stream| initiate(shared, peer, stream, true));
+        }
+    }
     if matches!(result, Err(SyncError::NotPaired)) {
         // 对方取消了配对：这边也删掉，不再连、不亮红灯
         tracing::info!(peer = %peer.name, "peer unpaired this device, forgetting it");
@@ -140,6 +170,31 @@ pub(super) fn sync_peer(shared: &Shared, peer: &Peer) {
             });
         }
     }
+}
+
+fn initiate<S: std::io::Read + std::io::Write>(
+    shared: &Shared,
+    peer: &Peer,
+    stream: S,
+    relay: bool,
+) -> Result<usize, SyncError> {
+    let mut channel = connect(stream, &shared.identity, |key| {
+        device_id_of(key) == peer.device_id
+    })?;
+    let mut replica = shared.replica.clone();
+    let before = newest_at(&replica);
+    let mut watcher = Watcher::new(shared, peer.name.clone());
+    let mut filtered = crate::relay::TextReplica(&mut replica);
+    let selected: &mut dyn Replica = if relay { &mut filtered } else { filtered.0 };
+    let result = run_initiator(&mut channel, selected, &mut |progress| {
+        watcher.observe(progress)
+    });
+    watcher.finish(&result, &replica, before);
+    if result.is_ok() {
+        lock(&shared.routes).insert(peer.device_id.clone(), relay);
+    }
+    tracing::debug!(relay, success = result.is_ok(), "Sync round completed");
+    result
 }
 
 fn peer_name(shared: &Shared, device_id: &str) -> String {

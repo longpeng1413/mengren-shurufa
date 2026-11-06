@@ -52,6 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             name,
             model: "peer".to_owned(),
             own_discovery: true,
+            relay: Default::default(),
         },
         Box::new(Memory(items.clone())),
         sender,

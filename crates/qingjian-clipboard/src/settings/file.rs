@@ -33,6 +33,12 @@ pub(super) struct ClipboardSection {
 
     pub(super) sync_enabled: Option<toml::Value>,
 
+    pub(super) relay_enabled: Option<toml::Value>,
+
+    pub(super) relay_url: Option<toml::Value>,
+
+    pub(super) relay_revision: Option<toml::Value>,
+
     pub(super) sync_neon: Option<toml::Value>,
 
     pub(super) device_name: Option<toml::Value>,

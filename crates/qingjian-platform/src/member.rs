@@ -66,6 +66,39 @@ fn load_youdao_secret() -> Option<String> {
     String::from_utf8(crypt(&std::fs::read(path).ok()?, false).ok()?).ok()
 }
 
+/// 中转令牌独立于会员和有道，不写入普通配置或导出文件。
+pub fn save_relay_secret(secret: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if !(24..=256).contains(&secret.len()) || !secret.bytes().all(|byte| byte.is_ascii_graphic()) {
+        return Err("Invalid relay access token".into());
+    }
+    let path = path()
+        .ok_or("No local data directory")?
+        .with_file_name("clipboard-relay.dpapi");
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let temporary = path.with_extension("tmp");
+    std::fs::write(&temporary, crypt(secret.as_bytes(), true)?)?;
+    std::fs::rename(temporary, path)?;
+    Ok(())
+}
+
+pub fn load_relay_secret() -> Option<String> {
+    let path = path()?.with_file_name("clipboard-relay.dpapi");
+    String::from_utf8(crypt(&std::fs::read(path).ok()?, false).ok()?).ok()
+}
+
+pub fn clear_relay_secret() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let path = path()
+        .ok_or("No local data directory")?
+        .with_file_name("clipboard-relay.dpapi");
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
 /// 将整套凭据加密后替换磁盘记录；不会创建明文临时文件。
 pub fn save(
     path: &Path,

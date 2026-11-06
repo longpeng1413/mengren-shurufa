@@ -811,3 +811,10 @@ Windows Server 受控退出使用 ExitCode 返回以刷新既有 tracing 队列�
 Windows 的后台任务集中在 `apps/settings/src/jobs/update/`，只把校验后的路径交给系统安装器；旧配置通过 Server 一次性迁移到默认检查开启，后续保留用户选择。安卓 `update/` 只做系统代理、状态展示与 PackageInstaller 会话，SHA256、签名验证和版本挑选仍在 Rust。
 
 `mengren/release.py` 在 Windows 上验证两端安装包版本和 APK 原签名，再把审查后的源码追加到独立公开历史；私钥、签名备份、私人说明、设计素材和原私有历史不上传。签名工具支持 Windows 系统随机源及 DPAPI 密钥文件，私钥始终不打印。
+
+
+## 猛人 0.3.5 公网中转
+
+`qingjian-clipboard-sync::relay` 增加 WSS 字节流、登记与接入、文字过滤和有界服务端；`SyncOptions.relay` 默认关闭。原 PAKE、Noise、内容 ID 与对账规则不变。Windows 的 `ClipSettings` 与平台配置同步读取 `relay_enabled`、`relay_url`、`relay_revision`，令牌只从 DPAPI 注入；安卓通过 Keystore 解密后在内存经 JNI 传递。中转路径与局域网路径都保留最近成功路线。服务入口、systemd 与 Caddy 模板在 `mengren/relay`，详细规格见 `docs/design/clipboard-relay.md`，用户设置见 `docs/user/help/mengren-relay.md`。公网验证工具 `probe` 只使用合成记录与临时身份。
+
+回环 TCP 协议测试不启动 mDNS，避免本机虚拟网卡改变指定的测试地址；加密测试和同步测试以完成信号等待接收方读完，避免 Windows 在测试线程过早退出时重置最后一条响应。生产协议未为此增加消息。

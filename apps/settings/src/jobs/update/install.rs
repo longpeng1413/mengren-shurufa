@@ -89,6 +89,21 @@ impl UpdateInstall {
     pub fn finish(&mut self) -> Option<Result<PathBuf, String>> {
         let result = self.result.lock().ok()?.take()?;
         self.running = false;
-        Some(result)
+        Some(if self.cancelled.load(Ordering::Relaxed) {
+            Err(tr("update.cancelled").to_owned())
+        } else {
+            result
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn cancel_after_download_before_wake_does_not_launch_installer() {
+        let mut job = super::UpdateInstall::default();
+        *job.result.lock().unwrap() = Some(Ok(std::path::PathBuf::from("test-setup.exe")));
+        job.cancel();
+        assert!(job.finish().unwrap().is_err());
     }
 }

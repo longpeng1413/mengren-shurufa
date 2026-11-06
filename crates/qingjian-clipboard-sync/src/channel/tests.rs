@@ -20,13 +20,16 @@ fn right_code_pairs_and_both_learn_the_other_key() {
     let (host, join) = (Identity::generate().unwrap(), Identity::generate().unwrap());
     let (host_public, join_public) = (host.public, join.public);
     let (client, mut server) = tcp_pair();
+    let (finished, wait) = std::sync::mpsc::channel();
     let hosting = thread::spawn(move || {
         assert_eq!(read_opening(&mut server).unwrap(), Opening::Pair);
         let channel = pair_host(server, &host, "123456").unwrap();
         assert_eq!(channel.remote(), &join_public);
+        wait.recv().unwrap();
     });
     let channel = pair_join(client, &join, "123456").unwrap();
     assert_eq!(channel.remote(), &host_public);
+    finished.send(()).unwrap();
     hosting.join().unwrap();
 }
 
@@ -82,15 +85,18 @@ fn large_messages_survive_chunking_and_are_encrypted() {
     let (client, mut server) = tcp_pair();
     let message: Vec<u8> = (0..300_000_u32).map(|index| index as u8).collect();
     let expected = message.clone();
+    let (finished, wait) = std::sync::mpsc::channel();
     let hosting = thread::spawn(move || {
         read_opening(&mut server).unwrap();
         let mut channel = accept(server, &host, |_| true).unwrap();
         assert_eq!(channel.receive().unwrap(), expected);
         channel.send(b"").unwrap();
+        wait.recv().unwrap();
     });
     let mut channel = connect(client, &join, |_| true).unwrap();
     channel.send(&message).unwrap();
     assert!(channel.receive().unwrap().is_empty());
+    finished.send(()).unwrap();
     hosting.join().unwrap();
 }
 

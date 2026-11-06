@@ -9,6 +9,8 @@ pub enum FieldId {
     Proxy,
     YoudaoAppKey,
     YoudaoSecret,
+    RelayUrl,
+    RelayToken,
     PhraseCode,
     PhraseWeight,
     PhraseText,
@@ -18,13 +20,15 @@ pub enum FieldId {
 
 impl FieldId {
     /// 存进配置的那几个（短语的几个随卡片一起存）。
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 8] = [
         Self::BaseUrl,
         Self::Model,
         Self::ApiKey,
         Self::Proxy,
         Self::YoudaoAppKey,
         Self::YoudaoSecret,
+        Self::RelayUrl,
+        Self::RelayToken,
     ];
 
     /// 配置文件 `[predict]` 里的键。
@@ -36,6 +40,8 @@ impl FieldId {
             Self::Proxy => "proxy",
             Self::YoudaoAppKey => "app_key",
             Self::YoudaoSecret => "secret",
+            Self::RelayUrl => "relay_url",
+            Self::RelayToken => "relay_token",
             Self::PhraseCode => "code",
             Self::PhraseWeight => "weight",
             Self::PhraseText => "text",

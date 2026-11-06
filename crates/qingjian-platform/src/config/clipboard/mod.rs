@@ -34,6 +34,13 @@ pub struct ClipboardConfig {
     /// 同步到局域网里配对的设备。缺省关，关着时不监听端口、不公布自己。
     pub sync_enabled: bool,
 
+    pub relay_enabled: bool,
+
+    pub relay_url: String,
+
+    /// 令牌变更只用版本标记通知剪贴板进程，不暴露密钥。
+    pub relay_revision: String,
+
     /// 同步时屏幕边缘亮霓虹灯。
     pub sync_neon: bool,
 
@@ -49,6 +56,9 @@ impl Default for ClipboardConfig {
             history_limit: CLIPBOARD_HISTORY_LIMITS[2],
             paused: false,
             sync_enabled: false,
+            relay_enabled: false,
+            relay_url: String::new(),
+            relay_revision: String::new(),
             sync_neon: true,
             device_name: String::new(),
             excluded_apps: DEFAULT_CLIPBOARD_EXCLUDED_APPS

@@ -215,6 +215,31 @@ impl App for Settings {
             }
             Message::Commit(id) => self.commit(id),
             Message::Cancel(id) => self.reset_field(id),
+            Message::ShowRelayToken => {
+                if self.relay_token_visible {
+                    self.reset_field(FieldId::RelayToken);
+                    return true;
+                }
+                #[cfg(windows)]
+                if let Some(secret) = qingjian_platform::member::load_relay_secret() {
+                    self.fields
+                        .insert(FieldId::RelayToken, bamboo_slip::TextEdit::new(secret));
+                    self.relay_token_visible = true;
+                }
+            }
+            Message::ClearRelayToken =>
+            {
+                #[cfg(windows)]
+                if qingjian_platform::member::clear_relay_secret().is_ok() {
+                    self.write(
+                        "clipboard",
+                        "relay_revision",
+                        uuid::Uuid::new_v4().to_string(),
+                    );
+                    self.reset_field(FieldId::RelayToken);
+                    self.notice = Some(("relay", tr("relay.cleared").to_owned()));
+                }
+            }
             Message::TestCloud => {
                 if !self.cloud_test.running() {
                     let text = match self
@@ -358,6 +383,9 @@ impl App for Settings {
 
     /// 切回设置窗口时重扫输入方案：用户多半是刚在访达 / 资源管理器里往 `schemes/` 放了方案。
     fn set_active(&mut self, active: bool) {
+        if !active && self.relay_token_visible {
+            self.reset_field(FieldId::RelayToken);
+        }
         if active {
             if let Ok(config) = qingjian_platform::Config::load(&self.path)
                 && config.predict != self.config.predict

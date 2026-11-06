@@ -41,16 +41,19 @@ fn round(mut left: Memory, mut right: Memory) -> (Memory, Memory, usize, usize) 
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
     let (one, two) = (Identity::generate().unwrap(), Identity::generate().unwrap());
+    let (finished, wait) = std::sync::mpsc::channel();
     let responder = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         read_opening(&mut stream).unwrap();
         let mut channel = accept(stream, &two, |_| true).unwrap();
         let applied = run_responder(&mut channel, &mut right, &mut |_| {}).unwrap();
+        wait.recv().unwrap();
         (right, applied)
     });
     let stream = TcpStream::connect(address).unwrap();
     let mut channel = connect(stream, &one, |_| true).unwrap();
     let left_applied = run_initiator(&mut channel, &mut left, &mut |_| {}).unwrap();
+    finished.send(()).unwrap();
     let (right, right_applied) = responder.join().unwrap();
     (left, right, left_applied, right_applied)
 }

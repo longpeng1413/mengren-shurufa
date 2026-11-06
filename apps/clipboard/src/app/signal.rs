@@ -22,7 +22,10 @@ impl ClipboardApp {
             }
             Signal::Sync(event) => self.handle_sync(event),
             Signal::Settings(settings) => {
-                let sync_changed = settings.sync_enabled != self.settings.sync_enabled
+                let sync_changed = settings.relay_enabled != self.settings.relay_enabled
+                    || settings.relay_url != self.settings.relay_url
+                    || settings.relay_revision != self.settings.relay_revision
+                    || settings.sync_enabled != self.settings.sync_enabled
                     || settings.device_name != self.settings.device_name
                     || settings.history_limit != self.settings.history_limit
                     || settings.language != self.settings.language;

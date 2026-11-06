@@ -16,6 +16,9 @@ impl Settings {
 
     /// 输入框换回配置里的值（密钥框总是空的，不显示已存的密钥）。
     pub(super) fn reset_field(&mut self, id: FieldId) {
+        if id == FieldId::RelayToken {
+            self.relay_token_visible = false;
+        }
         let predict = &self.config.predict;
         let value = match id {
             FieldId::BaseUrl => predict.base_url.clone(),
@@ -23,7 +26,8 @@ impl Settings {
             FieldId::ApiKey => String::new(),
             FieldId::Proxy => predict.proxy.clone(),
             FieldId::YoudaoAppKey => predict.youdao.app_key.clone(),
-            FieldId::YoudaoSecret => String::new(),
+            FieldId::YoudaoSecret | FieldId::RelayToken => String::new(),
+            FieldId::RelayUrl => self.config.clipboard.relay_url.clone(),
             FieldId::VocabularySearch => String::new(),
             FieldId::PhraseCode | FieldId::PhraseWeight | FieldId::PhraseText => return,
         };
@@ -40,6 +44,25 @@ impl Settings {
             return;
         };
         match id {
+            FieldId::RelayUrl => self.write("clipboard", "relay_url", text),
+            FieldId::RelayToken => {
+                #[cfg(windows)]
+                if !text.is_empty()
+                    && qingjian_platform::member::load_relay_secret().as_deref() != Some(&text)
+                {
+                    match qingjian_platform::member::save_relay_secret(&text) {
+                        Ok(()) => {
+                            self.write(
+                                "clipboard",
+                                "relay_revision",
+                                uuid::Uuid::new_v4().to_string(),
+                            );
+                            self.notice = Some(("relay", tr("relay.saved").to_owned()));
+                        }
+                        Err(_) => self.notice = Some(("relay", tr("relay.invalid").to_owned())),
+                    }
+                }
+            }
             FieldId::YoudaoAppKey => self.write("predict.youdao", "app_key", text),
             FieldId::YoudaoSecret =>
             {

@@ -274,7 +274,7 @@ fn timing(
         .build(ui, &page.theme)
 }
 
-fn field(
+pub(super) fn field(
     ui: &mut Ui<Message>,
     page: &Page,
     id: FieldId,
@@ -287,7 +287,10 @@ fn field(
     };
     let input = TextField::new(edit)
         .placeholder(placeholder)
-        .secret(matches!(id, FieldId::ApiKey | FieldId::YoudaoSecret))
+        .secret(
+            matches!(id, FieldId::ApiKey | FieldId::YoudaoSecret)
+                || id == FieldId::RelayToken && !page.settings.relay_token_visible,
+        )
         .width(FIELD_WIDTH)
         .build(
             ui,

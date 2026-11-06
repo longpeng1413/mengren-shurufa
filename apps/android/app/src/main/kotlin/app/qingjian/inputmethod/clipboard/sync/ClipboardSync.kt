@@ -11,12 +11,16 @@ import app.qingjian.inputmethod.core.store.ClipboardStore
 import app.qingjian.inputmethod.settings.Settings
 import kotlin.concurrent.thread
 import org.json.JSONObject
+import app.qingjian.inputmethod.cloud.SecretStore
 
 /**
  * 局域网同步在安卓这边的管家：按设置开关 Rust 的同步服务和系统的局域网发现、取事件转给界面。
  * 只在进程活着时同步（键盘服务或设置页），不用常驻通知；键盘弹出时补一轮，系统杀过进程也接得上。
  */
 object ClipboardSync {
+    const val KEY_RELAY_ENABLED = "clipboard_relay_enabled"
+    const val KEY_RELAY_URL = "clipboard_relay_url"
+    const val KEY_RELAY_TOKEN = "clipboard_relay_token_cipher"
     const val KEY_ENABLED = "clipboard_sync"
     const val KEY_NEON = "clipboard_sync_neon"
     const val KEY_DEVICE_NAME = "clipboard_device_name"
@@ -77,10 +81,16 @@ object ClipboardSync {
         if (enabled(app)) start(app)
     }
 
+    private fun relayConfig(context: Context): String {
+        val prefs = Settings.preferences(context)
+        val token = prefs.getString(KEY_RELAY_TOKEN, null)?.let(SecretStore::open).orEmpty()
+        return JSONObject().put("enabled", prefs.getBoolean(KEY_RELAY_ENABLED, false)).put("url", prefs.getString(KEY_RELAY_URL, "").orEmpty()).put("token", token).toString()
+    }
+
     private fun start(context: Context) {
         val limit = Settings.load(context).clipboardLimit
         val started = runCatching {
-            Native.clipboardSyncStart(ClipboardStore.userDir(context), deviceName(context), Build.MODEL.orEmpty(), limit)
+            Native.clipboardSyncStart(ClipboardStore.userDir(context), deviceName(context), Build.MODEL.orEmpty(), limit, relayConfig(context))
         }.getOrDefault(false)
         if (!started) return
         running = true

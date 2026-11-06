@@ -80,6 +80,8 @@ pub struct Settings {
     /// 输入框的编辑状态；回车或离开时才存进配置。
     pub fields: HashMap<FieldId, TextEdit>,
 
+    pub relay_token_visible: bool,
+
     pub cloud_test: CloudTest,
 
     pub update: UpdateCheck,
@@ -183,6 +185,7 @@ impl Settings {
             notice: None,
             sources_open: false,
             fields: HashMap::new(),
+            relay_token_visible: false,
             cloud_test: CloudTest::default(),
             update: UpdateCheck::load(),
             update_install: crate::jobs::update::install::UpdateInstall::default(),

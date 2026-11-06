@@ -9,9 +9,13 @@ repository.workspace = true
 [lints]
 workspace = true
 
+[features]
+relay-server = []
+
 [dependencies]
 if-addrs = "0.15"
 mdns-sd = "0.21.7"
+rustls.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
@@ -19,3 +23,5 @@ snow = "0.10"
 spake2 = "0.4"
 thiserror.workspace = true
 tracing.workspace = true
+tungstenite.workspace = true
+webpki-roots.workspace = true

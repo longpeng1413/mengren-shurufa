@@ -114,7 +114,7 @@ internal object Native {
     external fun clipboardSyncDefaultName(userDir: String, chinese: Boolean): String?
 
     /** 开始局域网同步（已开着就重开），成功回真。 */
-    external fun clipboardSyncStart(userDir: String, name: String, model: String, limit: Int): Boolean
+    external fun clipboardSyncStart(userDir: String, name: String, model: String, limit: Int, relay: String): Boolean
 
     external fun clipboardSyncStop()
 

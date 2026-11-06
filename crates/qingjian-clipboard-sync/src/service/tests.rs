@@ -53,7 +53,9 @@ fn device(tag: &str, name: &str) -> Device {
             directory: directory.clone(),
             name: name.to_owned(),
             model: String::new(),
-            own_discovery: true,
+            // 协议测试固定回环地址，避免真实 mDNS 把它换成本机虚拟网卡地址。
+            own_discovery: false,
+            relay: Default::default(),
         },
         Box::new(Memory(items.clone())),
         sender,
@@ -67,6 +69,7 @@ fn device(tag: &str, name: &str) -> Device {
     }
 }
 
+#[track_caller]
 fn wait_for(device: &Device, wanted: impl Fn(&SyncEvent) -> bool) -> SyncEvent {
     loop {
         let event = device
@@ -92,7 +95,7 @@ fn add(device: &Device, record: Record) {
     device.service.notify_changed();
 }
 
-// 端口和 mDNS 是真的，只有地址走回环，所以一次只跑一组
+// 使用真实 TCP 与回环地址，发现机制不参与协议测试。
 #[test]
 fn pair_push_and_refuse_after_unpair() {
     let host = device("flow", "电脑");

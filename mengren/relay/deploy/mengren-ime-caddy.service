@@ -1,0 +1,24 @@
+[Unit]
+Description=HTTPS for Mengren IME relay
+After=network-online.target mengren-ime-relay.service
+Wants=network-online.target
+
+[Service]
+DynamicUser=yes
+StateDirectory=mengren-ime-caddy
+Environment=XDG_DATA_HOME=/var/lib/mengren-ime-caddy
+Environment=XDG_CONFIG_HOME=/var/lib/mengren-ime-caddy
+ExecStart=/opt/mengren-ime-relay/caddy run --config /etc/mengren-ime-relay/Caddyfile --adapter caddyfile
+Restart=on-failure
+RestartSec=3
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+MemoryMax=128M
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target

@@ -150,6 +150,61 @@ fn clipboard(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, RenderErr
             .control(add)
             .build(ui, theme)?,
     ];
+    if Feature::ClipboardRelay.here() {
+        use super::cloud::field;
+        use crate::message::FieldId;
+        rows.push(toggle_info(
+            ui,
+            page,
+            tr("relay.enabled"),
+            Some(tr("relay.info")),
+            ("clipboard", "relay_enabled"),
+            config.relay_enabled,
+            !on || !config.sync_enabled,
+        )?);
+        rows.push(field(
+            ui,
+            page,
+            FieldId::RelayUrl,
+            tr("relay.url"),
+            None,
+            "wss://relay.example.com/v1/clipboard",
+        )?);
+        rows.push(field(
+            ui,
+            page,
+            FieldId::RelayToken,
+            tr("relay.token"),
+            Some(tr("relay.token_info")),
+            tr("relay.keep"),
+        )?);
+        let show = Button::new(tr("relay.show")).build(
+            ui,
+            theme,
+            "relay-show",
+            Message::ShowRelayToken,
+        )?;
+        let clear = Button::new(tr("relay.clear")).build(
+            ui,
+            theme,
+            "relay-clear",
+            Message::ClearRelayToken,
+        )?;
+        rows.push(
+            SettingRow::new(tr("relay.manage"))
+                .info(tr("relay.show_info"))
+                .control(show)
+                .build(ui, theme)?,
+        );
+        rows.push(
+            SettingRow::new(tr("relay.clear"))
+                .control(clear)
+                .build(ui, theme)?,
+        );
+        if let Some(("relay", message)) = &page.settings.notice {
+            rows.push(paragraph(ui, theme, message, None)?);
+        }
+    }
     for app in &config.excluded_apps {
         let kept: Vec<String> = config
             .excluded_apps

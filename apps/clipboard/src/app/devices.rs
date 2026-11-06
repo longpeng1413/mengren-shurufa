@@ -1,13 +1,14 @@
 //! 设备页：设备名与配对。
 
-use std::net::SocketAddr;
-
 use qingjian_clipboard::ClipSettings;
 
 use super::ClipboardApp;
 use crate::link::Pairing;
 
 impl ClipboardApp {
+    pub(crate) fn relay_enabled(&self) -> bool {
+        self.settings.relay_enabled
+    }
     pub(super) fn shown_name(&self) -> String {
         if self.link.service().is_some() {
             self.link.name.clone()
@@ -34,12 +35,11 @@ impl ClipboardApp {
         let Some(service) = self.link.service() else {
             return;
         };
-        let Ok(target) = address.text().trim().parse::<SocketAddr>() else {
+        if !service.join_target(address.text().trim(), code.text().trim().to_owned()) {
             self.pair_status = crate::i18n::tr("devices.bad_address").to_owned();
-            return;
-        };
-        self.pair_status.clear();
-        service.join_pairing(target, code.text().trim().to_owned());
+        } else {
+            self.pair_status.clear();
+        }
     }
 
     pub(super) fn cancel_pairing(&mut self) {

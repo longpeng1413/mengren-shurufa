@@ -40,6 +40,11 @@ edit = "编辑"
 delete = "删除"
 
 [devices]
+relay = "公网中转"
+relay_connected = "已连接中转"
+relay_disconnected = "中转未连接：检查地址、令牌和网络"
+relay_device = "中转设备"
+
 button = "设备"
 title = "设备"
 back = "返回"

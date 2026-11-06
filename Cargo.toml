@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "mengren/relay",
     "crates/qingjian-core",
     "crates/qingjian-dictionary",
     "crates/qingjian-translate",
@@ -87,6 +88,7 @@ vi = "0.8.0"
 # 安卓没有可链的系统 TLS：云联想（只开 rustls 时）与语音识别走 rustls（ring + 内置 Mozilla 根证书）
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 webpki-roots = "1"
+tungstenite = { version = "0.30.0", default-features = false, features = ["handshake"] }
 tokio = { version = "1.53.1", features = ["rt", "time"] }
 
 # Linux IBus 前端：IBus 走 D-Bus，纯 Rust

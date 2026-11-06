@@ -9,6 +9,7 @@ import app.qingjian.inputmethod.R
 import app.qingjian.inputmethod.clipboard.sync.ClipboardSync
 import app.qingjian.inputmethod.core.Native
 import org.json.JSONObject
+import app.qingjian.inputmethod.cloud.SecretStore
 
 /** 局域网同步页：总开关、设备名、已配对和附近的设备、配对。服务只在开关打开时运行。 */
 class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
@@ -86,6 +87,7 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
             },
         )
         val devices = runCatching { Native.clipboardSyncDevices() }.getOrNull()?.let(::JSONObject)
+        views += relaySettings(devices)
         val peers = devices?.optJSONArray("peers")
         val nearby = devices?.optJSONArray("nearby")
         val paired = HashSet<String>()
@@ -112,6 +114,17 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
             }
         }
         views += ui.group(getString(R.string.sync_nearby), rows, if (rows.isEmpty()) getString(R.string.sync_none_nearby) else null)
+        val relays = devices?.optJSONArray("relay_peers")
+        if (relays != null && prefs.getBoolean(ClipboardSync.KEY_RELAY_ENABLED, false)) {
+            val remote = mutableListOf<View>()
+            for (i in 0 until relays.length()) {
+                val id = relays.getString(i)
+                if (id in paired) continue
+                remote += ui.row(getString(R.string.sync_relay_device, id.takeLast(8)), null).apply { setOnClickListener { askCode("relay:$id") } }
+            }
+            views += ui.group(getString(R.string.sync_relay_devices), remote)
+        }
+
         val code = showingCode
         views += ui.group(
             getString(R.string.sync_pairing),
@@ -128,8 +141,38 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
         return views
     }
 
+    private fun relaySettings(devices: JSONObject?): View {
+        val tokenSaved = prefs.contains(ClipboardSync.KEY_RELAY_TOKEN)
+        return ui.group(R.string.sync_relay_title,
+            ui.toggle(R.string.sync_relay_enabled, R.string.sync_relay_note, prefs.getBoolean(ClipboardSync.KEY_RELAY_ENABLED, false)) {
+                prefs.edit().putBoolean(ClipboardSync.KEY_RELAY_ENABLED, it).apply()
+                ClipboardSync.restart(this); rebuild()
+            },
+            ui.input(R.string.sync_relay_url, getString(R.string.sync_relay_url_hint), prefs.getString(ClipboardSync.KEY_RELAY_URL, "").orEmpty(), false) {
+                prefs.edit().putString(ClipboardSync.KEY_RELAY_URL, it.trim()).apply()
+                ClipboardSync.restart(this); rebuild()
+            },
+            ui.input(R.string.sync_relay_token, getString(if (tokenSaved) R.string.sync_relay_keep else R.string.sync_relay_token_hint), "", true) {
+                val token = it.trim()
+                if (token.isNotEmpty()) {
+                    if (token.length !in 24..256 || token.any { char -> char.code !in 33..126 }) { status = getString(R.string.sync_relay_bad_token) }
+                    else runCatching { SecretStore.seal(token) }.onSuccess { sealed ->
+                        prefs.edit().putString(ClipboardSync.KEY_RELAY_TOKEN, sealed).apply()
+                        ClipboardSync.restart(this)
+                    }.onFailure { status = getString(R.string.sync_relay_bad_token) }
+                }
+                rebuild()
+            },
+            ui.action(R.string.sync_relay_clear_token, null) {
+                prefs.edit().remove(ClipboardSync.KEY_RELAY_TOKEN).apply()
+                ClipboardSync.restart(this); rebuild()
+            },
+            ui.row(getString(R.string.sync_relay_status), getString(if (devices?.optBoolean("relay_connected") == true) R.string.sync_relay_connected else R.string.sync_relay_disconnected)),
+        )
+    }
+
     private fun peerState(peer: JSONObject): String = when (peer.optString("status")) {
-        "connected" -> getString(R.string.sync_connected)
+        "connected" -> getString(R.string.sync_connected) + if (peer.optBoolean("relay")) " · " + getString(R.string.sync_relay_title) else ""
         "unreachable" -> {
             val seen = peer.optLong("last_seen", 0L)
             if (seen > 0L) {

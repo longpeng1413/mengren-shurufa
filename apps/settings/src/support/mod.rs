@@ -63,11 +63,12 @@ pub enum Feature {
     /// 没在打字时打开符号面板翻译组的快捷键。
     TranslatePanel,
     InAppUpdate,
+    ClipboardRelay,
 }
 
 impl Feature {
     #[cfg(test)]
-    pub const ALL: [Self; 30] = [
+    pub const ALL: [Self; 31] = [
         Self::AuxCode,
         Self::Schemes,
         Self::SwitchKeys,
@@ -98,6 +99,7 @@ impl Feature {
         Self::ShuangpinRawWindow,
         Self::TranslatePanel,
         Self::InAppUpdate,
+        Self::ClipboardRelay,
     ];
 
     /// 当前平台显示这一项。
@@ -149,6 +151,7 @@ impl Feature {
             // 符号面板只有 macOS 与 Windows 有
             Self::TranslatePanel => [Yes, Yes, No],
             Self::InAppUpdate => [No, Yes, No],
+            Self::ClipboardRelay => [No, Yes, No],
             Self::KeyHint => [Yes, Yes, Todo],
             // Fcitx 面板与应用里的行内拼音共用一串，还没分开
             Self::ShowTones => [Yes, Yes, Todo],
@@ -195,6 +198,7 @@ impl Feature {
             Self::ShuangpinRawWindow => "双拼候选窗显示按键",
             Self::TranslatePanel => "打开符号面板的翻译组",
             Self::InAppUpdate => "应用内下载安装更新",
+            Self::ClipboardRelay => "公网剪贴板中转",
         }
     }
 
@@ -245,7 +249,8 @@ impl Feature {
             | Self::ApiUsage
             | Self::ExperimentalModels
             | Self::Clipboard
-            | Self::InAppUpdate => &[],
+            | Self::InAppUpdate
+            | Self::ClipboardRelay => &[],
         }
     }
 }

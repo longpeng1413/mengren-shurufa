@@ -9,4 +9,6 @@ pub struct PeerState {
     pub peer: Peer,
 
     pub status: PeerStatus,
+
+    pub via_relay: bool,
 }

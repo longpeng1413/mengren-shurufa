@@ -4,16 +4,16 @@
 #[cfg(test)]
 mod tests;
 
-mod command;
+pub(crate) mod command;
 mod event;
 mod hello;
 mod link;
 mod locked;
 mod options;
 mod received_item;
-mod round;
+pub(crate) mod round;
 mod scan;
-mod state;
+pub(crate) mod state;
 mod worker;
 
 pub use event::SyncEvent;
@@ -97,6 +97,13 @@ impl SyncService {
             events,
         ));
         let stop = Arc::new(AtomicBool::new(false));
+        if options.relay.enabled {
+            if options.relay.validate().is_ok() {
+                *lock(&shared.relay) = options.relay;
+            } else {
+                tracing::warn!("Invalid relay configuration; LAN sync remains available");
+            }
+        }
         let (commands, inbox) = channel();
         // 一启动就对一轮：状态不用等，离线时攒下的也马上补
         let _ = commands.send(Command::SyncAll);
@@ -107,6 +114,13 @@ impl SyncService {
         if let Some(discovery) = discovery {
             threads.push(spawn_discovery(
                 discovery,
+                shared.clone(),
+                commands.clone(),
+                stop.clone(),
+            ));
+        }
+        if lock(&shared.relay).enabled {
+            threads.push(crate::relay::client::spawn(
                 shared.clone(),
                 commands.clone(),
                 stop.clone(),
@@ -183,6 +197,10 @@ impl SyncService {
         self.peers()
             .into_iter()
             .map(|peer| PeerState {
+                via_relay: lock(&self.shared.routes)
+                    .get(&peer.device_id)
+                    .copied()
+                    .unwrap_or(false),
                 status: links
                     .get(&peer.device_id)
                     .copied()
@@ -210,6 +228,51 @@ impl SyncService {
     pub fn device_id(&self) -> String {
         self.shared.identity.device_id()
     }
+
+    pub fn relay_connected(&self) -> bool {
+        self.shared.relay_connected.load(Ordering::Relaxed)
+    }
+
+    pub fn relay_peers(&self) -> Vec<String> {
+        lock(&self.shared.relay_peers).clone()
+    }
+
+    /// 同时接受局域网地址或 relay:<设备ID>；配对码仍只经 SPAKE2 使用。
+    pub fn join_target(&self, target: &str, code: String) -> bool {
+        if code.len() != 6 || !code.bytes().all(|byte| byte.is_ascii_digit()) {
+            return false;
+        }
+        if let Some(id) = target.strip_prefix("relay:") {
+            if !crate::relay::valid_id(id) || !lock(&self.shared.relay).enabled {
+                return false;
+            }
+            let id = id.to_owned();
+            let shared = self.shared.clone();
+            let commands = self.commands.clone();
+            thread::spawn(move || {
+                let result = (|| {
+                    let config = lock(&shared.relay).clone();
+                    let stream =
+                        crate::relay::client::dial(&config, &shared.identity.device_id(), &id)?;
+                    join_stream(&shared, stream, None, &code, Some(&id))
+                })();
+                let event = match result {
+                    Ok(name) => {
+                        let _ = commands.send(Command::SyncAll);
+                        SyncEvent::Paired { name }
+                    }
+                    Err(_) => SyncEvent::PairFailed,
+                };
+                shared.emit(event);
+            });
+            true
+        } else if let Ok(address) = target.parse() {
+            self.join_pairing(address, code);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl Drop for SyncService {
@@ -225,7 +288,20 @@ fn join(shared: &Shared, address: SocketAddr, code: &str) -> Result<String, Sync
     let stream = TcpStream::connect_timeout(&address, CONNECT_TIMEOUT)?;
     stream.set_read_timeout(Some(IO_TIMEOUT))?;
     stream.set_write_timeout(Some(IO_TIMEOUT))?;
+    join_stream(shared, stream, Some(address), code, None)
+}
+
+fn join_stream<S: std::io::Read + std::io::Write>(
+    shared: &Shared,
+    stream: S,
+    address: Option<SocketAddr>,
+    code: &str,
+    expected: Option<&str>,
+) -> Result<String, SyncError> {
     let mut channel = pair_join(stream, &shared.identity, code)?;
+    if expected.is_some_and(|expected| device_id_of(channel.remote()) != expected) {
+        return Err(SyncError::UnknownPeer);
+    }
     let own = PairHello {
         name: shared.name.clone(),
         port: shared.port,
@@ -235,7 +311,7 @@ fn join(shared: &Shared, address: SocketAddr, code: &str) -> Result<String, Sync
     lock(&shared.book).add(
         channel.remote(),
         hello.name.clone(),
-        Some(hello.address_from(address)),
+        address.map(|address| hello.address_from(address)),
     )?;
     shared.record_link(&device_id_of(channel.remote()), true);
     Ok(hello.name)

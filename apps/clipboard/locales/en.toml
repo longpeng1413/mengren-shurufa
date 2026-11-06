@@ -40,6 +40,11 @@ edit = "Edit"
 delete = "Delete"
 
 [devices]
+relay = "Internet relay"
+relay_connected = "Relay connected"
+relay_disconnected = "Relay disconnected: check URL, token and network"
+relay_device = "Relay device"
+
 button = "Devices"
 title = "Devices"
 back = "Back"

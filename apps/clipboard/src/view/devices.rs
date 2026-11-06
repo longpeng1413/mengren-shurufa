@@ -217,7 +217,11 @@ pub(super) fn devices(ui: &mut Ui<Message>, context: &Context) -> Result<Vec<Nod
     }
     for state in &peers {
         let peer = &state.peer;
-        let status = status_text(state.status, peer.last_seen);
+        let mut status = status_text(state.status, peer.last_seen);
+        if state.via_relay && state.status == PeerStatus::Connected {
+            status.push_str(" · ");
+            status.push_str(tr("devices.relay"));
+        }
         let button = Button::new(tr("devices.unpair")).build(
             ui,
             theme,
@@ -259,6 +263,41 @@ pub(super) fn devices(ui: &mut Ui<Message>, context: &Context) -> Result<Vec<Nod
             device.model.clone(),
             button,
         )?);
+    }
+    if app.relay_enabled() {
+        body.push(heading(ui, context, tr("devices.relay"))?);
+        body.push(note(
+            ui,
+            context,
+            if service.is_some_and(|service| service.relay_connected()) {
+                tr("devices.relay_connected")
+            } else {
+                tr("devices.relay_disconnected")
+            },
+        )?);
+        for id in service
+            .map(|service| service.relay_peers())
+            .unwrap_or_default()
+        {
+            if peers.iter().any(|peer| peer.peer.device_id == id)
+                || nearby.iter().any(|peer| peer.device_id == id)
+            {
+                continue;
+            }
+            let button = Button::new(tr("devices.pair")).build(
+                ui,
+                theme,
+                ("relay-pair", id.as_str()),
+                Message::PairEnter(format!("relay:{id}")),
+            )?;
+            body.push(device_row(
+                ui,
+                context,
+                format!("{} #{}", tr("devices.relay_device"), short_id(&id)),
+                String::new(),
+                button,
+            )?);
+        }
     }
     body.extend(pairing(ui, context)?);
 

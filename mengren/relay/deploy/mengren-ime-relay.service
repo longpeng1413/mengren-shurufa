@@ -1,0 +1,21 @@
+[Unit]
+Description=Mengren IME encrypted clipboard relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+DynamicUser=yes
+EnvironmentFile=/etc/mengren-ime-relay.env
+ExecStart=/opt/mengren-ime-relay/mengren-ime-relay
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+MemoryMax=96M
+TasksMax=64
+LimitNOFILE=256
+
+[Install]
+WantedBy=multi-user.target

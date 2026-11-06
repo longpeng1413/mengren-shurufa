@@ -27,4 +27,20 @@
     <string name="update_permission_title">Allow update installation</string>
     <string name="update_permission_note">Allow this app to install packages in system settings, then return. The system still asks you to confirm the update.</string>
     <string name="update_permission_open">Open system settings</string>
+
+    <string name="sync_relay_title">Internet relay</string>
+    <string name="sync_relay_enabled">Use relay across networks</string>
+    <string name="sync_relay_note">Prefer LAN; relay only text and links through your own server, end-to-end encrypted. Both devices must be online.</string>
+    <string name="sync_relay_url">Relay URL</string>
+    <string name="sync_relay_url_hint">wss://relay.example.com:8443/v1/clipboard</string>
+    <string name="sync_relay_token">Relay access token</string>
+    <string name="sync_relay_token_hint">Same random token on both devices (24+ characters)</string>
+    <string name="sync_relay_keep">Saved securely (leave blank to keep)</string>
+    <string name="sync_relay_bad_token">Token not saved: enter at least 24 characters without spaces</string>
+    <string name="sync_relay_clear_token">Delete relay token</string>
+    <string name="sync_relay_status">Relay connection</string>
+    <string name="sync_relay_connected">Connected</string>
+    <string name="sync_relay_disconnected">Disconnected: check URL, token and network</string>
+    <string name="sync_relay_devices">Devices on relay</string>
+    <string name="sync_relay_device">Relay device #%1$s</string>
 </resources>
