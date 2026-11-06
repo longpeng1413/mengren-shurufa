@@ -72,6 +72,8 @@ pub enum Message {
     /// 表达式、问字两个模式键之一换成这个字母（撞了就对调）。
     ModeKey(&'static str, char),
     CheckUpdate,
+    InstallUpdate,
+    CancelUpdate,
     /// 实验功能里下载这个模型（失败后的「重试」也是它）。
     DownloadModel(qingjian_platform::LocalModel),
     CancelDownload,

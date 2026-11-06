@@ -25,6 +25,9 @@ def main():
     for name in sorted(set(paths)):
         if not name or name in PRIVATE or name.startswith(("mengren/private/", "mengren/design/", "mengren/安装包/")):
             continue
+        leaf = Path(name).name.lower()
+        if (leaf.startswith(".env") and leaf != ".env.example") or Path(name).suffix.lower() in {".dpapi", ".keystore", ".jks", ".p12", ".pfx"}:
+            raise SystemExit(f"发现凭据类文件，拒绝公开导出：{name}")
         source = ROOT / name
         if not source.is_file():
             continue

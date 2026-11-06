@@ -13,6 +13,8 @@ impl Target {
             "macos"
         } else if cfg!(windows) {
             "windows"
+        } else if cfg!(target_os = "android") {
+            "android"
         } else {
             "linux"
         };

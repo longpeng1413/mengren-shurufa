@@ -4,12 +4,15 @@ mod release;
 mod signature;
 
 pub use asset::Asset;
+#[cfg(feature = "desktop")]
 pub(crate) use fetch::fetch_index;
+pub(crate) use fetch::fetch_index_with_proxy;
 pub use release::Release;
 pub use signature::{PUBLIC_KEYS, verify};
 
 use serde::Deserialize;
 
+#[cfg(feature = "desktop")]
 use qingjian_platform::UpdateChannel;
 
 use crate::{Available, Target, UpdateError, Version};
@@ -37,34 +40,41 @@ impl Index {
     }
 
     /// 比 `current` 新、渠道里看得到、有这台机器安装包的版本里最新的那个。
+    #[cfg(feature = "desktop")]
     pub fn newest(
         &self,
         current: &Version,
         target: Target,
         channel: UpdateChannel,
     ) -> Option<Available> {
+        self.for_target(current, target, channel == UpdateChannel::Beta)
+    }
+
+    /// 跨平台共同挑选规则，安卓无需依赖桌面配置库。
+    pub fn for_target(&self, current: &Version, target: Target, beta: bool) -> Option<Available> {
         self.releases
             .iter()
-            .filter(|release| channel.includes(&release.channel))
-            .filter(|release| {
-                release
+            .filter(|release| beta || release.channel == "stable")
+            .filter_map(|release| {
+                let asset = release
                     .assets
                     .iter()
-                    .any(|asset| asset.platform == target.platform && asset.cpu == target.cpu)
+                    .find(|asset| asset.platform == target.platform && asset.cpu == target.cpu)?;
+                let version = Version::parse(&release.version)?;
+                (version > *current).then_some((version, release, asset))
             })
-            .filter_map(|release| Some((Version::parse(&release.version)?, release)))
-            .filter(|(version, _)| version > current)
-            .max_by(|(left, _), (right, _)| left.cmp(right))
-            .map(|(_, release)| Available {
+            .max_by(|left, right| left.0.cmp(&right.0))
+            .map(|(_, release, asset)| Available {
                 version: release.version.clone(),
                 channel: release.channel.clone(),
                 date: release.date.clone(),
                 notes: release.notes.clone(),
+                asset: Some(asset.clone()),
             })
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "desktop"))]
 mod tests {
     use super::*;
 

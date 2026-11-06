@@ -40,6 +40,7 @@ impl App for Settings {
                 | Message::ExportConfig
                 | Message::TestCloud
                 | Message::CheckUpdate
+                | Message::InstallUpdate
                 | Message::DownloadModel(_)
                 | Message::Import(_)
                 | Message::VocabularyExport(_)
@@ -164,6 +165,21 @@ impl App for Settings {
                     .and_then(|field| field.apply(&edit))
                 {
                     bamboo_slip::set_clipboard(&copied);
+                }
+            }
+            Message::CancelUpdate => self.update_install.cancel(),
+            Message::InstallUpdate => {
+                if let Some(offer) = self.update.available(&self.config.update) {
+                    match self.update_install.start(
+                        offer,
+                        self.config.update.channel,
+                        self.waker.clone(),
+                    ) {
+                        Ok(()) => {
+                            self.notice = Some(("update", tr("update.downloading").to_owned()))
+                        }
+                        Err(error) => self.notice = Some(("update", error)),
+                    }
                 }
             }
             Message::CheckUpdate => {
@@ -304,6 +320,17 @@ impl App for Settings {
 
     fn wake(&mut self) -> bool {
         let mut changed = self.search.expire(Instant::now());
+        if let Some(result) = self.update_install.finish() {
+            let message = match result.and_then(|path| crate::system::installer::launch(&path)) {
+                Ok(()) => tr("update.installing").to_owned(),
+                Err(error) => error,
+            };
+            self.notice = Some(("update", message));
+            changed = true;
+        }
+        if self.update_install.running() {
+            changed = true;
+        }
         if let Some(text) = self.cloud_test.finish() {
             self.notice = Some(("cloud", text));
             changed = true;

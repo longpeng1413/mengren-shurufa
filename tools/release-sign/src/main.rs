@@ -6,6 +6,8 @@
 //!
 //! 私钥与公钥都是 base64 的 32 字节，签名是 base64 的 64 字节。
 
+mod key_file;
+
 use std::path::{Path, PathBuf};
 
 use base64::Engine;
@@ -33,7 +35,11 @@ enum Command {
     },
 
     /// 给文件生成分离签名 <文件>.sig
-    Sign { file: PathBuf },
+    Sign {
+        file: PathBuf,
+        #[arg(long)]
+        key_file: Option<PathBuf>,
+    },
 
     /// 按内置公钥验 <文件>.sig
     Verify { file: PathBuf },
@@ -70,7 +76,7 @@ fn main() {
 fn run(command: Command) -> Result<(), SignError> {
     match command {
         Command::Keygen { out } => keygen(&out),
-        Command::Sign { file } => sign(&file),
+        Command::Sign { file, key_file } => sign(&file, key_file.as_deref()),
         Command::Verify { file } => {
             let signature = std::fs::read_to_string(signature_path(&file))?;
             qingjian_update::verify(&std::fs::read(&file)?, &signature)?;
@@ -89,7 +95,7 @@ fn keygen(out: &Path) -> Result<(), SignError> {
     let mut seed = [0u8; 32];
     fill_random(&mut seed)?;
     let key = SigningKey::from_bytes(&seed);
-    write_private(out, &STANDARD.encode(seed))?;
+    key_file::write(out, STANDARD.encode(seed).as_bytes())?;
     println!("private key: {}", out.display());
     println!(
         "public key:  {}",
@@ -98,8 +104,13 @@ fn keygen(out: &Path) -> Result<(), SignError> {
     Ok(())
 }
 
-fn sign(file: &Path) -> Result<(), SignError> {
-    let encoded = std::env::var(KEY_ENV).map_err(|_| SignError::MissingKey)?;
+fn sign(file: &Path, key_path: Option<&Path>) -> Result<(), SignError> {
+    let encoded = match key_path {
+        Some(path) => {
+            String::from_utf8(key_file::read(path)?).map_err(|_| SignError::MalformedKey)?
+        }
+        None => std::env::var(KEY_ENV).map_err(|_| SignError::MissingKey)?,
+    };
     let seed: [u8; 32] = STANDARD
         .decode(encoded.trim())
         .ok()
@@ -124,26 +135,8 @@ fn signature_path(file: &Path) -> PathBuf {
     PathBuf::from(name)
 }
 
-/// 系统随机源：Unix 读 /dev/urandom；Windows 上不生成密钥（密钥在维护者的 Mac 上生成一次）。
+/// 使用系统随机源；不会将私钥写入标准输出。
 fn fill_random(seed: &mut [u8; 32]) -> Result<(), SignError> {
-    use std::io::Read;
-    std::fs::File::open("/dev/urandom")?.read_exact(seed)?;
-    Ok(())
-}
-
-fn write_private(path: &Path, text: &str) -> Result<(), SignError> {
-    #[cfg(unix)]
-    {
-        use std::io::Write;
-        use std::os::unix::fs::OpenOptionsExt;
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(path)?;
-        file.write_all(text.as_bytes())?;
-    }
-    #[cfg(not(unix))]
-    std::fs::write(path, text)?;
+    getrandom::fill(seed).map_err(|error| std::io::Error::other(error.to_string()))?;
     Ok(())
 }

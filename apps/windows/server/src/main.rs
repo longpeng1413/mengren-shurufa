@@ -3,6 +3,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod panic_log;
+mod update_migration;
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -170,6 +171,7 @@ fn main() -> ExitCode {
 
     // 日志级别取自配置，所以先写模板、读配置，再装日志。
     let template = write_config_template();
+    update_migration::enable_once(config_path().as_deref());
     let config = load_config();
     let _log_guard = init_logging(&config);
     panic_log::install();

@@ -802,3 +802,12 @@ Windows Server 受控退出使用 ExitCode 返回以刷新既有 tracing 队列�
 - Windows 打开网址使用 ShellExecuteW，不能把带长查询串的 OAuth 地址交给 explorer.exe（可能误开文档目录）。登录子进程结束后显示本地化成功/失败提示。
 - `WindowOptions.icon` 是通用可选窗口位图，host 转为非预乘 RGBA 传给 winit。设置程序用品牌 PNG 作为标题栏、侧栏和关于页标志；EXE、安装器、托盘及 TSF 使用同一张彩色天马 ICO。品牌资源由 `mengren/rebrand.py` 复制，`--check` 核对。
 - `mengren/build.ps1` 复制新包后核对 SHA256，只有成功才把同平台旧包送入回收站；不再永久删除旧安装包。
+
+
+### 猛人 0.3.4：检查、下载与系统安装更新
+
+`qingjian-update` 默认启用 desktop/native-tls；Android 关闭默认功能，只启用 rustls，避免把桌面配置库和系统 TLS 链进 JNI。Available 记录签名索引中的 Asset；下载前再次验签查询，限定本仓库与版本的 URL，按摘要命名缓存并校验长度和 SHA256。两个客户端共享同一份检查、取消与校验逻辑。
+
+Windows 的后台任务集中在 `apps/settings/src/jobs/update/`，只把校验后的路径交给系统安装器；旧配置通过 Server 一次性迁移到默认检查开启，后续保留用户选择。安卓 `update/` 只做系统代理、状态展示与 PackageInstaller 会话，SHA256、签名验证和版本挑选仍在 Rust。
+
+`mengren/release.py` 在 Windows 上验证两端安装包版本和 APK 原签名，再把审查后的源码追加到独立公开历史；私钥、签名备份、私人说明、设计素材和原私有历史不上传。签名工具支持 Windows 系统随机源及 DPAPI 密钥文件，私钥始终不打印。

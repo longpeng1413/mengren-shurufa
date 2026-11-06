@@ -77,13 +77,47 @@ pub fn about(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, RenderErr
     ];
     if let Some(found) = page.settings.update.available(update) {
         let title = tr_args("about.new_version", &[("version", &found.version)]);
-        let download = Button::new(tr("about.download")).primary().build(
-            ui,
-            theme,
-            "download",
-            Message::Run(Action::OpenDownload),
-        )?;
+        let install = crate::support::Feature::InAppUpdate.here();
+        let label = if page.settings.update_install.running() {
+            tr_args(
+                "update.progress",
+                &[("percent", &page.settings.update_install.percent())],
+            )
+        } else {
+            tr(if install {
+                "about.install_update"
+            } else {
+                "about.download"
+            })
+            .to_owned()
+        };
+        let download = Button::new(&label)
+            .primary()
+            .disabled(page.settings.update_install.running())
+            .build(
+                ui,
+                theme,
+                "download",
+                if install {
+                    Message::InstallUpdate
+                } else {
+                    Message::Run(Action::OpenDownload)
+                },
+            )?;
         rows.push(SettingRow::new(&title).control(download).build(ui, theme)?);
+        if page.settings.update_install.running() {
+            let cancel = Button::new(tr("update.cancel")).build(
+                ui,
+                theme,
+                "cancel-update",
+                Message::CancelUpdate,
+            )?;
+            rows.push(
+                SettingRow::new(tr("update.downloading"))
+                    .control(cancel)
+                    .build(ui, theme)?,
+            );
+        }
         let notes = found
             .notes
             .iter()

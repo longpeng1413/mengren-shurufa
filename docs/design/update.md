@@ -1,60 +1,30 @@
-# 检查更新
+# 猛人输入法检查与安装更新
 
-2026-09-17 定。0.1.3 只做「检查 + 提示 + 打开下载页」，下载与安装留给后面的版本。
+2026-11-06，0.3.4 起。保留青简 ed25519 索引设计，更新源、发版公钥和安装流程改为猛人独立通道。
 
-## 目标与边界
+## 发布与验证
 
-- 用户不用再从群里拿包：发了新版，已装的青简一天内自己知道。测试者把渠道切到「测试版」就能收到 beta / rc。
-- 输入法不替换自己：只提示，点了打开 [下载页](https://qingjian.app/download)，安装仍由系统安装程序完成。
-- 更新通道等于远程代码执行通道，所以索引从第一版起就签名；客户端只认签过名的索引。
-- 隐私：请求是对静态文件的 GET，不带账号、设备标识或输入内容；`[update] check = false` 关掉后不联网。
+- 仅从 `longpeng1413/mengren-shurufa` 的正式 GitHub Release 获取更新；`releases/latest/download/releases.json` 与 `.sig` 原样保存并验签。客户端只信任猛人公钥，不信任上游青简的更新签名。
+- 签名索引记录版本、渠道、说明及每个平台安装包的 URL、字节数和 SHA256。安卓 arm64 与 Windows x86_64 各一个包，附件用 ASCII 拼音名。
+- 安装前重新获取签名索引，确认仍是用户选中的版本，限定本仓库对应版本的 HTTPS 下载路径；流式下载，限制大小，校验长度与 SHA256 后才改名成可安装包。失败或取消清理残片。
+- URL 和版本号不能作为本地文件名，本地缓存用摘要命名；只清理该缓存中超过一天的旧安装包和残片。
+- 新版通过相关检查和打包后，用 `mengren/release.py` 导出源码、扫描隐私、更新独立公开历史、上传草稿附件；远端大小与摘要核对通过才公开 Release。
 
-## 数据流
+## 两端流程
 
-```
-发版（release.yml）
-  releases_json.py → releases.json
-  qingjian-release-sign sign → releases.json.sig      私钥：CI 密钥 QINGJIAN_INDEX_SIGNING_KEY
-  两个文件挂到本次 Release 与 GitHub latest
-官网构建（qingjian-web scripts/sync-releases.mjs）
-  原样拷到 static/ → https://qingjian.app/releases.json 与 .sig
-客户端（crates/qingjian-update）
-  下载两者 → ed25519 验签 → 解析 → 按平台 / CPU / 渠道挑比当前新的最新版 → 写 update.json
-```
+- Windows 沿用 Server 每日检查与 `update.json`，设置的「关于」页手动检查和下载安装在后台执行，显示进度与取消。安装器用 `/SILENT /SUPPRESSMSGBOXES /NORESTART /SP-`，系统处理 UAC，原目录升级并保留用户配置，完成后重启 Server。
+- 第一次迁移到猛人更新源时开启 Windows 自动检查并落一次性标记，此后保留用户开关；手动检查不受自动检查开关影响。
+- 安卓共享同一 Rust 更新逻辑，通过 JNI 转交 JSON 状态和进度；系统代理从 ConnectivityManager 读取，可单独指定更新代理。每小时在进程存活时检查是否已满一天，不额外启动常驻服务。
+- 安卓使用 PackageInstaller 会话，校验包名、递增版本号和原 APK 签名。需要安装来源授权或本次安装确认时由系统显示，不从后台强行弹出。
+- 自动检查不等于强制安装。安装由用户点击更新发起，不上传输入、剪贴板、账号或设备标识。
 
-索引放官网域名而不是直连 GitHub：国内访问 GitHub 不稳，官网是 Cloudflare 上的静态站（非浏览器 User-Agent 实测不被拦）。
-签名是对文件字节的分离签名，所以官网必须原样拷贝，不能经 JSON 重排。
+## 签名与仓库边界
 
-## 渠道与版本
+- 发版私钥由维护者本机工具生成，Windows `.dpapi` 文件只保存加密内容；签名工具可用 `sign releases.json --key-file <私人路径>`，不需要打印或把私钥传到环境变量。公钥见更新 crate。
+- APK 必须沿用已安装版本的签名。0.3.4 使用 release 构建、关闭调试标记，同时保留原签名；发布脚本按保存的公钥证书摘要核对，不一致则停止。
+- 私人说明、运维资料、签名文件、早期设计素材及原开发历史不进入公开仓库。公开源码保留青简版权和许可，在已有干净公开历史上追加提交，不强推。
+- 本地安装包目录每个平台只保留最新包，旧包送回收站；发布缓存与用户安装目录分开。
 
-- 索引里每个版本的 `channel` 是更新渠道：定期发的版本 `stable`，中间放给测试者的 `alpha` / `beta` / `rc`（版本号带同名预发布后缀）。
-- 客户端两档：`stable` 只看 `stable`；`beta` 看全部，取版本号最大的，所以测试版用户在正式版出来后会升到正式版。
-- 版本按语义化版本比较（`0.1.4-beta.2 < 0.1.4-rc.1 < 0.1.4`）。
-- 本地开发包（`0.1.3-dev-<哈希>`）不检查。调试用环境变量：`QINGJIAN_UPDATE_VERSION` 顶替当前版本，`QINGJIAN_UPDATE_INDEX` 换索引地址（签名照验）；
-  `cargo run -p qingjian-update --example check -- 0.1.2 beta` 手动走一遍。
-- 只有带本机安装包（`platform` + `cpu`）的版本才算数：只发了 macOS 的版本不会提示 Windows 用户。
+## 验证边界
 
-## 调度
-
-壳在已有的每秒定时器里调 `Checker::poll`：开关开着、上次成功超过 24 小时（或换了渠道）、上次尝试超过 1 小时、没有正在查的，才起一个一次性线程去查。
-失败（断网、验签不过、格式版本不认识）只记日志。结果落在数据目录的 `update.json`，装上新版后旧结果因为「不比当前新」自然失效。
-
-- macOS 菜单的坑（2026-09-17）：「有新版本」这一行是可点的条目，必须放在「打开日志目录」那一组里。第一版把它放在最后一条分隔线之后、
-  夹在「配置文件有错误」与「青简 x.y.z」两个纯展示条目之间，结果 IMK 每次按键后都 `deactivateServer` 再新建控制器，
-  第二个字母盖掉第一个、候选框闪；与条目是否隐藏、标题、tag 都无关，挪个位置或去掉 action 就好（对照构建逐个验过）。
-- macOS：IMK 进程自己查；菜单里「有新版本 x.y.z…」一行与「关于」页的状态行，状态变了才刷界面。
-- Windows：Server 查并写 `update.json`（DLL 不联网）；设置程序的「关于」页读这个文件，「立即检查」在设置程序自己的后台线程里查。
-  任务栏「中 / 英」图标的右键菜单在查到新版本时多一项「有新版本，前往下载…」：Server 随 `ModeSync` 下发 `IndicatorState.update_available`，
-  点了发 `IndicatorCommand::OpenDownload`，由 Server 打开下载页（DLL 可能在 UWP 沙箱里起不了进程）。
-
-## 签名密钥
-
-`tools/release-sign`：`keygen --out <文件>` 生成密钥对（私钥只写文件），`sign <文件>` 按环境变量里的私钥写 `.sig`，`verify <文件>` 按内置公钥验。
-公钥在 `crates/qingjian-update/src/index/signature.rs` 的 `PUBLIC_KEYS`，是个列表：换钥时新旧并列发一两个版本，等旧版本用户都升上来再去掉旧的。
-`sign` 会先核对私钥与内置公钥对得上，对不上当场失败；`release.yml` 的门禁在没配私钥时直接失败——签不了名的索引等于所有用户收不到更新。
-
-## 以后
-
-- 下载 + 校验 sha256（索引里已有）+ 调起安装程序（macOS 打开 pkg，Windows 静默跑安装包）。
-- 系统通知里的提示。
-- SignPath 要求「向非用户指定的系统发数据」的功能在安装时可关：安装向导里加一个「自动检查更新」勾选项。
+自动测试覆盖版本挑选、签名拒绝、包大小与摘要、错误源路径和配置迁移；发布后需用真实 GitHub 索引验证两套 TLS 路径及完整包下载。编译和离屏检查不能替代手机安装确认、Windows UAC 和安装后的真机使用。

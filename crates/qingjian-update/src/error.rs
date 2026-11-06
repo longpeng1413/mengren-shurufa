@@ -6,6 +6,15 @@ pub enum UpdateError {
     #[error("request failed: {0}")]
     Request(#[from] reqwest::Error),
 
+    #[error("invalid update package or release changed; check again")]
+    InvalidPackage,
+
+    #[error("update package hash or size mismatch")]
+    Integrity,
+
+    #[error("update download cancelled")]
+    Cancelled,
+
     #[error("runtime failed: {0}")]
     Runtime(#[from] std::io::Error),
 

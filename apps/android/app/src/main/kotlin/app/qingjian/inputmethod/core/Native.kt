@@ -2,6 +2,11 @@ package app.qingjian.inputmethod.core
 
 /** Rust 侧（apps/android/core）的 JNI 入口。句柄只在主线程用。 */
 internal object Native {
+    external fun updateCheck(version: String, proxy: String): String?
+    external fun updateDownload(current: String, version: String, proxy: String, cache: String): String?
+    external fun updateProgress(): Long
+    external fun updateCancel()
+
     external fun cloudModels(settings: String): String?
     external fun memberStart(host: String, proxy: String): String?
     external fun memberFinish(): String?

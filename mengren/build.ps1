@@ -57,14 +57,14 @@ if ($Android) {
     $env:CARGO_TARGET_DIR = 'D:\mengren-dev\target'
     Push-Location (Join-Path $Repo 'apps\android')
     try {
-        & .\gradlew.bat assembleDebug --console=plain '-Pkotlin.incremental=false' `
+        & .\gradlew.bat assembleRelease --console=plain '-Pkotlin.incremental=false' `
             '-Dhttp.proxyHost=127.0.0.1' '-Dhttp.proxyPort=7897' '-Dhttps.proxyHost=127.0.0.1' '-Dhttps.proxyPort=7897'
         if ($LASTEXITCODE -ne 0) { throw "安卓编译失败（退出码 $LASTEXITCODE）" }
     } finally { Pop-Location }
     Remove-Item Env:CARGO_TARGET_DIR
     $apk = Join-Path $Out "猛人输入法-安卓-$stamp.apk"
-    Copy-Item (Join-Path $Repo 'apps\android\app\build\outputs\apk\debug\app-debug.apk') $apk
-    Verify-Package (Join-Path $Repo 'apps\android\app\build\outputs\apk\debug\app-debug.apk') $apk
+    Copy-Item (Join-Path $Repo 'apps\android\app\build\outputs\apk\release\app-release.apk') $apk
+    Verify-Package (Join-Path $Repo 'apps\android\app\build\outputs\apk\release\app-release.apk') $apk
     Prune '猛人输入法-安卓-*.apk' $apk
     Write-Host "安卓：$apk" -ForegroundColor Green
 }

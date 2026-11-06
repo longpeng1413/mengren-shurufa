@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_section">Software updates</string>
+    <string name="update_auto">Automatically check for updates</string>
+    <string name="update_auto_note">Check official Mengren releases daily without sending typed text or account data.</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_idle">Update source: Mengren GitHub</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_latest">You are up to date</string>
+    <string name="update_available">New version available</string>
+    <string name="update_ready">Verified and ready to install</string>
+    <string name="update_installing">Preparing system installation…</string>
+    <string name="update_confirmation">Return here to confirm installation</string>
+    <string name="update_installed">Update installed</string>
+    <string name="update_integrity">Package verification failed. Please download again.</string>
+    <string name="update_signature">Update signature verification failed.</string>
+    <string name="update_cancelled">Update cancelled</string>
+    <string name="update_changed">Release information changed. Check again.</string>
+    <string name="update_package_error">Installation failed. The APK must match the installed app signature.</string>
+    <string name="update_network_error">Connection failed. Check the network, proxy and per-app proxy list.</string>
+    <string name="update_progress">Downloading %1$d%%</string>
+    <string name="update_install">Update now</string>
+    <string name="update_offer">Version %1$s · %2$d MB</string>
+    <string name="update_cancel">Cancel download</string>
+    <string name="update_proxy">Update proxy (blank uses system)</string>
+    <string name="update_network_note">Downloads are verified before system installation. Settings are preserved. Allow Mengren in your per-app proxy list.</string>
+    <string name="update_permission_title">Allow update installation</string>
+    <string name="update_permission_note">Allow this app to install packages in system settings, then return. The system still asks you to confirm the update.</string>
+    <string name="update_permission_open">Open system settings</string>
+</resources>

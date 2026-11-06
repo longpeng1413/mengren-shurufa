@@ -7,3 +7,12 @@
 /data
 .playwright-mcp/
 __pycache__/
+
+# 本机凭据与签名文件不得进入公开源码
+.env.*
+!.env.example
+*.dpapi
+*.keystore
+*.jks
+*.p12
+*.pfx

@@ -6,6 +6,7 @@
 
     <!-- 只有快捷翻译、青简翻译、补充译词与云联想（后两样缺省关）连用户自己填的大模型接口（见 cloud/ 与 Rust 侧 apps/android/core/src/cloud），语音输入连用户自己填的识别服务（见 voice/ 与 crates/qingjian-voice）；不开云联想时打字不联网 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- 云联想「只在 Wi-Fi 下使用」要看当前网络（见 cloud/Network.kt） -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -92,6 +93,8 @@
             android:authorities="${applicationId}.logs"
             android:exported="false"
             android:grantUriPermissions="true" />
+
+        <receiver android:name=".update.UpdateInstallReceiver" android:exported="false" />
 
         <service
             android:name=".service.QingjianInputMethodService"

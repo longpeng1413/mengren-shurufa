@@ -24,7 +24,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `crates/qingjian-render`：候选窗与状态条：帧数据 + 主题 → 场景树，画在 bamboo-slip 上，各平台只贴图。见 `docs/design/rendering.md`。
 - `crates/bamboo-slip`：自绘 UI 引擎（场景树、布局、文字、动画 → 位图，另有控件库与窗口宿主），候选窗与设置程序共用；不放任何青简的概念，约定见该目录的 `CLAUDE.md`。双许可，见该目录的 `LICENSE.md`。
 - `crates/bamboo-slip-i18n`：界面文案多语言：各 crate 的 `locales/*.toml` 编译时嵌入，`tr` 按进程级的界面语言查，回退英文再回退中文。双许可，见该目录的 `LICENSE.md`。
-- `crates/qingjian-update`：检查更新：读官网的 `releases.json`、验 ed25519 签名、按平台与渠道挑新版本，只提示不安装；发版侧的签名工具是 `tools/release-sign`。见 `docs/design/update.md`。
+- `crates/qingjian-update`：更新：读猛人 GitHub 的签名索引，按平台挑新版、下载并校验安装包，壳负责系统安装；发版侧的签名工具是 `tools/release-sign`。见 `docs/design/update.md`。
 - `crates/qingjian-code`：认出一段文字像不像代码并切高亮片段，输入法与剪贴板共用；core 里转出为 `qingjian_core::code`。
 - `crates/qingjian-clipboard`：剪贴板历史存储（SQLite，留好同步要用的字段）与面板位置，平台无关，不放窗口与界面。
 - `crates/qingjian-clipboard-sync`：剪贴板的设备间同步：配对、加密通道、合并、发现与扫描，不依赖具体存储；Windows 与 Android 共用。
@@ -62,3 +62,12 @@ Windows 本机只 `cargo check --target x86_64-pc-windows-gnu`，真编译与真
 @docs/contributing.md
 
 交流用中文。
+
+
+## 猛人输入法发版边界
+
+- 本机主仓库 origin 指向 `longpeng1413/mengren-shurufa-private-archive`（私有）。公开仓库为 `longpeng1413/mengren-shurufa`，只接受审查后的独立源码变更；禁止把主仓库的分支、历史或 --mirror 推过去。
+- 用户已授权每轮完整功能升级通过检查后发布 GitHub 正式版，不需要逐次重新确认。Windows 与安卓产品版本必须同步递增，不用 -dev 发布；不跳过必要检查，不把编译通过称为真机验收。
+- 先运行 `mengren/build.ps1` 生成两端包，再用 `mengren/release.py --version X.Y.Z --notes mengren/releases/vX.Y.Z.md --gitleaks <工具路径> --publish` 导出、扫描、提交公开源码，发布签名索引与安装包。脚本会保留 GitHub 独立修改，遇同文件冲突先合并，禁止覆盖或强推。
+- 更新仅来自猛人仓库，信任猛人专用公钥。签名私钥、安卓签名备份、私人说明和早期设计素材不公开；私钥在 `mengren/private/` 以 DPAPI 加密保存，不打印、不提交，不换掉已安装 APK 的签名。
+- 每次新包成功并校验后，本机安装包目录每个平台只留最新包，旧包送回收站。发布附件用 ASCII 拼音名；用户设置和已安装目录不能作为旧包清理。

@@ -3,4 +3,4 @@
 pub mod cloud_test;
 pub mod import;
 pub mod model_download;
-pub mod update_check;
+pub mod update;

@@ -65,9 +65,9 @@ TEXT = [
     ]),
     ('apps/settings/src/support/mod.rs', [('Self::Clipboard => "青简剪贴板"', 'Self::Clipboard => "猛人剪贴板"')]),
     ('apps/clipboard/locales/zh-Hans.toml', [('tip = "青简剪贴板"', 'tip = "猛人剪贴板"')]),
-    # 检查更新默认关掉：官网的新版本是官方青简，装上会把猛人输入法覆盖掉
-    ('crates/qingjian-platform/src/config/update/mod.rs', [('check: true,', 'check: false,')]),
-    ('crates/qingjian-platform/src/config/mod.rs', [('\ncheck = true\n# 渠道', '\ncheck = false\n# 渠道')]),
+    # 猛人更新源已接入独立签名清单，默认检查开启
+    ('crates/qingjian-platform/src/config/update/mod.rs', [('check: false,', 'check: true,')]),
+    ('crates/qingjian-platform/src/config/mod.rs', [('\ncheck = false\n# 渠道', '\ncheck = true\n# 渠道')]),
 ]
 
 # ---- 整个文件覆盖：(目标, 内容)

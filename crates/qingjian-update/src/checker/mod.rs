@@ -2,10 +2,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-mod available;
 mod state;
 
-pub use available::Available;
+pub use crate::Available;
 pub use state::UpdateState;
 
 use qingjian_platform::{UpdateChannel, UpdateConfig};
@@ -153,7 +152,15 @@ impl Checker {
     ) -> Option<Available> {
         let version = Version::parse(&Self::effective_version(current))
             .filter(|version| !version.is_dev())?;
-        Self::relevant(state, &version, config).cloned()
+        Self::relevant(
+            state,
+            &version,
+            &UpdateConfig {
+                check: true,
+                channel: config.channel,
+            },
+        )
+        .cloned()
     }
 
     fn relevant<'a>(
@@ -216,6 +223,7 @@ mod tests {
                 channel: channel.to_owned(),
                 date: String::new(),
                 notes: Vec::new(),
+                asset: None,
             }),
         }
     }
@@ -233,7 +241,7 @@ mod tests {
     }
 
     #[test]
-    fn saved_prerelease_is_hidden_on_the_stable_channel_and_when_off() {
+    fn manual_check_works_with_auto_off_and_stable_filters_prereleases() {
         let state = state("0.1.4-beta.1", "beta");
         assert!(
             Checker::available_in(&state, "0.1.3", &config(true, UpdateChannel::Beta)).is_some()
@@ -242,7 +250,7 @@ mod tests {
             Checker::available_in(&state, "0.1.3", &config(true, UpdateChannel::Stable)).is_none()
         );
         assert!(
-            Checker::available_in(&state, "0.1.3", &config(false, UpdateChannel::Beta)).is_none()
+            Checker::available_in(&state, "0.1.3", &config(false, UpdateChannel::Beta)).is_some()
         );
     }
 

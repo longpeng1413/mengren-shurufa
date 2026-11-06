@@ -8,6 +8,7 @@ class QingjianApp : Application() {
     override fun onCreate() {
         super.onCreate()
         AppLog.init(this)
+        app.qingjian.inputmethod.update.Updates.start(this)
         app.qingjian.inputmethod.cloud.MemberAccount.start(this)
     }
 }

@@ -27,7 +27,7 @@ use qingjian_render::{TextSizes, Theme, ThemeLibrary};
 use crate::jobs::cloud_test::CloudTest;
 use crate::jobs::import::ImportJob;
 use crate::jobs::model_download::ModelDownload;
-use crate::jobs::update_check::UpdateCheck;
+use crate::jobs::update::check::UpdateCheck;
 use crate::library::Library;
 use crate::message::{FieldId, Popup, SizeKind};
 use crate::page_id::PageId;
@@ -83,6 +83,8 @@ pub struct Settings {
     pub cloud_test: CloudTest,
 
     pub update: UpdateCheck,
+
+    pub update_install: crate::jobs::update::install::UpdateInstall,
 
     /// 正在录的快捷键。
     pub recording: Option<Shortcut>,
@@ -183,6 +185,7 @@ impl Settings {
             fields: HashMap::new(),
             cloud_test: CloudTest::default(),
             update: UpdateCheck::load(),
+            update_install: crate::jobs::update::install::UpdateInstall::default(),
             recording: None,
             library: Library::scan(),
             import: ImportJob::default(),

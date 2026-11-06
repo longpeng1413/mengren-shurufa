@@ -1,6 +1,6 @@
 [package]
 name = "qingjian-update"
-description = "检查更新：读官网的 releases.json、验 ed25519 签名、按平台与渠道挑出比当前新的版本"
+description = "猛人更新：签名索引、版本挑选、安装包下载与内容校验"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,12 +10,25 @@ repository.workspace = true
 workspace = true
 
 [dependencies]
-qingjian-platform.workspace = true
+qingjian-platform = { workspace = true, optional = true }
 base64.workspace = true
 ed25519-dalek.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-reqwest = { workspace = true, features = ["native-tls", "system-proxy"] }
+reqwest.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+sha2 = "0.11"
+rustls = { workspace = true, optional = true }
+webpki-roots = { workspace = true, optional = true }
+
+[features]
+default = ["desktop", "native-tls"]
+desktop = ["dep:qingjian-platform"]
+native-tls = ["reqwest/native-tls", "reqwest/system-proxy"]
+rustls = ["reqwest/rustls-no-provider", "dep:rustls", "dep:webpki-roots"]
+
+[[example]]
+name = "check"
+required-features = ["desktop"]

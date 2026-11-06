@@ -6,6 +6,8 @@
 - [青简 GitHub](https://github.com/qingjian-team/qingjian)
 - [猛人输入法 GitHub](https://github.com/longpeng1413/mengren-shurufa)
 
+从 0.3.4 起，安卓与 Windows 可在软件「关于」页直接检查并更新，见[更新说明](docs/user/help/mengren-updates.md)。
+
 本项目的改版说明见 [猛人功能与使用说明](docs/user/cloud/mengren-services.md)。下文保留青简上游的介绍和使用文档；其中的青简下载与发布链接属于上游项目。
 
 ---

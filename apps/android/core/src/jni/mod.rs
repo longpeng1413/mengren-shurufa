@@ -16,6 +16,7 @@ mod stats;
 mod strip;
 mod swipe;
 mod theme;
+mod update;
 mod voice;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};

@@ -54,7 +54,7 @@ android {
         }
         release {
             isMinifyEnabled = false
-            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
         }
     }
 

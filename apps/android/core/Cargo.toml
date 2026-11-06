@@ -1,7 +1,7 @@
 [package]
 name = "qingjian-android"
 description = "Android 输入法的 Rust 侧：Engine 装配 + JNI 接口，编成 libqingjian_android.so"
-version = "0.3.3-dev"
+version = "0.3.4"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -22,6 +22,7 @@ qingjian-lm.workspace = true
 qingjian-predict = { path = "../../../crates/qingjian-predict", default-features = false, features = ["rustls"] }
 qingjian-render.workspace = true
 qingjian-translate.workspace = true
+qingjian-update = { version = "0.1.1", path = "../../../crates/qingjian-update", default-features = false, features = ["rustls"] }
 qingjian-voice.workspace = true
 serde.workspace = true
 serde_json.workspace = true

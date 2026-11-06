@@ -26,7 +26,7 @@
 #endif
 #define AppName "猛人输入法"
 #define Publisher "猛人"
-#define WebsiteUrl "https://qingjian.im"
+#define WebsiteUrl "https://github.com/longpeng1413/mengren-shurufa"
 ; 脚本相对仓库根（ime/）：installer → windows → apps → ime
 #define Repo "..\..\.."
 ; 按版本起名的 TSF DLL（见文件头「升级」）。
@@ -305,6 +305,9 @@ begin
   end;
 end;
 
+var
+  UpdateLaunchError: Integer;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
@@ -313,6 +316,9 @@ begin
     DeleteStaleDlls;
     DeleteRetiredServers;
   end;
+  if (CurStep = ssDone) and WizardSilent then
+    ShellExecAsOriginalUser('', ExpandConstant('{app}\qingjian-server.exe'), '', '',
+      SW_SHOWNORMAL, ewNoWait, UpdateLaunchError);
 end;
 
 { 卸载同理：[UninstallRun] 杀 Server 之前先改名，旧版 DLL 拉不起它，文件才删得掉。 }

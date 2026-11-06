@@ -1,21 +1,42 @@
-//! 检查更新：读官网的版本索引 `releases.json`，验 ed25519 签名，按平台、CPU 与渠道挑出比当前新的版本。
-//!
-//! 只提示不安装。壳在自己的定时器里调 [`Checker::poll`]，到点了它起一个一次性线程去查，结果写进数据目录的 `update.json`；
-//! 菜单与设置页用 [`Checker::available`] 取要提示的版本。设计与发版侧的签名见 `docs/design/update.md`。
+//! 猛人更新：读取 GitHub 签名索引，按平台挑选新版，下载并校验安装包。
+//! 桌面调度与安卓共用同一份版本、验签和内容校验逻辑；系统安装由平台壳负责。
 
 #![forbid(unsafe_code)]
 
+mod available;
+#[cfg(feature = "desktop")]
 mod checker;
+mod download;
 mod error;
+mod http;
 mod index;
 mod target;
 mod version;
 
-pub use checker::{Available, Checker, UpdateState};
+pub use available::Available;
+#[cfg(feature = "desktop")]
+pub use checker::{Checker, UpdateState};
+pub use download::download_release;
 pub use error::UpdateError;
 pub use index::{Asset, Index, PUBLIC_KEYS, Release, SCHEMA_VERSION, verify};
 pub use target::Target;
 pub use version::Version;
 
 /// 下载页，提示里点开的就是它。
-pub const DOWNLOAD_URL: &str = "https://qingjian.app/download";
+pub const DOWNLOAD_URL: &str = "https://github.com/longpeng1413/mengren-shurufa/releases/latest";
+
+/// 显式检查本机版本，索引必须通过猛人发版公钥验签。
+pub fn check(current: &str, target: Target, beta: bool) -> Result<Option<Available>, UpdateError> {
+    check_with_proxy(current, target, beta, "")
+}
+
+/// 安卓从系统网络设置传入代理；留空使用客户端缺省代理。
+pub fn check_with_proxy(
+    current: &str,
+    target: Target,
+    beta: bool,
+    proxy: &str,
+) -> Result<Option<Available>, UpdateError> {
+    let version = Version::parse(current).ok_or(UpdateError::InvalidPackage)?;
+    Ok(index::fetch_index_with_proxy(current, proxy)?.for_target(&version, target, beta))
+}
