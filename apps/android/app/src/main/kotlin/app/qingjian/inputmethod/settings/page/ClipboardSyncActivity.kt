@@ -108,7 +108,7 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
         val name = ClipboardSync.deviceName(this)
         views += ui.group(
             R.string.sync_this_device,
-            ui.input(R.string.sync_device_name, name, prefs.getString(ClipboardSync.KEY_DEVICE_NAME, "").orEmpty(), false) {
+            ui.input(R.string.sync_device_name, name, prefs.getString(ClipboardSync.KEY_DEVICE_NAME, "").orEmpty(), false, textInputType = InputType.TYPE_CLASS_TEXT) {
                 prefs.edit().putString(ClipboardSync.KEY_DEVICE_NAME, it.trim()).apply()
                 ClipboardSync.restart(this)
                 runCatching { Native.clipboardSyncWatch(true) }

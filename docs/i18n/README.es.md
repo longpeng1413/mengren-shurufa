@@ -1,3 +1,5 @@
+> Mengren Windows/Android 0.4.1 is the freeze release. Development pauses after release verification. See the [current scope and remaining work](../notes/freeze-041.md). The translated upstream introduction below is historical baseline material.
+
 <p align="center"><a href="../../README.md">简体中文</a> | <a href="README.zh-Hant.md">繁體中文</a> | <a href="README.en.md">English</a> | <a href="README.ja.md">日本語</a> | <b>Español</b> | <a href="README.vi.md">Tiếng Việt</a> | <a href="README.de.md">Deutsch</a></p>
 
 <p align="center">

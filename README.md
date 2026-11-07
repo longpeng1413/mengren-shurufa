@@ -1,5 +1,7 @@
 # 猛人输入法
 
+**0.4.1 为本轮收尾版，发布验证后暂停开发。** [下载与更新](https://github.com/longpeng1413/mengren-shurufa/releases/latest) · [冻结状态及未完成项](docs/user/help/mengren-freeze.md)。
+
 使用跨网络剪贴板与私密发送，请阅读[客户端配置](docs/user/help/mengren-relay.md)和[自建中转部署](mengren/relay/README.md)。
 
 基于 [青简输入法](https://github.com/qingjian-team/qingjian) 改版的猛人输入法。感谢青简项目及其贡献者；保留原项目版权、许可证与数据来源声明。

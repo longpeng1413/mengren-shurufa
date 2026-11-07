@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 仓库现状
 
-本工作区为基于青简改版的猛人输入法，当前产品版本为 Windows / Android v0.4.0（2026-11-07，用户已授权本轮功能完成后合并发布）。Core 平台无关，各平台只做壳；下面的 crate 地图及上游 macOS/Linux 资料继续作为架构参考，不表示本轮要扩展所有平台。
+本工作区为基于青简改版的猛人输入法，当前产品版本为 Windows / Android v0.4.1（2026-11-07，中文设备名修复与文档收尾版；发布验证完成后按用户要求冻结并暂停开发）。Core 平台无关，各平台只做壳；下面的 crate 地图及上游 macOS/Linux 资料继续作为架构参考，不表示本轮要扩展所有平台。
 当前范围见 `docs/design/mengren-public.md`，猛人进度与剩余项见 `docs/plan/todo.md`；`docs/plan/roadmap.md` 主体为上游路线图。2026-11-07 v0.3.8 发布后，用户确认原有手机到另一手机及桌面设备的私密路线通过；新增 Windows 设备的普通/私密互传尚未联通，用户已确认仅看见附近/中转设备，尚未配对；先逐对完成六位码配对。0.4.0 修复 Windows 小键盘配对码输入顺序，并加入自定义短语同步及紧凑竖排剪贴板。源码没有三台设备上限，六台逻辑设备中转互传扩容测试已通过，不将逻辑测试当作新增真实设备已通过。此前 v0.3.7 故障历史见 `docs/notes/private-transfer-037-review.md`。
 
 ## 目录地图
@@ -71,3 +71,7 @@ apps/macos/scripts/bundle.sh --install        # mac 壳装到 ~/Library/Input Me
 - 先运行 `mengren/build.ps1` 生成两端包，再用 `mengren/release.py --version X.Y.Z --notes mengren/releases/vX.Y.Z.md --gitleaks <工具路径> --publish` 导出、扫描、提交公开源码，发布签名索引与安装包。脚本会保留 GitHub 独立修改，遇同文件冲突先合并，禁止覆盖或强推。
 - 更新仅来自猛人仓库，信任猛人专用公钥。签名私钥、安卓签名备份、私人说明和早期设计素材不公开；私钥在 `mengren/private/` 以 DPAPI 加密保存，不打印、不提交，不换掉已安装 APK 的签名。
 - 每次新包成功并校验后，本机安装包目录每个平台只留最新包，旧包送回收站。发布附件用 ASCII 拼音名；用户设置和已安装目录不能作为旧包清理。
+
+## 0.4.1 后的冻结约束
+
+用户最新要求：本轮修复安卓中文设备名、对照原设计更新说明并发布 0.4.1；完成发布和更新验证后暂停开发。后续不要自主开始 P5、桌面扩展或新版本，只有用户明确要求恢复/修复时继续。当前未完成与验收边界以 `docs/notes/freeze-041.md` 为准；冻结不等于原计划全部完成。不能清理用户数据、开发缓存、配对身份或签名来“收尾”。

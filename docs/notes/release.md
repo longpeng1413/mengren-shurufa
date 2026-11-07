@@ -1,10 +1,8 @@
-| `.github/workflows/ci.yml` | push main、PR | `core`（Linux）fmt / clippy / 全 workspace 测试（排除 IMK 壳）；`macos` 编 IMK 壳并跑它的测试；`windows` 编 Server / TSF DLL / Settings 并跑测试；`android` 用样例数据编 debug APK。仓库公开，Actions 不计费 |
-| `.github/workflows/audit.yml` | 每周一、Cargo.lock 变动 | `cargo audit`（RustSec 已知漏洞） |
-| `.github/dependabot.yml` | 每周一 | Cargo 依赖与钉 commit 的 actions 的更新 PR |# 发版流程
+# 发版流程
 
 ## 猛人当前发布流程
 
-2026-11-07 用户已明确授权本轮完成后合并发布 Windows/Android v0.4.0，含配对码输入修复、自定义短语同步与 Windows 紧凑剪贴板；数字输入已由用户确认正常。此前暂停要求已被替代，原 v0.3.7 标签和附件保留。真实机型与应用验收仍需用户测试，不将编译/自动测试当作全部真机通过。
+2026-11-07 当前收尾版本为 Windows/Android v0.4.1，修复安卓中文设备名并完成原计划对照和文档更新；发布与更新下载验证结束后按用户要求暂停开发。历史标签和附件保留。真实机型与应用验收仍需用户测试，不将编译/自动测试当作全部真机通过。
 
 恢复发布后使用 `mengren/build.ps1` 生成同一产品版本的两端正式包，再通过 `mengren/release.py` 导出审查源码、扫描隐私、验证 APK 原签名和安装包版本，签署更新索引，在独立公开历史上追加提交并核对远端附件后发布。禁止把本机主仓库的旧历史推入公开库，Actions 保持关闭；本机旧交付包在新包成功校验后送回收站。用户设置与已安装目录不参与旧包清理。
 
@@ -211,3 +209,7 @@ gh secret set QINGJIAN_ANDROID_KEY_PASSWORD
 
 `apps/macos/scripts/bundle.sh --pkg` 打本机架构；`QINGJIAN_TARGET=x86_64-apple-darwin` 交叉编译 Intel 包（要先 `rustup target add`，
 本机不需要时不必装，CI 上两个都打）。成品在 `target/pkg/qingjian-<版本>-macos-<arch>.pkg`，每个架构一个工作目录，连着打互不覆盖。
+
+## 0.4.1 收尾与冻结
+
+本轮发布安卓中文设备名修复和文档核对结果，Windows 与安卓产品号统一为 0.4.1。发布验证完成后暂停开发；既有正式标签和附件保留，两端继续通过检查更新安装。本机旧交付包仅在新包成功并校验后送回收站。完整边界见[冻结说明](freeze-041.md)。

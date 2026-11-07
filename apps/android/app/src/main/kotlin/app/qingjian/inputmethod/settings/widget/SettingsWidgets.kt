@@ -278,9 +278,10 @@ class SettingsWidgets(private val context: Context, val colors: AppColors) {
 
     /**
      * 点开弹输入框的一行：左边标题，右边 [value]（密钥这类只给提示）。输入框里预填 [current]；
+     * 普通字段可用 [textInputType] 指定输入场景，设备名用普通文本以允许中文组词。
      * [secret] 时按密码显示、不预填。点「保存」交出去（去掉首尾空白）。
      */
-    fun input(title: Int, value: String, current: String, secret: Boolean, onSave: (String) -> Unit) = LinearLayout(context).apply {
+    fun input(title: Int, value: String, current: String, secret: Boolean, textInputType: Int = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, onSave: (String) -> Unit) = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         minimumHeight = dp(ROW_HEIGHT_DP)
@@ -300,7 +301,7 @@ class SettingsWidgets(private val context: Context, val colors: AppColors) {
                 if (secret) {
                     inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                 } else {
-                    inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+                    inputType = textInputType
                     setText(current)
                     setSelection(current.length)
                 }

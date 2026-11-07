@@ -4,6 +4,9 @@ order: 1
 description: "When Qingjian goes online, what it records on your device, what the input log is for and how to turn it off, and how password fields and private input fields are handled."
 ---
 
+This translated page describes the upstream baseline. Mengren Windows/Android 0.4.1 also provides encrypted paired-device clipboard and persistent custom-phrase sync, optional private delivery, Youdao, membership and speech services. These enabled features communicate over the network. Private received text avoids the recipient system clipboard; ordinary clipboard items and saved phrases are persistent data. See the [current Mengren privacy guide](../../../help/privacy.md) and [freeze scope](../../../help/mengren-freeze.md).
+
+
 Qingjian doesn't upload what you type. Pinyin conversion, dictionaries, learning and glosses all happen on your device. No account, no usage reporting.
 
 ## When it goes online

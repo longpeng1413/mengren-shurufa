@@ -1,5 +1,7 @@
 # 青简剪贴板更新日志
 
+此页保留上游独立剪贴板产品的历史。猛人 0.4.1 随主产品发布并冻结，当前记录见 [主更新日志](../../CHANGELOG.md) 和[冻结审计](../../docs/notes/freeze-041.md)。
+
 格式同仓库根的 `CHANGELOG.md`：一个版本一节，标题写「版本 · 日期 · 渠道」，正文一行一条、面向用户的措辞。
 推 `clipboard-v<版本>` 标签时，CI 取这一节写进 qingjian-team/qingjian-clipboard 的 Release。
 

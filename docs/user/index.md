@@ -4,6 +4,8 @@ order: 0
 description: 青简输入法使用文档：安装、打字、学语言、个性化、AI 服务、各平台差异、隐私与常见问题。
 ---
 
+猛人当前收尾版本为 0.4.1，发布后暂停开发；现有功能继续可用，[版本状态与未完成项](help/mengren-freeze.md)。
+
 猛人 Windows/Android 改版用户先阅读 [云服务](cloud/mengren-services.md)、[同步与私密输入](help/mengren-relay.md) 和 [内置更新](help/mengren-updates.md)。v0.3.7 私密交互已有未送达和提示混乱的反馈，当前先处理问题，不要求重复完整测试；后续检查见 [真机清单](help/mengren-testing.md)。下文保留上游基础输入说明，平台范围以对应功能页为准。
 
 青简是一个拼音输入法。输入时，候选词旁边附带一条所学语言的译词，在输入的同时记住一个词。

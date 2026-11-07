@@ -844,3 +844,10 @@ v0.3.7：共享 PrivateSender 弱句柄，接收权限/可用性短锁，私密�
 `qingjian-clipboard-sync::PhraseSource` 从壳读取本机快照；mode=6 经原 Noise 配对公钥认证后先交换摘要，再按发起方先发、响应方后发的顺序交换限长批次及持久化确认，避免两端大消息同时写阻塞。入库前重新检查配对；旧端不支持新 mode 时不改变配对或普通/私密同步。Windows 监听收件箱与隐藏文件变化热装配短语；Android 收到元数据事件重挂候选并刷新面板，下次展开键盘也重读。
 
 Windows 剪贴板使用 `Edge::compact_rect`，约 420×520 逻辑像素，保留选定边、居中并限制于当前显示器工作区。列表与滚轮竖排，短文卡片按内容限高；macOS 原布局保留。`bamboo-slip` 根据逻辑字符键区分 NumLock 的小键盘数字与无修饰键下的导航键，保留原字符快捷键映射。
+
+
+### 猛人 0.4.1 冻结收尾
+
+Android `SettingsWidgets.input` 保留兼容 URI 类型的默认值，增加可选 `textInputType`，只有同步设备名传 `TYPE_CLASS_TEXT`，使系统中文 IME 可以组词提交；密码框仍独立设密码类型。SharedPreferences 保存和 JNI/JSON UTF-8 路径不变。已有配对名字的认证刷新协议未新增，仍是冻结未完成项。
+
+设置程序关于/隐私文案更正启用云服务、同步、短语与更新的联网范围。0.4.1 发布验证后暂停开发，完整原计划对照见 [冻结审计](freeze-041.md)。
