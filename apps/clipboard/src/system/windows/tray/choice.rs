@@ -4,7 +4,7 @@
 pub enum Choice {
     Open,
     PrivateSend,
-    PrivateWait,
+    PrivateInput,
     TogglePause,
     OpenSettings,
     ToggleAutostart,

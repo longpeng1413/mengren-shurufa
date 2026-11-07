@@ -33,6 +33,7 @@ impl ClipboardApp {
                 self.neon_on = settings.sync_neon;
                 self.settings = settings.clone();
                 if sync_changed {
+                    self.private_deliveries.clear();
                     self.link.apply(&settings);
                     self.name_edit = TextEdit::new(self.shown_name());
                     if self.link.service().is_none() {
@@ -87,9 +88,17 @@ impl ClipboardApp {
                 #[cfg(windows)]
                 crate::system::windows::private::received(self.settings.private_auto_fill);
             }
-            SyncEvent::PrivateSent { .. } => {
+            SyncEvent::PrivateSendStarted => {
+                self.private_deliveries.clear();
+            }
+            SyncEvent::PrivateDelivery { peer, confirmed } => {
+                self.private_deliveries.insert(peer, confirmed);
+            }
+            SyncEvent::PrivateSent { count } => {
+                self.pair_status =
+                    crate::i18n::tr("private.sent").replace("{count}", &count.to_string());
                 #[cfg(windows)]
-                crate::system::windows::listener::notice("private.sent");
+                crate::system::windows::listener::notice_text(&self.pair_status);
             }
             SyncEvent::PrivateFailed => {
                 #[cfg(windows)]

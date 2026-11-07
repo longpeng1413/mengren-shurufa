@@ -2,11 +2,11 @@
 
 ## 支持的版本
 
-青简还在测试阶段，只修最新版本：
+猛人输入法基于青简，当前维护 Windows/Android，只修最新正式版。v0.3.7 已发布，但私密交互的最新真机反馈尚未通过，不能据协议测试推断所有真实流程可靠：
 
 | 版本 | 支持 |
 |---|---|
-| 最新的 0.1.x | ✅ |
+| 最新的猛人正式版（当前 0.3.7） | ✅，接收问题报告并修复 |
 | 更早 | ❌，请升级 |
 
 ## 报告漏洞
@@ -26,7 +26,7 @@
 
 ---
 
-**English.** Qingjian is in beta; only the latest 0.1.x release receives fixes. Please report vulnerabilities privately via
+**English.** Mengren is based on Qingjian and maintains Windows/Android. Only the latest Mengren stable release (currently 0.3.7) receives fixes; recent private-transfer device feedback remains unresolved. Please report vulnerabilities privately via
 GitHub's "Report a vulnerability" (Security tab), not in public issues. Expect a reply within 3 days; confirmed issues are fixed
 in the next release and credited in the changelog. An input method sees every keystroke, so we care most about keystroke leakage
 (logs, diagnostics, cloud requests, Secure Input), API key exposure, installer integrity (pkg vs. `SHA256SUMS`), and crashes from

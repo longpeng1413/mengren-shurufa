@@ -64,7 +64,7 @@ impl Default for ClipboardConfig {
             sync_enabled: false,
             relay_enabled: false,
             private_receive: true,
-            private_auto_fill: true,
+            private_auto_fill: false,
             private_send_mode: "auto".into(),
             relay_url: String::new(),
             relay_revision: String::new(),

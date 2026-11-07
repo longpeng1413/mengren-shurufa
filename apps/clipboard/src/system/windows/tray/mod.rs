@@ -47,7 +47,7 @@ const PERSONALIZE_KEY: PCWSTR = w!(r"Software\Microsoft\Windows\CurrentVersion\T
 const CHOICES: [Choice; 7] = [
     Choice::Open,
     Choice::PrivateSend,
-    Choice::PrivateWait,
+    Choice::PrivateInput,
     Choice::TogglePause,
     Choice::OpenSettings,
     Choice::ToggleAutostart,
@@ -142,8 +142,17 @@ pub fn remove(window: HWND) {
 }
 
 pub fn notice(window: HWND, message: &str) {
+    static LAST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+    let mut last = LAST
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if last.is_some_and(|time| time.elapsed() < std::time::Duration::from_secs(4)) {
+        return;
+    }
+    *last = Some(std::time::Instant::now());
     let mut icon_data = data(window);
-    icon_data.uFlags = windows::Win32::UI::Shell::NIF_INFO;
+    icon_data.uFlags =
+        windows::Win32::UI::Shell::NIF_INFO | windows::Win32::UI::Shell::NIF_REALTIME;
     for (out, unit) in icon_data
         .szInfo
         .iter_mut()
@@ -174,7 +183,7 @@ pub fn show_menu(window: HWND, state: &MenuState) -> Option<Choice> {
     let mut items = vec![
         (Choice::Open, MF_STRING, tr("tray.open")),
         (Choice::PrivateSend, MF_STRING, tr("private.send")),
-        (Choice::PrivateWait, MF_STRING, tr("private.wait")),
+        (Choice::PrivateInput, MF_STRING, tr("private.input")),
         (Choice::TogglePause, check(state.paused), tr("tray.pause")),
     ];
     if state.has_settings {

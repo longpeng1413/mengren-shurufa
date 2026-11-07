@@ -118,6 +118,8 @@ pub struct ClipboardApp {
 
     /// 配对的结果，显示在设备页。
     pub(crate) pair_status: String,
+
+    pub(crate) private_deliveries: HashMap<String, bool>,
 }
 
 impl ClipboardApp {
@@ -142,6 +144,7 @@ impl ClipboardApp {
             showing_devices: false,
             pairing: Pairing::Idle,
             pair_status: String::new(),
+            private_deliveries: HashMap::new(),
             paused: watch.settings.paused,
             edge: forced_edge.unwrap_or(watch.settings.edge),
             fixed_edge: forced_edge.is_some(),

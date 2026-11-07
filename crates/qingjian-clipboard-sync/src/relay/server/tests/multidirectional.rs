@@ -42,13 +42,30 @@ fn every_paired_device_can_send_and_receive_privately() {
                 .private_sender()
                 .send(Secret::new(text.clone()).unwrap())
         );
-        let event = devices[source].wait(|event| {
-            matches!(
+        let mut receipts = std::collections::HashMap::new();
+        devices[source].wait(|event| *event == SyncEvent::PrivateSendStarted);
+        let event = loop {
+            let event = devices[source]
+                .events
+                .recv_timeout(std::time::Duration::from_secs(30))
+                .unwrap();
+            if let SyncEvent::PrivateDelivery { peer, confirmed } = &event {
+                receipts.insert(peer.clone(), *confirmed);
+            }
+            if matches!(
                 event,
                 SyncEvent::PrivateSent { .. } | SyncEvent::PrivateFailed
-            )
-        });
+            ) {
+                break event;
+            }
+        };
         assert_eq!(event, SyncEvent::PrivateSent { count: 2 });
+        assert_eq!(receipts.len(), 2);
+        for (index, target) in devices.iter().enumerate() {
+            if index != source {
+                assert_eq!(receipts.get(&target.service().device_id()), Some(&true));
+            }
+        }
         for (index, target) in devices.iter().enumerate() {
             if index != source {
                 assert_eq!(

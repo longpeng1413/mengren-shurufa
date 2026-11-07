@@ -221,6 +221,14 @@ pub(super) fn devices(ui: &mut Ui<Message>, context: &Context) -> Result<Vec<Nod
     for state in &peers {
         let peer = &state.peer;
         let mut status = status_text(state.status, peer.last_seen);
+        if let Some(confirmed) = context.app.private_deliveries.get(&peer.device_id) {
+            status.push_str(" · ");
+            status.push_str(tr(if *confirmed {
+                "private.delivery_received"
+            } else {
+                "private.delivery_unconfirmed"
+            }));
+        }
         if state.via_relay && state.status == PeerStatus::Connected {
             status.push_str(" · ");
             status.push_str(tr("devices.relay"));

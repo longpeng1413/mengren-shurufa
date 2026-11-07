@@ -118,8 +118,27 @@ fn plain_http_health_check_works_without_websocket_headers() {
     tcp.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
     tcp.write_all(b"GET /healthz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
         .unwrap();
-    let mut response = String::new();
-    tcp.read_to_string(&mut response).unwrap();
+    // 按 HTTP Content-Length 读完，不把 Windows 关闭连接时的 RST 当成响应缺失。
+    let mut header = Vec::new();
+    while !header.ends_with(b"\r\n\r\n") {
+        assert!(header.len() < 1024);
+        let mut byte = [0];
+        tcp.read_exact(&mut byte).unwrap();
+        header.push(byte[0]);
+    }
+    let header = String::from_utf8(header).unwrap();
+    let length: usize = header
+        .lines()
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.eq_ignore_ascii_case("content-length")
+                .then(|| value.trim().parse().unwrap())
+        })
+        .unwrap();
+    assert!(length < 1024);
+    let mut body = vec![0; length];
+    tcp.read_exact(&mut body).unwrap();
+    let response = header + &String::from_utf8(body).unwrap();
     assert!(response.starts_with("HTTP/1.1 200 OK"));
     assert!(response.ends_with("{\"ok\":true,\"online\":0}"));
 }

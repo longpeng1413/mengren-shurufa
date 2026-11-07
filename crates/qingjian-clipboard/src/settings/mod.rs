@@ -90,7 +90,7 @@ impl Default for ClipSettings {
             hotkey: Hotkey::DEFAULT,
             private_hotkey: Hotkey::DEFAULT,
             private_receive: true,
-            private_auto_fill: true,
+            private_auto_fill: false,
             private_send_mode: "auto".into(),
             private_send_hotkey: Hotkey {
                 shift: true,
@@ -199,7 +199,7 @@ impl ClipSettings {
                 .private_auto_fill
                 .as_ref()
                 .and_then(toml::Value::as_bool)
-                .unwrap_or(true),
+                .unwrap_or(defaults.private_auto_fill),
             private_send_hotkey: text_of(&file.shortcut.private_send)
                 .and_then(|key| Hotkey::parse(&key))
                 .unwrap_or(defaults.private_send_hotkey),

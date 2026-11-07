@@ -1,5 +1,7 @@
 # 青简 Windows 输入法
 
+本工作区发行产品为猛人 Windows，当前 v0.3.8。猛人品牌、设置与独立剪贴板壳沿用下文架构，正式构建入口为 `mengren/build.ps1`；使用 [猛人更新通道](../../docs/user/help/mengren-updates.md)，不从上游青简安装包更新本产品。私密输入问题与拟议修复见 [当前分析](../../docs/notes/private-transfer-037-review.md)，用户已授权本版发布供定向复测。
+
 Windows 端是**一个产品、两个产物**，各自一个 package，同放本目录：
 
 | 目录 | package | 产物 | 职责 |

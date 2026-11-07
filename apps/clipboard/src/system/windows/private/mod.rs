@@ -16,6 +16,8 @@ use zeroize::{Zeroize, Zeroizing};
 
 static VAULT: Mutex<Weak<PrivateVault>> = Mutex::new(Weak::new());
 static SENDER: Mutex<Option<qingjian_clipboard_sync::service::PrivateSender>> = Mutex::new(None);
+static INPUT_GATE: qingjian_clipboard_sync::private::input::InputGate =
+    qingjian_clipboard_sync::private::input::InputGate::new();
 static RECEIVE: AtomicBool = AtomicBool::new(false);
 static LOCKED: AtomicBool = AtomicBool::new(true);
 static SUSPENDED: AtomicBool = AtomicBool::new(false);
@@ -127,41 +129,61 @@ fn current() -> Option<Arc<PrivateVault>> {
 
 /// 有私密内容时吞掉快捷键，即使输入失败也不退回普通粘贴。
 pub(crate) fn input() -> bool {
+    if INPUT_GATE.active() {
+        return true;
+    }
     let Some(vault) = current() else {
         return false;
     };
     if !vault.pending() {
         return false;
     }
+    input_at(None)
+}
+
+fn input_at(target: Option<isize>) -> bool {
+    let Some(permit) = INPUT_GATE.acquire() else {
+        return true;
+    };
+    let Some(vault) = current().filter(|vault| vault.pending()) else {
+        return false;
+    };
+    let Some(secret) = vault.take() else {
+        return false;
+    };
     automation::cancel();
-    let target = unsafe { GetForegroundWindow() }.0 as isize;
+    let target = target.unwrap_or_else(|| unsafe { GetForegroundWindow() }.0 as isize);
+    let generation = automation::generation();
     std::thread::spawn(move || {
+        let _permit = permit;
+        let _com = com::Com::new();
+        let focus = (unsafe { GetForegroundWindow() }.0 as isize == target)
+            .then(|| focus::Focus::capture(false))
+            .flatten();
         let until = Instant::now() + Duration::from_secs(2);
-        while [0x10, 0x11, 0x12, 0x5B, 0x5C]
-            .iter()
-            .any(|key| super::key_down(*key))
+        while unsafe { GetForegroundWindow() }.0 as isize != target
+            || [0x10, 0x11, 0x12, 0x5B, 0x5C]
+                .iter()
+                .any(|key| super::key_down(*key))
         {
-            if Instant::now() >= until {
-                vault.clear();
+            if Instant::now() >= until || automation::generation() != generation || blocked() {
                 super::listener::notice("private.failed");
                 return;
             }
             std::thread::sleep(Duration::from_millis(10));
         }
-        if LOCKED.load(Ordering::SeqCst)
-            || SUSPENDED.load(Ordering::SeqCst)
+        if blocked()
+            || automation::generation() != generation
             || target == 0
             || unsafe { GetForegroundWindow() }.0 as isize != target
+            || focus.as_ref().is_some_and(|focus| !focus.unchanged())
         {
-            vault.clear();
             super::listener::notice("private.failed");
             return;
         }
-        let Some(secret) = vault.take() else {
-            super::listener::notice("private.empty");
-            return;
-        };
-        if !type_into(&secret, false) {
+        let committed = type_into(&secret, false);
+        tracing::info!(committed, "Private input completed");
+        if !committed {
             super::listener::notice("private.failed");
         }
     });
@@ -178,13 +200,15 @@ pub(crate) fn received(automatic: bool) {
     automation::received(automatic);
 }
 
-pub(crate) fn prepare(target: Option<isize>) {
-    automation::prepare(target);
+pub(crate) fn input_target(target: isize) {
+    if !input_at(Some(target)) {
+        super::listener::notice("private.empty");
+    }
 }
 
-pub(crate) fn input_or_wait() {
+pub(crate) fn input_current() {
     if !input() {
-        prepare(None);
+        super::listener::notice("private.empty");
     }
 }
 

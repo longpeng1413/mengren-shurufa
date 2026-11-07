@@ -43,7 +43,7 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
 
     override fun onSyncEvent(type: String, event: JSONObject) {
         when (type) {
-            "nearby" -> rebuild()
+            "nearby", "private_started", "private_delivery" -> rebuild()
             "paired" -> {
                 showingCode = null
                 status = getString(R.string.sync_paired_ok, event.optString("name"))
@@ -119,7 +119,10 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
                 val peer = peers.getJSONObject(i)
                 val id = peer.getString("id")
                 paired += id
-                val state = peerState(peer)
+                val delivery = ClipboardSync.privateDelivery(id)?.let {
+                    getString(if (it) R.string.private_delivery_received else R.string.private_delivery_unconfirmed)
+                }
+                val state = listOfNotNull(peerState(peer), delivery).joinToString(" · ")
                 rows += ui.row(peer.getString("name"), state).apply { setOnClickListener { confirmUnpair(id, peer.getString("name")) } }
             }
             views += ui.group(getString(R.string.sync_paired), rows)

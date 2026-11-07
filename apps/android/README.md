@@ -1,5 +1,7 @@
 # 青简 Android
 
+本工作区的发行产品为猛人 Android，当前 v0.3.8；应用 ID 为 `com.mengren.shurufa`，Kotlin namespace 和 JNI 名称仍为 `app.qingjian.inputmethod`，不要因品牌名替换源码包路径。猛人改版范围见 [说明](../../docs/design/mengren-public.md)，同步和私密输入见 [使用文档](../../docs/user/help/mengren-relay.md)。本机正式构建入口为 `mengren/build.ps1`，保留既有 APK 签名；下文为共享架构与通用构建参考。
+
 Kotlin 的 `InputMethodService` 壳 + Rust 的 `libqingjian_android.so`。Android 的输入法跑在自己的进程里，
 没有 Server / 薄壳之分，Engine 直接装在 `.so` 里，经 JNI 调用。
 
@@ -12,7 +14,7 @@ Kotlin 的 `InputMethodService` 壳 + Rust 的 `libqingjian_android.so`。Androi
   `store/` 是不经会话的数据读写（`catalog` 符号 / 表情面板目录、`clipboard` / `phrases` 剪贴板与常用语、`code` 代码显示、`dictionaries` 词库页的列出导入删除、`learning` 高级页导出与清空的文件清单、`shuangpin` 方案与键印、`stats` / `vocabulary` App 的统计与生词本）；
   `cloud/` 是云端配置与测试连接；`appearance/` 是外观（内置主题列表、按主题推出的键盘配色、设置页的主题预览、字号档）；`strip/` 把帧里的候选画成候选条位图（`StripPainter`），`Handle` 是句柄背后的会话 + 画笔；
   `jni/` 是出口（`mod.rs` 句柄生命周期，`operations.rs` 各个操作，`strip.rs` 候选条位图：`renderStrip` 画、`copyStrip` 拷像素，`theme.rs` 主题列表、键盘配色、预览与候选条换主题，`voice.rs` 语音与识别配置、测试连接，`swipe.rs` 滑行）。
-- `app/`：Android 应用模块，包名 `app.qingjian.inputmethod`，按职责分包，同一职能的再分子包：
+- `app/`：Android 应用模块，源码 namespace 为 `app.qingjian.inputmethod`，发行应用 ID 为 `com.mengren.shurufa`，按职责分包，同一职能的再分子包：
   - `core/`：JNI 封装（`Native` / `Engine`，「青简翻译」用的轻量句柄 `TranslationEngine`）与首次启动解随包数据（`BundledData`）；`frame/` 帧的数据类，`strip/` 画好的一帧候选条（位图 + 分界 + 可点区域），
     `store/` 不要句柄的数据（面板目录、剪贴板与常用语、双拼方案、主题与预览图、统计、生词本）。
   - `service/`：`QingjianInputMethodService` 只管生命周期、设置与视图，`InputPanel` 拼出整块视图；

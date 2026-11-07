@@ -316,9 +316,13 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncCh
 
 fn event_json(event: SyncEvent, reader: Option<&HistoryReplica>) -> serde_json::Value {
     match event {
+        SyncEvent::PrivateSendStarted => json!({"type":"private_started"}),
         SyncEvent::PrivateReceived => json!({"type":"private_received"}),
         SyncEvent::PrivateSent { count } => json!({"type":"private_sent", "count":count}),
         SyncEvent::PrivateFailed => json!({"type":"private_failed"}),
+        SyncEvent::PrivateDelivery { peer, confirmed } => {
+            json!({"type":"private_delivery", "peer":peer, "confirmed":confirmed})
+        }
         SyncEvent::NearbyChanged => json!({"type": "nearby"}),
         SyncEvent::Paired { name } => json!({"type": "paired", "name": name}),
         SyncEvent::PairFailed => json!({"type": "pair_failed"}),

@@ -285,7 +285,7 @@ fn clipboard_process_reads_the_same_keys() {
             relay_revision: String::new(),
             private_hotkey: Hotkey::DEFAULT,
             private_receive: true,
-            private_auto_fill: true,
+            private_auto_fill: false,
             private_send_mode: "auto".into(),
             private_send_hotkey: Hotkey {
                 shift: true,

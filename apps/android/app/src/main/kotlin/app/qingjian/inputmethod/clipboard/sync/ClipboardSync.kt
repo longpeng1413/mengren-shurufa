@@ -34,8 +34,10 @@ object ClipboardSync {
 
     private val main = Handler(Looper.getMainLooper())
     private val listeners = LinkedHashSet<Listener>()
-    private var running = false
-    private var poller: Thread? = null
+    @Volatile private var running = false
+    @Volatile private var poller: Thread? = null
+    private val privateDeliveries = mutableMapOf<String, Boolean>()
+    fun privateDelivery(peer: String): Boolean? = privateDeliveries[peer]
     private var discovery: NsdDiscovery? = null
 
     /** 刚由同步放上系统剪贴板的文字：监听到它不再记一遍，不然时刻变新又传回去，两边来回传。 */
@@ -106,6 +108,7 @@ object ClipboardSync {
 
     private fun stop() {
         PrivateReceive.stop()
+        privateDeliveries.clear()
         running = false
         poller = null
         runCatching { Native.clipboardSyncStop() }
@@ -132,14 +135,21 @@ object ClipboardSync {
                         ClipData.newUri(context.contentResolver, "猛人输入法", uri))
                 } }
             }
-            main.post { listeners.toList().forEach { it.onSyncEvent(type, event) } }
-            if (type == "private_sent" || type == "private_failed") {
-                main.post { android.widget.Toast.makeText(context,
-                    if (type == "private_sent") app.qingjian.inputmethod.R.string.private_sent else app.qingjian.inputmethod.R.string.private_failed,
-                    android.widget.Toast.LENGTH_LONG).show() }
+            main.post {
+                // 重启服务之后丢弃旧 poller 已投递的回调，避免迟到事件污染当前状态。
+                if (!running || poller !== self) return@post
+                if (type == "private_started") privateDeliveries.clear()
+                if (type == "private_delivery") {
+                    privateDeliveries[event.optString("peer")] = event.optBoolean("confirmed")
+                    app.qingjian.inputmethod.core.AppLog.info("private delivery: peer=${event.optString("peer").takeLast(8)} confirmed=${event.optBoolean("confirmed")}")
+                }
+                listeners.toList().forEach { it.onSyncEvent(type, event) }
+                when (type) {
+                    "private_sent" -> PrivateNotice.show(context, context.getString(app.qingjian.inputmethod.R.string.private_sent, event.optInt("count")))
+                    "private_failed" -> PrivateNotice.show(context, context.getString(app.qingjian.inputmethod.R.string.private_failed))
+                    "private_received" -> if (PrivateReceive.pending()) PrivateNotice.show(context, context.getString(app.qingjian.inputmethod.R.string.private_received))
+                }
             }
-            if (type == "private_received") main.post { if (PrivateReceive.pending()) android.widget.Toast.makeText(context,
-                app.qingjian.inputmethod.R.string.private_received, android.widget.Toast.LENGTH_LONG).show() }
         }
     }
 

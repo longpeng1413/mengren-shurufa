@@ -419,7 +419,7 @@
     <string name="sync_relay_disconnected">未连接：检查地址、令牌和网络</string>
     <string name="sync_relay_devices">中转在线设备</string>
     <string name="sync_relay_device">中转设备 #%1$s</string>
-    <string name="private_sent">私密内容已发送到在线接收设备，两分钟内用私密输入快捷键输入一次。</string>
+    <string name="private_sent">已有 %1$d 台设备确认收到私密内容，可在两分钟内单次填入。各设备结果见同步设置。</string>
     <string name="private_failed">私密发送失败：请确认同步已开启，接收设备在线、已解锁且允许接收；内容不会补发。</string>
     <string name="private_disabled">私密发送已关闭，请到剪贴板同步设置开启。</string>
     <string name="private_empty">当前剪贴板没有可发送的私密文字。</string>
@@ -431,16 +431,15 @@
     <string name="private_note">只发给在线、已解锁且已配对的接收设备，不进历史；两分钟内单次输入。</string>
     <string name="private_input">私密输入</string>
     <string name="private_received">已收到私密内容，请打开目标输入框，在键盘上方点一下直接填入。</string>
-    <string name="private_input_empty">没有待输入的私密内容，可能已使用或过期。</string>
+    <string name="private_input_empty">尚未收到可填入的私密内容，或内容已使用、已失效。请确认发送端的投递结果。</string>
     <string name="private_input_unavailable">请开启私密接收，在解锁后的输入框中使用私密输入。</string>
     <string name="private_input_failed">输入失败，私密内容已清除，请重新发送。</string>
     <string name="private_receive_enabled">接收设备私密内容</string>
-    <string name="private_receive_note">手机和电脑均可发送给本机。仅在解锁时接收，内存保存两分钟，键盘上方点一下填入；也可点解锁图标等待本框自动填入。灭屏或关闭接收即清除。</string>
+    <string name="private_receive_note">仅在解锁时接收，内存保留两分钟。需要填写时点击键盘上方提示；无需提前准备。灭屏或关闭接收即清除。</string>
     <string name="private_fill_hint">私密内容已到 · 点此直接填入</string>
-    <string name="private_wait_hint">等待私密内容，收到后填入本框 · 点此取消</string>
-    <string name="private_wait_started">已准备在当前输入框自动填入。请从另一台设备发送，等待最多两分钟。</string>
-    <string name="private_wait_cancelled">已取消本次自动填入。</string>
     <string name="private_finish_composing">请先结束当前拼音或关闭编辑条，再使用私密输入。</string>
     <string name="private_auto_fill">密码框自动填入</string>
-    <string name="private_auto_fill_note">键盘已打开且光标位于密码框时，收到后直接填入。其他输入框点上方提示，或点解锁图标准备等待本框填入。</string>
+    <string name="private_auto_fill_note">可选，默认关闭。键盘已打开且光标位于密码框时，收到后直接填入；其他情况点击上方提示填入。</string>
+    <string name="private_delivery_received">本次私密内容已接收（未确认填入）</string>
+    <string name="private_delivery_unconfirmed">本次私密投递未获确认，请检查连接和接收设置</string>
 </resources>

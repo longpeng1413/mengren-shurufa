@@ -5,6 +5,8 @@ import app.qingjian.inputmethod.core.AppLog
 
 /** 应用进程的入口：输入法、设置页、翻译都在这一个进程里，日志在这里先装上。 */
 class QingjianApp : Application() {
+    val clipboardWatcher by lazy { app.qingjian.inputmethod.clipboard.ClipboardWatcher(this) }
+
     override fun onCreate() {
         super.onCreate()
         AppLog.init(this)
@@ -12,6 +14,8 @@ class QingjianApp : Application() {
         java.io.File(filesDir, "user/clipboard-import").listFiles()?.filter {
             it.isFile && it.name.startsWith("image-") && it.name.endsWith(".tmp")
         }?.forEach { it.delete() }
+        app.qingjian.inputmethod.clipboard.sync.ClipboardSync.apply(this)
+        clipboardWatcher.start()
         app.qingjian.inputmethod.update.Updates.start(this)
         app.qingjian.inputmethod.cloud.MemberAccount.start(this)
     }

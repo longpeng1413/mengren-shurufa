@@ -8,9 +8,9 @@ import android.content.IntentFilter
 import android.os.Build
 import android.os.PowerManager
 import android.view.inputmethod.InputConnection
-import android.widget.Toast
 import app.qingjian.inputmethod.R
 import app.qingjian.inputmethod.core.Native
+import app.qingjian.inputmethod.core.AppLog
 import app.qingjian.inputmethod.settings.Settings
 
 /** 私密内容留在 Rust 内存槽，仅用户点击后直接上屏；灭屏和锁屏禁止接收。 */
@@ -18,24 +18,18 @@ object PrivateReceive {
     const val KEY_ENABLED = "clipboard_private_receive"
     const val KEY_AUTO_FILL = "clipboard_private_auto_fill"
     private var app: Context? = null
-    private val target = PrivateTarget<InputConnection> { android.os.SystemClock.elapsedRealtime() }
-
-    val isWaiting: Boolean get() = target.waiting
-
     fun pending() = runCatching { Native.clipboardSyncPrivatePending() }.getOrDefault(false)
 
-    fun cancelWaiting() = target.clear()
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
-                cancelWaiting()
                 runCatching { Native.clipboardSyncPrivateState(enabled(context), false) }
             } else update(context)
         }
     }
 
     fun enabled(context: Context) = Settings.preferences(context).getBoolean(KEY_ENABLED, true)
-    fun autoFillEnabled(context: Context) = Settings.preferences(context).getBoolean(KEY_AUTO_FILL, true)
+    fun autoFillEnabled(context: Context) = Settings.preferences(context).getBoolean(KEY_AUTO_FILL, false)
 
     private fun unlocked(context: Context) = context.getSystemService(PowerManager::class.java)?.isInteractive == true &&
         context.getSystemService(KeyguardManager::class.java)?.isDeviceLocked == false
@@ -56,14 +50,12 @@ object PrivateReceive {
     }
 
     fun stop() {
-        cancelWaiting()
         app?.let { runCatching { it.unregisterReceiver(receiver) } }
         app = null
         runCatching { Native.clipboardSyncPrivateState(false, false) }
     }
 
     fun update(context: Context) {
-        if (!enabled(context) || !unlocked(context)) cancelWaiting()
         runCatching { Native.clipboardSyncPrivateState(enabled(context) && app != null, unlocked(context)) }
     }
 
@@ -71,42 +63,29 @@ object PrivateReceive {
         update(context)
         if (connection == null || app == null || !enabled(context) || !unlocked(context)) { notice(context, R.string.private_input_unavailable); return }
         val text = runCatching { Native.clipboardSyncPrivateTake() }.getOrNull()
-        if (text == null) {
-            if (target.matches(connection)) { cancelWaiting(); notice(context, R.string.private_wait_cancelled) }
-            else { target.arm(connection); notice(context, R.string.private_wait_started) }
-            return
-        }
-        cancelWaiting()
-        fill(context, connection, text, passwordField)
-    }
-
-    fun fillWaiting(context: Context, connection: InputConnection?, passwordField: Boolean) {
-        if (!target.matches(connection) || connection == null || !enabled(context) || !unlocked(context)) {
-            cancelWaiting(); return
-        }
-        cancelWaiting()
-        val text = runCatching { Native.clipboardSyncPrivateTake() }.getOrNull() ?: return
+        if (text == null) { notice(context, R.string.private_input_empty); return }
         fill(context, connection, text, passwordField)
     }
 
     private fun fill(context: Context, connection: InputConnection, text: String, replace: Boolean) {
-        if (!unlocked(context) || !runCatching {
+        val committed = unlocked(context) && runCatching {
             if (replace) {
                 connection.beginBatchEdit()
                 try { connection.performContextMenuAction(android.R.id.selectAll); connection.commitText(text, 1) }
                 finally { connection.endBatchEdit() }
             } else connection.commitText(text, 1)
-        }.getOrDefault(false)) {
+        }.getOrDefault(false)
+        AppLog.info("private input: committed=$committed")
+        if (!committed) {
             notice(context, R.string.private_input_failed)
         }
     }
 
     fun onReceived(context: Context, connection: InputConnection?, passwordField: Boolean) {
-        if (isWaiting) { fillWaiting(context, connection, passwordField); return }
         if (app == null || connection == null || !passwordField || !autoFillEnabled(context) || !enabled(context) || !unlocked(context)) return
         val text = runCatching { Native.clipboardSyncPrivateTake() }.getOrNull() ?: return
         fill(context, connection, text, true)
     }
 
-    private fun notice(context: Context, message: Int) = Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+    private fun notice(context: Context, message: Int) = PrivateNotice.show(context, context.getString(message))
 }

@@ -274,10 +274,10 @@ fn tray_menu(window: HWND) {
     match tray::show_menu(window, &state) {
         Some(Choice::Open) => open_from_tray(),
         Some(Choice::PrivateSend) => send_private(true),
-        Some(Choice::PrivateWait) => {
+        Some(Choice::PrivateInput) => {
             let target = window_under_taskbar();
             super::paste::refocus(target);
-            super::private::prepare(Some(target));
+            super::private::input_target(target);
         }
         Some(Choice::TogglePause) => write_flag(window, "paused", !paused),
         Some(Choice::OpenSettings) => {
@@ -438,7 +438,7 @@ unsafe extern "system" fn procedure(
             if wparam.0 == SEND_HOTKEY_ID as usize {
                 send_private(true);
             } else if wparam.0 == PRIVATE_HOTKEY_ID as usize {
-                super::private::input_or_wait();
+                super::private::input_current();
             } else if !shared || !super::private::input() {
                 send(hotkey_signal());
             }
@@ -492,9 +492,13 @@ fn send(signal: Signal) {
 }
 
 pub(crate) fn notice(key: &'static str) {
+    notice_text(crate::i18n::tr(key));
+}
+
+pub(crate) fn notice_text(message: &str) {
     let window = HWND(TRAY_WINDOW.load(Ordering::Relaxed) as *mut _);
     if !window.is_invalid() {
-        tray::notice(window, crate::i18n::tr(key));
+        tray::notice(window, message);
     }
 }
 

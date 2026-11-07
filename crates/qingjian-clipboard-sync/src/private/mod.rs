@@ -1,5 +1,6 @@
 //! 只在内存停留的私密内容，不接触 Replica、事件正文或离线队列。
 
+pub mod input;
 mod secret;
 mod slot;
 #[cfg(test)]

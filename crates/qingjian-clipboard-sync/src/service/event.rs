@@ -7,11 +7,20 @@ pub enum SyncEvent {
     /// 私密事件绝不携带内容。
     PrivateReceived,
 
+    PrivateSendStarted,
+
     PrivateSent {
         count: usize,
     },
 
     PrivateFailed,
+
+    /// 仅是本轮对端入槽确认，不代表已填入；不带正文或正文摘要。
+    PrivateDelivery {
+        peer: String,
+
+        confirmed: bool,
+    },
 
     /// 附近的设备有变化，界面重读 [`crate::service::SyncService::nearby`]。
     NearbyChanged,

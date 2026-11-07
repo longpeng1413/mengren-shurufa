@@ -19,7 +19,6 @@ import app.qingjian.inputmethod.R
 import app.qingjian.inputmethod.candidates.CandidateBarView
 import app.qingjian.inputmethod.clipboard.ClipboardImageProvider
 import app.qingjian.inputmethod.clipboard.sync.ClipboardSync
-import app.qingjian.inputmethod.clipboard.ClipboardWatcher
 import app.qingjian.inputmethod.clipboard.sync.NeonEdgeView
 import org.json.JSONObject
 import app.qingjian.inputmethod.cloud.CloudConfig
@@ -90,7 +89,7 @@ class QingjianInputMethodService :
     /** 就地改设置会重建键盘，重建完重新打开这个面板。 */
     private var reopenPanel: PanelKind? = null
 
-    private val clipboardWatcher by lazy { ClipboardWatcher(this) }
+    private val clipboardWatcher get() = (application as app.qingjian.inputmethod.QingjianApp).clipboardWatcher
 
     private var neon: NeonEdgeView? = null
 
@@ -109,7 +108,7 @@ class QingjianInputMethodService :
                 "private_received" -> {
                     if (isInputViewShown && shownPreedit.isEmpty() && editor == null) {
                         app.qingjian.inputmethod.clipboard.sync.PrivateReceive.onReceived(this@QingjianInputMethodService, currentInputConnection, currentInputEditorInfo?.isPasswordField() == true)
-                    } else app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
+                    }
                     refreshPrivateHint()
                 }
             }
@@ -129,11 +128,9 @@ class QingjianInputMethodService :
 
     private fun refreshPrivateHint() {
         val receiver = app.qingjian.inputmethod.clipboard.sync.PrivateReceive
-        if (shownPreedit.isNotEmpty() || editor != null) receiver.cancelWaiting()
         val hint = when {
             !isInputViewShown || !receiver.enabled(this) || editor != null -> null
             receiver.pending() -> R.string.private_fill_hint
-            receiver.isWaiting -> R.string.private_wait_hint
             else -> null
         }
         panel?.bar?.showPrivateHint(hint)
@@ -207,17 +204,14 @@ class QingjianInputMethodService :
         SecretStore.prefs(this).registerOnSharedPreferenceChangeListener(cloudListener)
         VoiceConfig.prefs(this).registerOnSharedPreferenceChangeListener(voiceListener)
         clipboardWatcher.onChanged = { panel?.refreshClipboard() }
-        clipboardWatcher.start()
         ClipboardSync.addListener(syncListener)
         ClipboardSync.apply(this)
     }
 
     override fun onDestroy() {
         privateUiHandler.removeCallbacks(privateHintRefresh)
-        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
-        runCatching { app.qingjian.inputmethod.core.Native.clipboardSyncPrivateClear() }
         AppLog.info("ime destroy")
-        clipboardWatcher.stop()
+        clipboardWatcher.onChanged = null
         ClipboardSync.removeListener(syncListener)
         Settings.preferences(this).unregisterOnSharedPreferenceChangeListener(settingsListener)
         SecretStore.prefs(this).unregisterOnSharedPreferenceChangeListener(cloudListener)
@@ -371,7 +365,6 @@ class QingjianInputMethodService :
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
-        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
         super.onStartInput(attribute, restarting)
         composer.directInput = attribute.wantsDirectInput()
         composer.privateInput = attribute.wantsPrivacy()
@@ -385,7 +378,6 @@ class QingjianInputMethodService :
     }
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
-        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
         super.onStartInputView(info, restarting)
         AppLog.info(
             "start input view: ${info.packageName}, inputType 0x${Integer.toHexString(info.inputType)}, " +
@@ -425,7 +417,6 @@ class QingjianInputMethodService :
 
     override fun onWindowHidden() {
         privateUiHandler.removeCallbacks(privateHintRefresh)
-        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
         panel?.bar?.showPrivateHint(null)
         super.onWindowHidden()
         AppLog.info("window hidden")
@@ -435,7 +426,6 @@ class QingjianInputMethodService :
 
     override fun onFinishInputView(finishingInput: Boolean) {
         privateUiHandler.removeCallbacks(privateHintRefresh)
-        app.qingjian.inputmethod.clipboard.sync.PrivateReceive.cancelWaiting()
         super.onFinishInputView(finishingInput)
         voice.cancel()
         closeEditor()

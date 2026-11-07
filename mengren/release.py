@@ -58,7 +58,7 @@ def main():
     version = args.version
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise SystemExit("只发布 X.Y.Z 正式版")
-    for relative in ["apps/android/core/Cargo.toml", "apps/settings/Cargo.toml", "apps/windows/server/Cargo.toml", "apps/windows/settings/Cargo.toml"]:
+    for relative in ["apps/android/core/Cargo.toml", "apps/clipboard/Cargo.toml", "apps/settings/Cargo.toml", "apps/windows/server/Cargo.toml", "apps/windows/tsf/Cargo.toml", "apps/windows/settings/Cargo.toml"]:
         if f'version = "{version}"' not in (ROOT / relative).read_text(encoding="utf-8"):
             raise SystemExit(f"产品版本不一致：{relative}")
     repo = gh_json(f"repos/{REPO}")

@@ -828,3 +828,10 @@ Windows 的后台任务集中在 `apps/settings/src/jobs/update/`，只把校验
 ## 猛人 v0.3.7
 
 v0.3.7：共享 PrivateSender 弱句柄，接收权限/可用性短锁，私密六向互传；Android JNI 仅传 pending 元数据、取用时返回一次正文，PrivateTarget 弱引用和单调时钟绑定输入连接。Windows private/ 子模块使用 UIA 焦点对象与密码标记，不读 Value，MTA 任务有界。符号按键统一 global_hotkey 映射，录制、探测与真实注册一致；plus 尾部 ++ 序列化。
+
+
+## 2026-11-07 本地私密流程优化（未发布）
+
+以 `docs/design/private-transfer.md` 的当前流程为准。Windows/Android 删除空槽启动等待，Windows 托盘改为填入现有内容；共享 `private::input::InputGate` 给手动/自动输入同一许可，任务取用后失败不清新槽。Android 复制监听归 Application，受理成功才持久化独立复制时间戳，新启动不发两分钟前的复制；JNI 受理不等于接收 ACK。IME 销毁不再清进程接收槽，锁屏/禁收仍撤销。
+
+私密发送最多四个并发目标，各目标报告 `PrivateDelivery`，本轮 `PrivateSendStarted` 清旧显示，终态 `PrivateSent.count` 只计 ACK；本机元数据事件增加但网络私密 v1 未变。两端显示逐设备确认，日志只用脱敏编号；Android 丢弃旧 poller 回调，Toast 单例替换，Windows 气泡限频和 NIF_REALTIME。密码框自动填入新配置默认关闭，已有保存的选择继续生效。

@@ -19,6 +19,8 @@ import kotlin.concurrent.thread
  */
 class ClipboardWatcher(private val context: Context) {
     private val manager = context.getSystemService(ClipboardManager::class.java)
+    private val prefs = context.getSharedPreferences("clipboard", Context.MODE_PRIVATE)
+    private val privateCopy = PrivateCopyState(prefs.getLong(LAST_PRIVATE, 0L))
     private val main = Handler(Looper.getMainLooper())
     private val listener = ClipboardManager.OnPrimaryClipChangedListener { capture() }
 
@@ -36,8 +38,15 @@ class ClipboardWatcher(private val context: Context) {
         val clip = runCatching { manager?.primaryClip }.getOrNull() ?: return
         if (clip.itemCount == 0) return
         if (sensitive(clip.description)) {
-            if (firstSeen(clip.description.timestamp)) clip.getItemAt(0).text?.toString()?.let {
-                app.qingjian.inputmethod.clipboard.sync.PrivateSend.automatic(context, it)
+            val timestamp = clip.description.timestamp
+            if (privateCopy.shouldAttempt(timestamp, System.currentTimeMillis())) {
+                app.qingjian.inputmethod.core.AppLog.info("private capture: sensitive_event")
+                clip.getItemAt(0).text?.toString()?.let {
+                    if (app.qingjian.inputmethod.clipboard.sync.PrivateSend.automatic(context, it)) {
+                        privateCopy.accepted = timestamp
+                        prefs.edit().putLong(LAST_PRIVATE, timestamp).apply()
+                    }
+                }
             }
             return
         }
@@ -100,6 +109,7 @@ class ClipboardWatcher(private val context: Context) {
 
     private companion object {
         const val MAX_IMAGE_BYTES = 99_999_999
+        const val LAST_PRIVATE = "last_private_timestamp"
         const val LAST_SEEN = "last_seen_timestamp"
     }
 }

@@ -8,7 +8,7 @@ use crate::{Peer, SyncError};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::{Arc, atomic::Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use zeroize::Zeroizing;
 
 const REQUEST: &[u8] = b"private-capabilities-v1";
@@ -68,27 +68,38 @@ pub(super) fn send_once(shared: Arc<Shared>, secret: Secret) -> bool {
         .name("clipboard-private-send".into())
         .spawn(move || {
             let shared = task;
-            let start = Instant::now();
+            shared.emit(SyncEvent::PrivateSendStarted);
             let expires = now_millis() + LIFETIME.as_millis() as i64;
             let peers = lock(&shared.book).peers().to_vec();
             let mut count = 0;
-            for peer in peers {
-                if start.elapsed() >= Duration::from_secs(15) {
-                    break;
-                }
-                match deliver(&shared, &peer, &secret, expires) {
-                    Ok(()) => count += 1,
-                    Err(error) => {
-                        tracing::debug!(%error, "Private delivery ended without confirmation");
-                    }
-                }
+            // 有界并行，各目标独立尝试；慢目标不能耗尽全局时间而跳过后面的设备。
+            for group in peers.chunks(4) {
+                count += std::thread::scope(|scope| {
+                    let tasks: Vec<_> = group.iter().map(|peer| {
+                        let shared = &shared;
+                        let secret = &secret;
+                        scope.spawn(move || {
+                            let confirmed = match deliver(shared, peer, secret, expires) {
+                                Ok(()) => true,
+                                Err(error) => {
+                                    tracing::debug!(peer = %crate::default_name::short_id(&peer.device_id), %error, "Private delivery unconfirmed");
+                                    false
+                                }
+                            };
+                            tracing::info!(peer = %crate::default_name::short_id(&peer.device_id), confirmed, "Private delivery confirmation");
+                            shared.emit(SyncEvent::PrivateDelivery { peer: peer.device_id.clone(), confirmed });
+                            usize::from(confirmed)
+                        })
+                    }).collect();
+                    tasks.into_iter().map(|task| task.join().unwrap_or(0)).sum::<usize>()
+                });
             }
-            shared.private_sending.store(false, Ordering::SeqCst);
             shared.emit(if count == 0 {
                 SyncEvent::PrivateFailed
             } else {
                 SyncEvent::PrivateSent { count }
             });
+            shared.private_sending.store(false, Ordering::SeqCst);
         });
     if spawned.is_err() {
         shared.private_sending.store(false, Ordering::SeqCst);
@@ -153,6 +164,9 @@ pub(super) fn respond<S: Read + Write>(
 }
 
 fn deliver(shared: &Shared, peer: &Peer, secret: &Secret, expires: i64) -> Result<(), SyncError> {
+    if !shared.private_running.load(Ordering::SeqCst) || now_millis() >= expires {
+        return Err(SyncError::Handshake);
+    }
     let address = lock(&shared.nearby)
         .get(&peer.device_id)
         .map(|value| value.address)
@@ -205,7 +219,7 @@ fn send<S: Read + Write>(
     secret: &Secret,
     expires: i64,
 ) -> Result<(), SyncError> {
-    if now_millis() >= expires {
+    if !shared.private_running.load(Ordering::SeqCst) || now_millis() >= expires {
         return Err(SyncError::Handshake);
     }
     let mut channel = connect_mode(
@@ -221,5 +235,7 @@ fn send<S: Read + Write>(
     if channel.receive_limited(64)? != ACK {
         return Err(SyncError::Handshake);
     }
-    channel.send(b"done")
+    // 对端已经确认入槽；收尾帧失败不能把已确认送达改报失败，更不能因此重发。
+    let _ = channel.send(b"done");
+    Ok(())
 }

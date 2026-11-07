@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 仓库现状
 
-跨平台输入法，Core 平台无关，各平台只做壳。已发版 0.1.3（macOS 与 Windows 共用版本号，2026-09-17）；Linux 提供 Rust Server + Fcitx5 默认候选面板（源码安装，0.1.4 起另有 Ubuntu 26.04 预编译包），另有 Ubuntu 22.04 的 Fcitx4 源码适配。
-阶段与已完成项见 `docs/plan/roadmap.md`，待办见 `docs/plan/todo.md`。
+本工作区为基于青简改版的猛人输入法，当前产品版本为 Windows / Android v0.3.8（2026-11-07，用户已授权发布供真机复测）。Core 平台无关，各平台只做壳；下面的 crate 地图及上游 macOS/Linux 资料继续作为架构参考，不表示本轮要扩展所有平台。
+当前范围见 `docs/design/mengren-public.md`，猛人进度与剩余项见 `docs/plan/todo.md`；`docs/plan/roadmap.md` 主体为上游路线图。2026-11-07 用户反馈私密互传和提示交互不可用，列为待修复阻断项，分析见 `docs/notes/private-transfer-037-review.md`，不得将自动测试通过写成该流程已获真机验收。
 
 ## 目录地图
 
@@ -52,8 +52,7 @@ cargo run -p qingjian-cli -- <拼音>...          # Core 的主要验证方式�
 apps/macos/scripts/bundle.sh --install        # mac 壳装到 ~/Library/Input Methods/（IMK 不能 cargo run 验证）
 ```
 
-Windows 本机只 `cargo check --target x86_64-pc-windows-gnu`，真编译与真机测试在 Windows 机器上做（部署方式见 `apps/windows/README.md`）；
-端到端验证 mac 可用 `osascript` 往 TextEdit 发按键再读回文本。
+本机 Windows 使用 MSVC 工具链构建，猛人两端构建入口为 `mengren/build.ps1`；Android 的中文路径与独立缓存约束见本机私人开发笔记。macOS 端到端验证可用 `osascript` 往 TextEdit 发按键再读回文本，相关部署见各平台 README。
 
 ## 约定
 
@@ -66,8 +65,9 @@ Windows 本机只 `cargo check --target x86_64-pc-windows-gnu`，真编译与真
 
 ## 猛人输入法发版边界
 
+- 2026-11-07 用户已明确恢复打包与发布授权：发布 v0.3.8 供手机/电脑通过检查更新进行真机复测，替代此前暂停要求。保留原 v0.3.7 标签与附件，不将本版编译/自动测试通过写成真机故障已全面解决。
 - 本机主仓库 origin 指向 `longpeng1413/mengren-shurufa-private-archive`（私有）。公开仓库为 `longpeng1413/mengren-shurufa`，只接受审查后的独立源码变更；禁止把主仓库的分支、历史或 --mirror 推过去。
-- 用户已授权每轮完整功能升级通过检查后发布 GitHub 正式版，不需要逐次重新确认。Windows 与安卓产品版本必须同步递增，不用 -dev 发布；不跳过必要检查，不把编译通过称为真机验收。
+- 每轮完整升级通过检查后可按既有授权发布； Windows 与安卓产品版本同步递增，不用 -dev 发布；不跳过必要检查，不把编译通过称为真机验收。
 - 先运行 `mengren/build.ps1` 生成两端包，再用 `mengren/release.py --version X.Y.Z --notes mengren/releases/vX.Y.Z.md --gitleaks <工具路径> --publish` 导出、扫描、提交公开源码，发布签名索引与安装包。脚本会保留 GitHub 独立修改，遇同文件冲突先合并，禁止覆盖或强推。
 - 更新仅来自猛人仓库，信任猛人专用公钥。签名私钥、安卓签名备份、私人说明和早期设计素材不公开；私钥在 `mengren/private/` 以 DPAPI 加密保存，不打印、不提交，不换掉已安装 APK 的签名。
 - 每次新包成功并校验后，本机安装包目录每个平台只留最新包，旧包送回收站。发布附件用 ASCII 拼音名；用户设置和已安装目录不能作为旧包清理。
