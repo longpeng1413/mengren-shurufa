@@ -23,9 +23,9 @@ import app.qingjian.inputmethod.panel.base.PanelIcons.Icon
 import app.qingjian.inputmethod.theme.Palette
 
 /**
- * 加 / 改常用语：浮在键盘上方，键盘照常打字，打的字进这里而不是外面的输入框——
+ * 加 / 改自定义短语：浮在键盘上方，键盘照常打字，打的字进这里而不是外面的输入框——
  * 输入法服务编辑时把 [connection] 当输入连接交给 Composer。上面 ⌄ 收起 / 标题 / 完成，中间正文（带字数），
- * 下面「输入码」（只收字母，最多 32 个，跟桌面自定义短语一样；点它切过去打码）与「目录」（点名字换下一组，「＋新建」打新分组名，新建中再点名字取消）。完成或收起都回常用语页。
+ * 下面「输入码」（只收字母，最多 32 个，跟桌面自定义短语一样；点它切过去打码）与「目录」（点名字换下一组，「＋新建」打新分组名，新建中再点名字取消）。完成或收起都回自定义短语页。
  */
 @SuppressLint("ViewConstructor")
 class PhraseEditor(
@@ -121,7 +121,7 @@ class PhraseEditor(
         canvas.drawColor(palette.board)
         val top = ink.dp(TITLE_DP) / 2
         ink.icon(canvas, Icon.EXPAND, ink.dp(28f), top, 22f, palette.text)
-        ink.text(canvas, if (phrase == null) "添加常用语" else "编辑常用语", 16.5f, palette.brand, width / 2f, top, bold = true)
+        ink.text(canvas, if (phrase == null) context.getString(app.qingjian.inputmethod.R.string.custom_phrases_add) else context.getString(app.qingjian.inputmethod.R.string.custom_phrases_edit), 16.5f, palette.brand, width / 2f, top, bold = true)
         ink.text(canvas, "完成", 15.5f, palette.text, width - ink.dp(34f), top, bold = true)
 
         box.set(ink.dp(10f), ink.dp(TITLE_DP), width - ink.dp(10f), height - ink.dp(6f))
@@ -141,7 +141,7 @@ class PhraseEditor(
         val room = textBottom - ink.dp(18f) - box.top - padding
         canvas.translate(box.left + padding, box.top + padding - (layout.height - room).coerceAtLeast(0f))
         if (text.isEmpty()) {
-            ink.textStart(canvas, "在这里输入常用语", 15.5f, palette.faint, 0f, ink.dp(10f), box.width())
+            ink.textStart(canvas, context.getString(app.qingjian.inputmethod.R.string.custom_phrases_hint), 15.5f, palette.faint, 0f, ink.dp(10f), box.width())
         } else {
             layout.draw(canvas)
         }

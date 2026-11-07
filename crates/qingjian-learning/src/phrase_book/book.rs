@@ -33,7 +33,7 @@ impl PhraseBook {
     /// 读数据目录里的常用语（不存在就是空的）；读不了或格式坏了就退回只在内存里记，不拿空表覆盖用户文件。
     pub fn open(dir: &Path) -> Self {
         let path = dir.join(PHRASE_BOOK_FILE);
-        match read_text_lossy(&path) {
+        let mut book = match read_text_lossy(&path) {
             Ok(None) => Self {
                 phrases: Vec::new(),
                 path: Some(path),
@@ -52,7 +52,16 @@ impl PhraseBook {
                 tracing::warn!(path = %path.display(), %error, "常用语读不了，本次只在内存里记");
                 Self::default()
             }
+        };
+        if book.path.is_some() {
+            match crate::SyncedPhrases::new(dir).merged(&book.phrases) {
+                Ok(phrases) => book.phrases = phrases,
+                Err(_) => {
+                    tracing::warn!("Cannot load synced custom phrases; keeping local library")
+                }
+            }
         }
+        book
     }
 
     pub fn phrases(&self) -> &[Phrase] {
@@ -91,12 +100,18 @@ impl PhraseBook {
         group: &str,
         code: &str,
     ) -> Result<bool, LearningError> {
-        let (Some(slot), Some(phrase)) =
+        let (Some(slot), Some(mut phrase)) =
             (self.phrases.get_mut(index), normalize(text, group, code))
         else {
             return Ok(false);
         };
+        phrase.weight = slot.weight;
+        phrase.enabled = slot.enabled;
+        let old = slot.clone();
         *slot = phrase;
+        if let Some(dir) = self.path.as_deref().and_then(Path::parent) {
+            crate::SyncedPhrases::new(dir).hide(&[old], &self.phrases)?;
+        }
         self.save()?;
         Ok(true)
     }
@@ -105,7 +120,10 @@ impl PhraseBook {
         if index >= self.phrases.len() {
             return Ok(());
         }
-        self.phrases.remove(index);
+        let removed = self.phrases.remove(index);
+        if let Some(dir) = self.path.as_deref().and_then(Path::parent) {
+            crate::SyncedPhrases::new(dir).hide(&[removed], &self.phrases)?;
+        }
         self.save()
     }
 
@@ -132,7 +150,12 @@ impl PhraseBook {
                 .iter()
                 .any(|p| p.code == phrase.code && p.text == phrase.text)
             {
-                phrases.push(CustomPhrase::new(&phrase.code, &phrase.text));
+                phrases.push(CustomPhrase {
+                    code: phrase.code.clone(),
+                    text: phrase.text.clone(),
+                    weight: phrase.weight,
+                    enabled: phrase.enabled,
+                });
             }
         }
         phrases
@@ -143,6 +166,9 @@ impl PhraseBook {
             return Ok(());
         };
         let text = serde_json::to_string_pretty(&self.phrases).expect("常用语总能序列化");
+        if let Some(dir) = path.parent() {
+            crate::SyncedPhrases::new(dir).hide(&[], &self.phrases)?;
+        }
         write_atomic_str(path, &text)?;
         Ok(())
     }
@@ -155,6 +181,8 @@ fn normalize(text: &str, group: &str, code: &str) -> Option<Phrase> {
     }
     let group = group.trim();
     Some(Phrase {
+        weight: 10,
+        enabled: true,
         text: text.to_owned(),
         group: if group.is_empty() {
             DEFAULT_GROUP
@@ -218,6 +246,8 @@ mod tests {
         book.add("新", "", &"a".repeat(40)).unwrap();
         assert_eq!(book.phrases()[0].code.len(), MAX_CODE_CHARS);
         book.phrases.push(Phrase {
+            weight: 10,
+            enabled: true,
             text: "旧".to_owned(),
             group: DEFAULT_GROUP.to_owned(),
             code: "b".repeat(64),

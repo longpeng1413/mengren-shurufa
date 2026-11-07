@@ -57,10 +57,10 @@ interface PanelActions {
     /** 拆词：按引擎的语言模型切成小块。 */
     fun textPieces(text: String): List<String>
 
-    /** 编辑常用语：[phrase] 为 null 是新加一条，放进 [group]。 */
+    /** 编辑自定义短语：[phrase] 为 null 是新加一条，放进 [group]。 */
     fun editPhrase(phrase: PhraseItem?, group: String)
 
-    /** 常用语改过：带输入码的重新挂进候选。 */
+    /** 自定义短语改过：带输入码的重新挂进候选。 */
     fun phrasesChanged()
 
     /** 拆词选着的字放进输入框，处在编辑中（组合文字，带下划线）；空串收掉。 */

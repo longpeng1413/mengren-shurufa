@@ -89,3 +89,8 @@ sent = "已有 {count} 台设备确认收到私密内容，可在两分钟内单
 input = "填入已收到的私密内容"
 delivery_received = "本次私密内容已接收（未确认填入）"
 delivery_unconfirmed = "本次私密投递未获确认"
+
+[phrases]
+title = "自定义短语"
+sync = "立即同步"
+empty = "在设置中添加短语，或从已配对设备同步"

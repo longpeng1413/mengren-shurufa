@@ -5,6 +5,10 @@ use qingjian_clipboard::ClipFilter;
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    OpenPhrases,
+    ClosePhrases,
+    PastePhrase(usize),
+    SyncPhrases,
     Search(Edit),
 
     /// 上下键移动选中项；`true` 往后。

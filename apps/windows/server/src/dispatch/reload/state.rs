@@ -68,6 +68,7 @@ impl DataDirs {
 
 /// 热加载状态。
 pub(crate) struct ConfigReload {
+    pub(super) phrase_mtimes: [Option<SystemTime>; 2],
     /// `config.toml` 路径。
     pub(super) config_path: PathBuf,
 

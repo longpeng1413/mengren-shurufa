@@ -133,14 +133,29 @@ pub(super) fn toolbar(ui: &mut Ui<Message>, context: &Context) -> Result<NodeId,
         &chips,
     )?;
     let mut children = vec![search_box, filters];
+    let mut actions = vec![Button::new(tr("phrases.title")).build(
+        ui,
+        theme,
+        "open-phrases",
+        Message::OpenPhrases,
+    )?];
     if context.app.link.service().is_some() {
-        children.push(Button::new(tr("devices.button")).build(
+        actions.push(Button::new(tr("devices.button")).build(
             ui,
             theme,
             "open-devices",
             Message::OpenDevices,
         )?);
     }
+    children.push(ui.scene().node(
+        Style {
+            gap: gap(theme, 8.0),
+            flex_shrink: 0.0,
+            ..Style::default()
+        },
+        Visual::Group,
+        &actions,
+    )?);
     if context.app.paused {
         children.push(text_node(
             ui,

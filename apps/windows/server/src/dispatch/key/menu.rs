@@ -183,7 +183,13 @@ impl Router {
     pub(super) fn configured_phrases(&self) -> Vec<qingjian_core::CustomPhrase> {
         self.config_path()
             .and_then(|path| Config::load(path).ok())
-            .map(|config| config.custom_phrases)
+            .map(|config| {
+                qingjian_platform::dirs::user_dir()
+                    .map(|dir| {
+                        qingjian_learning::merged_custom_phrases(&dir, &config.custom_phrases)
+                    })
+                    .unwrap_or(config.custom_phrases)
+            })
             .unwrap_or_default()
     }
 

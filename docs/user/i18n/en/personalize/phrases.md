@@ -65,3 +65,9 @@ once you've typed the whole shortcut, the phrase comes before the candidates (it
 Only entries whose shortcut is all lowercase English letters work; entries added or changed in System Settings take effect the next time you switch to Qingjian. They aren't listed on this page; change them in System Settings.
 
 Android's saved phrases are in the clipboard panel; see [Android: tools and AI](../platforms/android-tools.md#Clipboard-and-saved-phrases).
+
+## Mengren 0.4.0: paired-device phrase sync
+
+Windows and Android both use the name “Custom phrases”. With device sync enabled and direct pairing completed, additions merge automatically across upgraded devices, including after an offline device returns. “Sync now” is available in the Windows phrase panel and Android device-sync settings. Codes, multiline text, groups, weights and enabled states are preserved. Identical code/text pairs deduplicate; conflicting texts remain separate. Existing local metadata takes priority.
+
+This release synchronizes additions. Edits creating new code/text pairs appear as additions; deletion, ordering and metadata changes remain local. Locally deleted entries do not return from old snapshots. Tap-only Android entries also appear in the Windows phrase panel. Received phrases do not replace the system clipboard or enter clipboard history. They are persistent personal data, not the temporary private-password slot. Both endpoints need 0.4.0; the relay server does not need upgrading.

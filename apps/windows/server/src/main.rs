@@ -228,7 +228,10 @@ fn main() -> ExitCode {
     };
     engine.set_fuzzy(config.fuzzy);
     // Windows 端此前漏装 custom_phrases（macOS 端 apply_config 有）；失败只记日志不阻塞启动
-    if let Err(error) = engine.set_custom_phrases(config.custom_phrases.clone()) {
+    let phrases = user_dir()
+        .map(|dir| qingjian_learning::merged_custom_phrases(&dir, &config.custom_phrases))
+        .unwrap_or_else(|| config.custom_phrases.clone());
+    if let Err(error) = engine.set_custom_phrases(phrases) {
         tracing::warn!(%error, "自定义短语配置未应用");
     }
     // 拼音侧与形码侧在 `configure_schemes` 里一起装配（双拼 / 注音 / 混输都在那）

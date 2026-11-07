@@ -58,6 +58,7 @@ impl App for Settings {
                 self.page = page;
                 self.recording = None;
                 self.close_phrase();
+                self.reload();
                 if page == PageId::Dictionaries {
                     self.library = Library::scan();
                 }
@@ -396,6 +397,7 @@ impl App for Settings {
                 }
             }
             self.library.rescan_schemes();
+            self.reload();
         }
     }
 

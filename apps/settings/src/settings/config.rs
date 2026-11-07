@@ -31,7 +31,11 @@ impl Settings {
 
     pub(super) fn reload(&mut self) {
         match Config::load(&self.path) {
-            Ok(config) => {
+            Ok(mut config) => {
+                if let Some(dir) = self.path.parent() {
+                    config.custom_phrases =
+                        qingjian_learning::merged_custom_phrases(dir, &config.custom_phrases);
+                }
                 self.config = config;
                 self.config_error = None;
             }

@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 仓库现状
 
-本工作区为基于青简改版的猛人输入法，当前产品版本为 Windows / Android v0.3.8（2026-11-07，用户已授权发布供真机复测）。Core 平台无关，各平台只做壳；下面的 crate 地图及上游 macOS/Linux 资料继续作为架构参考，不表示本轮要扩展所有平台。
-当前范围见 `docs/design/mengren-public.md`，猛人进度与剩余项见 `docs/plan/todo.md`；`docs/plan/roadmap.md` 主体为上游路线图。2026-11-07 用户反馈私密互传和提示交互不可用，列为待修复阻断项，分析见 `docs/notes/private-transfer-037-review.md`，不得将自动测试通过写成该流程已获真机验收。
+本工作区为基于青简改版的猛人输入法，当前产品版本为 Windows / Android v0.4.0（2026-11-07，用户已授权本轮功能完成后合并发布）。Core 平台无关，各平台只做壳；下面的 crate 地图及上游 macOS/Linux 资料继续作为架构参考，不表示本轮要扩展所有平台。
+当前范围见 `docs/design/mengren-public.md`，猛人进度与剩余项见 `docs/plan/todo.md`；`docs/plan/roadmap.md` 主体为上游路线图。2026-11-07 v0.3.8 发布后，用户确认原有手机到另一手机及桌面设备的私密路线通过；新增 Windows 设备的普通/私密互传尚未联通，用户已确认仅看见附近/中转设备，尚未配对；先逐对完成六位码配对。0.4.0 修复 Windows 小键盘配对码输入顺序，并加入自定义短语同步及紧凑竖排剪贴板。源码没有三台设备上限，六台逻辑设备中转互传扩容测试已通过，不将逻辑测试当作新增真实设备已通过。此前 v0.3.7 故障历史见 `docs/notes/private-transfer-037-review.md`。
 
 ## 目录地图
 

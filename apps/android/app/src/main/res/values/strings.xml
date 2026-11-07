@@ -288,7 +288,7 @@
     <string name="export_title">导出数据</string>
     <string name="export_value">存为 zip</string>
     <string name="export_running">导出中…</string>
-    <string name="export_note">学过的词、生词本、统计和常用语打包成一个文件，不含剪贴板和导入的词库</string>
+    <string name="export_note">学过的词、生词本、统计和自定义短语打包成一个文件，不含剪贴板和导入的词库</string>
     <string name="export_done">已导出 %1$d 个文件</string>
     <string name="export_failed">导出失败，换个位置再试</string>
     <string name="logs_section">日志</string>
@@ -301,7 +301,7 @@
     <string name="logs_verbose_title">详细日志</string>
     <string name="logs_verbose_note">会记下打的内容，复现完问题请关掉</string>
     <string name="clear_learning_title">清空学习数据</string>
-    <string name="clear_learning_note">统计、常用语、剪贴板、词库和设置不受影响</string>
+    <string name="clear_learning_note">统计、自定义短语、剪贴板、词库和设置不受影响</string>
     <string name="clear_habits">输入习惯（常选的词、造的词）</string>
     <string name="clear_vocabulary">生词本（全部语言）</string>
     <string name="clear_habits_short">输入习惯</string>
@@ -442,4 +442,14 @@
     <string name="private_auto_fill_note">可选，默认关闭。键盘已打开且光标位于密码框时，收到后直接填入；其他情况点击上方提示填入。</string>
     <string name="private_delivery_received">本次私密内容已接收（未确认填入）</string>
     <string name="private_delivery_unconfirmed">本次私密投递未获确认，请检查连接和接收设置</string>
+    <string name="phrases_sync_now">立即同步自定义短语</string>
+    <string name="phrases_sync_note">自动合并所有已配对设备的新增短语；相同内容不重复，删除仅影响本机。</string>
+    <string name="phrases_sync_received">已接收 %1$d 条自定义短语</string>
+    <string name="custom_phrases">自定义短语</string>
+    <string name="custom_phrases_add">添加自定义短语</string>
+    <string name="custom_phrases_edit">编辑自定义短语</string>
+    <string name="custom_phrases_hint">在这里输入自定义短语</string>
+    <string name="custom_phrases_count">共 %1$d 条自定义短语，打输入码可直接出</string>
+    <string name="custom_phrases_empty">这组还没有自定义短语，点右上角 + 加一条</string>
+    <string name="custom_phrases_added">已加入自定义短语「%1$s」</string>
 </resources>

@@ -16,6 +16,35 @@ pub enum Edge {
 const DEPTH: (f32, f32) = (360.0, 420.0);
 
 impl Edge {
+    /// 紧凑面板：保持选定的呼出边，在边上居中，尺寸随 DPI 缩放并限制在工作区内。
+    pub fn compact_rect(self, area: WorkArea, scale: f32) -> (i32, i32, u32, u32) {
+        let width = (area.right - area.left).max(1);
+        let height = (area.bottom - area.top).max(1);
+        let w = ((420.0 * scale) as i32).clamp(1, width);
+        let h = ((520.0 * scale) as i32).clamp(1, height);
+        let x = match self {
+            Self::Left => area.left,
+            Self::Right => area.right - w,
+            _ => area.left + (width - w) / 2,
+        };
+        let y = match self {
+            Self::Top => area.top,
+            Self::Bottom => area.bottom - h,
+            _ => area.top + (height - h) / 2,
+        };
+        (x, y, w as u32, h as u32)
+    }
+
+    pub fn compact_slide_start(self, area: WorkArea, scale: f32) -> (i32, i32) {
+        let (x, y, width, height) = self.compact_rect(area, scale);
+        match self {
+            Self::Top => (x, area.top - height as i32),
+            Self::Bottom => (x, area.bottom),
+            Self::Left => (area.left - width as i32, y),
+            Self::Right => (area.right, y),
+        }
+    }
+
     pub fn parse(text: &str) -> Option<Self> {
         match text {
             "top" => Some(Self::Top),
@@ -87,5 +116,26 @@ mod tests {
     #[test]
     fn panel_never_exceeds_the_work_area() {
         assert_eq!(Edge::Bottom.rect(AREA, 4.0), (100, 0, 1920, 1040));
+    }
+
+    #[test]
+    fn compact_panel_stays_on_each_monitor_and_respects_scaling() {
+        let area = WorkArea {
+            left: -1920,
+            top: -200,
+            right: 0,
+            bottom: 840,
+        };
+        assert_eq!(Edge::Bottom.compact_rect(area, 1.0), (-1170, 320, 420, 520));
+        assert_eq!(Edge::Top.compact_rect(area, 2.0), (-1380, -200, 840, 1040));
+        for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
+            let (x, y, w, h) = edge.compact_rect(area, 8.0);
+            assert!(
+                x >= area.left
+                    && y >= area.top
+                    && x + w as i32 <= area.right
+                    && y + h as i32 <= area.bottom
+            );
+        }
     }
 }

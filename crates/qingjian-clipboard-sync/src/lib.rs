@@ -22,6 +22,6 @@ pub use identity::Identity;
 pub use peers::{Peer, PeerBook};
 pub use record::{Record, RecordKind, Stamp};
 pub use service::{
-    Nearby, PeerState, PeerStatus, ReceivedItem, SyncEvent, SyncOptions, SyncService,
+    Nearby, PeerState, PeerStatus, PhraseSource, ReceivedItem, SyncEvent, SyncOptions, SyncService,
 };
 pub use sync::Replica;

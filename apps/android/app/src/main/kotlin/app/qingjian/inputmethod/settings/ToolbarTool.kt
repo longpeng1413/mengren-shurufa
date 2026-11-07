@@ -16,7 +16,7 @@ enum class ToolbarTool(val label: String, val icon: Icon) {
     PRIVATE_SEND("", Icon.LOCK),
     PRIVATE_INPUT("", Icon.UNLOCK),
     RESIZE("键盘高度", Icon.RESIZE),
-    PHRASES("常用语", Icon.PHRASES),
+    PHRASES("自定义短语", Icon.PHRASES),
     SWITCH_INPUT_METHOD("切换输入法", Icon.GLOBE),
     SETTINGS("设置", Icon.SETTINGS),
     ;

@@ -66,4 +66,14 @@
     <string name="private_auto_fill_note">Optional, off by default. Fill on arrival only while the keyboard is open on a password field. Otherwise tap the suggestion to fill.</string>
     <string name="private_delivery_received">Private content received (not a fill confirmation)</string>
     <string name="private_delivery_unconfirmed">Private delivery not confirmed; check connection and receiving settings</string>
+    <string name="phrases_sync_now">Sync custom phrases now</string>
+    <string name="phrases_sync_note">Automatically merge additions from paired devices; duplicates are skipped and deletion stays local.</string>
+    <string name="phrases_sync_received">Received %1$d custom phrases</string>
+    <string name="custom_phrases">Custom phrases</string>
+    <string name="custom_phrases_add">Add custom phrase</string>
+    <string name="custom_phrases_edit">Edit custom phrase</string>
+    <string name="custom_phrases_hint">Enter a custom phrase</string>
+    <string name="custom_phrases_count">%1$d custom phrases; type a code to use</string>
+    <string name="custom_phrases_empty">No custom phrases in this group; tap + to add</string>
+    <string name="custom_phrases_added">Added to custom phrases: %1$s</string>
 </resources>

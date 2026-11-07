@@ -81,14 +81,30 @@ impl App for ClipboardApp {
 
     fn update(&mut self, message: Message) -> bool {
         match message {
+            Message::OpenPhrases => {
+                self.showing_phrases = true;
+                self.reload_phrases();
+            }
+            Message::ClosePhrases => self.showing_phrases = false,
+            Message::SyncPhrases => {
+                self.link.changed();
+                self.reload_phrases();
+            }
+            Message::PastePhrase(index) => self.paste_phrase(index),
             Message::Search(_) if self.hotkey_still_held() => {}
             // 卡片横着排、搜索框又是空的：左右键没有光标可挪，用来换卡片
             Message::Search(Edit::Key(press))
-                if self.edge.horizontal()
-                    && self.search.text().is_empty()
-                    && matches!(press.key, KeyCode::ArrowLeft | KeyCode::ArrowRight) =>
+                if self.search.text().is_empty()
+                    && if self.horizontal() {
+                        matches!(press.key, KeyCode::ArrowLeft | KeyCode::ArrowRight)
+                    } else {
+                        matches!(press.key, KeyCode::ArrowUp | KeyCode::ArrowDown)
+                    } =>
             {
-                self.move_selection(press.key == KeyCode::ArrowRight);
+                self.move_selection(matches!(
+                    press.key,
+                    KeyCode::ArrowRight | KeyCode::ArrowDown
+                ));
             }
             Message::Search(edit) => {
                 let before = self.search.text().to_owned();

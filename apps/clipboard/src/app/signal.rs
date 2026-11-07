@@ -69,6 +69,9 @@ impl ClipboardApp {
                 self.filter = ClipFilter::All;
                 self.list_generation += 1;
                 self.reload();
+                #[cfg(windows)]
+                let (x, y, width, height) = self.edge.compact_rect(area, scale);
+                #[cfg(not(windows))]
                 let (x, y, width, height) = self.edge.rect(area, scale);
                 self.visible = true;
                 self.command = Some(WindowCommand::Show {
@@ -76,7 +79,11 @@ impl ClipboardApp {
                     y,
                     width,
                     height,
-                    from: Some(self.edge.slide_start(area, scale)),
+                    from: Some(if cfg!(windows) {
+                        self.edge.compact_slide_start(area, scale)
+                    } else {
+                        self.edge.slide_start(area, scale)
+                    }),
                 });
             }
         }
@@ -84,6 +91,7 @@ impl ClipboardApp {
 
     fn handle_sync(&mut self, event: SyncEvent) {
         match event {
+            SyncEvent::PhrasesReceived { .. } => self.reload_phrases(),
             SyncEvent::PrivateReceived => {
                 #[cfg(windows)]
                 crate::system::windows::private::received(self.settings.private_auto_fill);

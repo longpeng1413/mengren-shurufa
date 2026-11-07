@@ -15,6 +15,7 @@ mod frequency_learner;
 mod input_log;
 mod panel_usage;
 mod phrase_book;
+mod phrase_sync;
 mod usage_stats;
 mod vocabulary_book;
 
@@ -28,5 +29,6 @@ pub use frequency_learner::FrequencyLearner;
 pub use input_log::InputLog;
 pub use panel_usage::{PANEL_USAGE_FILE, PanelUsage};
 pub use phrase_book::{DEFAULT_GROUP, MAX_CODE_CHARS, PHRASE_BOOK_FILE, Phrase, PhraseBook};
+pub use phrase_sync::{SyncedPhrases, merged_custom_phrases};
 pub use usage_stats::{USAGE_FILE, UsageStats, figures};
 pub use vocabulary_book::{VocabularyBook, VocabularyEntry};

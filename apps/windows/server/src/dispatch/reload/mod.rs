@@ -127,6 +127,16 @@ impl Router {
         let code_files = dirs.code_snapshot();
         let code_word_files = dirs.code_word_snapshot();
         let dictionary_files = dirs.dict_snapshot();
+        let phrase_mtimes = dirs
+            .user_root
+            .as_deref()
+            .map(|dir| {
+                [
+                    mtime(&dir.join("phrase-sync.json")),
+                    mtime(&dir.join("phrase-sync-hidden.json")),
+                ]
+            })
+            .unwrap_or_default();
         let updates = dirs.user_root.as_deref().map(|dir| {
             qingjian_update::Checker::new(dir.join(UPDATE_STATE_FILE), env!("CARGO_PKG_VERSION"))
         });
@@ -138,6 +148,7 @@ impl Router {
             code_files,
             code_word_files,
             last_mtime,
+            phrase_mtimes,
             applied_predict: config.predict.clone(),
             applied_dictionaries: config.dictionaries.clone(),
             applied_aux_code: config.aux_code.clone(),
@@ -182,7 +193,19 @@ impl Router {
         };
         let config_changed = {
             let current = mtime(&reload.config_path);
-            let changed = current != reload.last_mtime;
+            let phrases = reload
+                .dirs
+                .user_root
+                .as_deref()
+                .map(|dir| {
+                    [
+                        mtime(&dir.join("phrase-sync.json")),
+                        mtime(&dir.join("phrase-sync-hidden.json")),
+                    ]
+                })
+                .unwrap_or_default();
+            let changed = current != reload.last_mtime || phrases != reload.phrase_mtimes;
+            reload.phrase_mtimes = phrases;
             reload.last_mtime = current;
             changed
         };
@@ -223,10 +246,11 @@ impl Router {
         crate::clipboard_process::sync(config.clipboard.enabled);
         self.engine.set_fuzzy(config.fuzzy);
         // Windows 端此前漏装 custom_phrases（macOS 端 apply_config 有）；失败只记日志，保持原短语
-        if let Err(error) = self
-            .engine
-            .set_custom_phrases(config.custom_phrases.clone())
-        {
+        if let Err(error) = self.engine.set_custom_phrases(
+            qingjian_platform::dirs::user_dir()
+                .map(|dir| qingjian_learning::merged_custom_phrases(&dir, &config.custom_phrases))
+                .unwrap_or_else(|| config.custom_phrases.clone()),
+        ) {
             tracing::warn!(%error, "自定义短语配置未应用，保持原短语");
         }
         // 拼音侧与形码侧一起装配（双拼 / 注音 / 混输都在里面）

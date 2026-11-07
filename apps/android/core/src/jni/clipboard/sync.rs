@@ -209,6 +209,15 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncSt
             Box::new(HistoryReplica::new(directory, limit)),
             sender,
         )?;
+        let source = directory.to_owned();
+        service.set_phrase_source(
+            directory,
+            Box::new(move || {
+                Ok(qingjian_learning::PhraseBook::open(&source)
+                    .phrases()
+                    .to_vec())
+            }),
+        );
         *running() = Some(Running {
             service,
             reader: HistoryReplica::new(directory, limit),
@@ -316,6 +325,7 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncCh
 
 fn event_json(event: SyncEvent, reader: Option<&HistoryReplica>) -> serde_json::Value {
     match event {
+        SyncEvent::PhrasesReceived { count } => json!({"type":"phrases", "count":count}),
         SyncEvent::PrivateSendStarted => json!({"type":"private_started"}),
         SyncEvent::PrivateReceived => json!({"type":"private_received"}),
         SyncEvent::PrivateSent { count } => json!({"type":"private_sent", "count":count}),

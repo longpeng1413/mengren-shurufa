@@ -89,3 +89,8 @@ sent = "{count} device(s) confirmed receipt. Fill once within two minutes. See D
 input = "Fill received private content"
 delivery_received = "Private content received (not a fill confirmation)"
 delivery_unconfirmed = "Private delivery not confirmed"
+
+[phrases]
+title = "Custom phrases"
+sync = "Sync now"
+empty = "Add phrases in settings or sync from paired devices"

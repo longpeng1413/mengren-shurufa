@@ -156,10 +156,10 @@ internal object Native {
     /** 记一张复制的图片，回操作之后的列表 JSON。 */
     external fun clipboardAddImage(userDir: String, bytes: ByteArray, extension: String, limit: Int): String?
 
-    /** 常用语操作（[request] 是 `{"op":…}` 的 JSON），回操作之后的整页 JSON（{groups, phrases}）。 */
+    /** 自定义短语操作（[request] 是 `{"op":…}` 的 JSON），回操作之后的整页 JSON（{groups, phrases}）。 */
     external fun phrases(userDir: String, request: String): String?
 
-    /** 常用语编辑的规则（{default_group, max_code}），不要句柄。 */
+    /** 自定义短语编辑的规则（{default_group, max_code}），不要句柄。 */
     external fun phraseRules(): String?
 
     /** 剪贴板卡片的代码显示 JSON（{code, spans: [[起, 止, 种类]]}，UTF-16 偏移），不要句柄。 */
@@ -168,7 +168,7 @@ internal object Native {
     /** 拆词：一段文字切成可点选的小块（JSON 字符串数组）。 */
     external fun textPieces(handle: Long, text: String): String?
 
-    /** 常用语改过之后重挂带输入码的那些。 */
+    /** 自定义短语改过之后重挂带输入码的那些。 */
     external fun reloadPhrases(handle: Long, userDir: String)
 
     /** 接上（[settings] 是含密钥的配置 JSON）或断开（null）云端，返回接没接上。 */
@@ -191,7 +191,7 @@ internal object Native {
 
     external fun cancelTranslation(handle: Long)
 
-    /** 上屏记不记进输入统计；工具框（快捷翻译、常用语编辑）开着时关。 */
+    /** 上屏记不记进输入统计；工具框（快捷翻译、自定义短语编辑）开着时关。 */
     external fun setMetered(handle: Long, metered: Boolean)
 
     /** 私密输入：应用声明不要学习的输入框里不学习、不记统计与生词、不发云端。 */

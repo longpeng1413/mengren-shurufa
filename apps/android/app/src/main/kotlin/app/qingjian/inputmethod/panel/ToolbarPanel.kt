@@ -81,6 +81,7 @@ class ToolbarPanel(
         val label = when (tool) {
             ToolbarTool.PRIVATE_SEND -> context.getString(app.qingjian.inputmethod.R.string.private_send)
             ToolbarTool.PRIVATE_INPUT -> context.getString(app.qingjian.inputmethod.R.string.private_input)
+            ToolbarTool.PHRASES -> context.getString(app.qingjian.inputmethod.R.string.custom_phrases)
             else -> tool.label
         }
         ink.text(canvas, label, 12f, if (highlighted) palette.brand else palette.gloss, cx, cy + ink.dp(18f), maxWidth = cellWidth() - ink.dp(4f))

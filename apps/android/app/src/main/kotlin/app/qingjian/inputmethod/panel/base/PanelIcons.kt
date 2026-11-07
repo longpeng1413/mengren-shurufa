@@ -231,7 +231,7 @@ object PanelIcons {
         circle(16f, 10f, 1.2f)
     }
 
-    /** 常用语：左下带尾巴的对话框，里面两行字。 */
+    /** 自定义短语：左下带尾巴的对话框，里面两行字。 */
     private fun phrases() {
         polyline(11f, 17f, 6f, 17f, 3.5f, 14.5f, 3.5f, 6.5f, 6f, 4f, 18f, 4f, 20.5f, 6.5f, 20.5f, 14.5f, 18f, 17f, 11f, 17f, 7f, 20.5f, 7f, 17f)
         polyline(7.5f, 9f, 16.5f, 9f)

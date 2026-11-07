@@ -1,9 +1,11 @@
 //! 回环公网中转集成测试，明确不提供 LAN 地址，保证数据实际经过中转。
 
 mod device;
+mod expansion;
 mod large;
 mod memory;
 mod multidirectional;
+mod phrases;
 mod private;
 use crate::{Record, SyncEvent};
 use device::Device;

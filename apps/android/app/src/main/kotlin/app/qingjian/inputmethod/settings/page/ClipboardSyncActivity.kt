@@ -44,6 +44,10 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
     override fun onSyncEvent(type: String, event: JSONObject) {
         when (type) {
             "nearby", "private_started", "private_delivery" -> rebuild()
+            "phrases" -> {
+                status = getString(R.string.phrases_sync_received, event.optInt("count"))
+                rebuild()
+            }
             "paired" -> {
                 showingCode = null
                 status = getString(R.string.sync_paired_ok, event.optString("name"))
@@ -74,6 +78,9 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
             ),
         )
         if (!on) return views
+        views += ui.group(null, ui.action(R.string.phrases_sync_now, getString(R.string.phrases_sync_note)) {
+            ClipboardSync.changed()
+        })
         views += ui.group(null, ui.toggle(R.string.private_receive_enabled, R.string.private_receive_note,
             app.qingjian.inputmethod.clipboard.sync.PrivateReceive.enabled(this)) {
             prefs.edit().putBoolean(app.qingjian.inputmethod.clipboard.sync.PrivateReceive.KEY_ENABLED, it).apply()

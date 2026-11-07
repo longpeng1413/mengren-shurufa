@@ -31,9 +31,9 @@ import app.qingjian.inputmethod.settings.Settings
 import app.qingjian.inputmethod.theme.Palette
 
 /**
- * 剪贴板与常用语：表头两个页签，下面一张张圆角卡片，点卡片上屏，点右边 ⌄ 展开。
- * - 剪贴板：展开后 + 常用语 / 拆词 / 删除；右上角清空（点两次）。文字原样显示，像代码的用等宽字体、不重排；图片显示缩略图，长按看大图。
- * - 常用语：底下一排分组，展开后 编辑 / 移至首位 / 删除；右上角 + 新加一条。
+ * 剪贴板与自定义短语：表头两个页签，下面一张张圆角卡片，点卡片上屏，点右边 ⌄ 展开。
+ * - 剪贴板：展开后 + 自定义短语 / 拆词 / 删除；右上角清空（点两次）。文字原样显示，像代码的用等宽字体、不重排；图片显示缩略图，长按看大图。
+ * - 自定义短语：底下一排分组，展开后 编辑 / 移至首位 / 删除；右上角 + 新加一条。
  * 数据在 Rust 侧（[ClipboardStore]），这里每次改完拿回整份列表重画。
  */
 @SuppressLint("ViewConstructor")
@@ -45,7 +45,7 @@ class ClipboardPanel(
     phrasesFirst: Boolean,
 ) : PanelView(context, palette, actions, headerHeight) {
     private val tabs = Tabs(ink, scrollable(true) { _, _ -> false }, Tabs.Style.UNDERLINE).apply {
-        labels = listOf("剪贴板", "常用语")
+        labels = listOf("剪贴板", context.getString(app.qingjian.inputmethod.R.string.custom_phrases))
         selected = if (phrasesFirst) PHRASES else CLIPS
     }
     private val showingPhrases get() = tabs.selected == PHRASES
@@ -103,7 +103,7 @@ class ClipboardPanel(
     override fun onDraw(canvas: Canvas) {
         drawHeader(canvas, tabs, if (showingPhrases) Icon.PLUS else Icon.TRASH)
         val summary = if (showingPhrases) {
-            "共 ${page.phrases.size} 条常用语，打输入码可直接出"
+            context.getString(app.qingjian.inputmethod.R.string.custom_phrases_count, page.phrases.size)
         } else if (clearArmed) {
             "再点一次右上角清空全部剪贴板"
         } else {
@@ -117,7 +117,7 @@ class ClipboardPanel(
         canvas.clipRect(list)
         if (count == 0) {
             ink.text(
-                canvas, if (showingPhrases) "这组还没有常用语，点右上角 + 加一条" else "复制的文字和图片会出现在这里",
+                canvas, if (showingPhrases) context.getString(app.qingjian.inputmethod.R.string.custom_phrases_empty) else "复制的文字和图片会出现在这里",
                 14f, palette.gloss, width / 2f, list.top + ink.dp(60f),
             )
         }
@@ -216,7 +216,7 @@ class ClipboardPanel(
         return layout(i).height + (if (codeOf(i) != null) ink.dp(CODE_LINE_DP) else 0f)
     }
 
-    /** 常用语的输入码（有才画一行）。 */
+    /** 自定义短语的输入码（有才画一行）。 */
     private fun codeOf(i: Int): String? = if (showingPhrases) shownPhrases()[i].code.ifEmpty { null } else null
 
     private fun textOf(i: Int) = if (showingPhrases) shownPhrases()[i].text else clips[i].text
@@ -295,7 +295,7 @@ class ClipboardPanel(
     } else if (clips.getOrNull(expanded)?.image != null) {
         listOf(Icon.TRASH to "删除")
     } else {
-        listOf(Icon.PLUS to "常用语", Icon.SPLIT to "拆词", Icon.TRASH to "删除")
+        listOf(Icon.PLUS to context.getString(app.qingjian.inputmethod.R.string.custom_phrases), Icon.SPLIT to "拆词", Icon.TRASH to "删除")
     }
 
     private fun actionWidth() = ink.dp(96f)
@@ -394,10 +394,10 @@ class ClipboardPanel(
             return
         }
         when (label) {
-            "常用语" -> {
+            context.getString(app.qingjian.inputmethod.R.string.custom_phrases) -> {
                 val group = lastGroup
                 reloadPhrases(ClipboardStore.addPhrase(context, clips[i].text, group, ""))
-                actions.toast("已加入常用语「$group」")
+                actions.toast(context.getString(app.qingjian.inputmethod.R.string.custom_phrases_added, group))
             }
             "拆词" -> actions.openPieces(clips[i].text)
             "删除" -> {
@@ -431,7 +431,7 @@ class ClipboardPanel(
         private const val PREVIEW_BAR_DP = 60f
         private val PREVIEW_BUTTONS = listOf("关闭", "发送")
 
-        /** 常用语停在哪一组：关了面板再开还在这组；加完常用语跳到它所在的组。 */
+        /** 自定义短语停在哪一组：关了面板再开还在这组；加完自定义短语跳到它所在的组。 */
         var lastGroup = PhraseRules.defaultGroup
     }
 }

@@ -7,7 +7,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * 剪贴板历史与常用语的读写，都在 Rust 侧（`qingjian_learning` 的 `ClipboardHistory` / `PhraseBook`），这里只拼请求、解结果。
+ * 剪贴板历史与自定义短语的读写，都在 Rust 侧（`qingjian_learning` 的 `ClipboardHistory` / `PhraseBook`），这里只拼请求、解结果。
  * 不要引擎句柄，App 与输入法都能调；出错返回空的。
  */
 object ClipboardStore {
@@ -55,6 +55,7 @@ object ClipboardStore {
     private fun phrases(context: Context, request: JSONObject): PhrasePage {
         val json = runCatching { Native.phrases(userDir(context), request.toString()) }.getOrNull()
             ?: return PhrasePage(listOf(PhraseRules.defaultGroup), emptyList())
+        if (request.optString("op") != "list") app.qingjian.inputmethod.clipboard.sync.ClipboardSync.changed()
         val page = JSONObject(json)
         val groups = page.getJSONArray("groups")
         val phrases = page.getJSONArray("phrases")

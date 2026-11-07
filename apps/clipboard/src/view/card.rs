@@ -23,6 +23,26 @@ const CARD_WIDTH: f32 = 260.0;
 
 const CARD_HEIGHT: f32 = 200.0;
 
+/// 竖排时按可见文字估计高度；长文与图片预览有上限，原内容仍完整保留。
+fn compact_height(text: &str, image: bool, width: f32, font: f32) -> f32 {
+    if image {
+        return 230.0;
+    }
+    let columns = ((width - 24.0) / font.max(1.0)).max(1.0) as usize;
+    let lines: usize = text
+        .lines()
+        .take(6)
+        .map(|line| {
+            line.chars()
+                .take(columns * 6)
+                .count()
+                .max(1)
+                .div_ceil(columns)
+        })
+        .sum();
+    100.0 + lines.clamp(1, 6) as f32 * (font + 4.0)
+}
+
 /// 色条与底栏大约占的高度（点），图片按剩下的地方缩放。
 const CHROME_HEIGHT: f32 = 110.0;
 
@@ -355,13 +375,25 @@ pub(super) fn card(
             },
             (theme.px(CARD_WIDTH), height),
         ),
-        Extent::Wide(width) => (
-            Size {
-                width: Dimension::percent(1.0),
-                height: Dimension::length(theme.px(CARD_HEIGHT)),
-            },
-            (width, theme.px(CARD_HEIGHT)),
-        ),
+        Extent::Wide(width) => {
+            let height = if cfg!(windows) {
+                compact_height(
+                    &item.text,
+                    item.kind == ClipKind::Image,
+                    width / theme.px(1.0),
+                    theme.font.size,
+                )
+            } else {
+                CARD_HEIGHT
+            };
+            (
+                Size {
+                    width: Dimension::percent(1.0),
+                    height: Dimension::length(theme.px(height)),
+                },
+                (width, theme.px(height)),
+            )
+        }
     };
     let image_room = (
         room.0 - theme.px(20.0),
@@ -409,6 +441,12 @@ pub(super) fn card(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn short_previews_are_compact_and_long_previews_are_bounded() {
+        assert!(super::compact_height("你好", false, 400.0, 14.0) < 130.0);
+        assert!(super::compact_height(&"长文".repeat(5000), false, 400.0, 14.0) <= 208.0);
+        assert_eq!(super::compact_height("", true, 400.0, 14.0), 230.0);
+    }
     use jiff::Timestamp;
     use jiff::tz::TimeZone;
 

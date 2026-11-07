@@ -133,7 +133,7 @@ class InputPanel(
 
     val view: View get() = root
 
-    /** 编辑条（常用语编辑框、快捷翻译）摆在最上面（键盘照常可打）；[editor] 为 null 收起。 */
+    /** 编辑条（自定义短语编辑框、快捷翻译）摆在最上面（键盘照常可打）；[editor] 为 null 收起。 */
     fun showEditor(editor: View?) {
         root.getChildAt(0)?.takeIf { it is FloatingEditor }?.let(root::removeView)
         editor?.let { root.addView(it, 0) }
@@ -141,7 +141,7 @@ class InputPanel(
 
     /** 剪贴板面板开着时重读（系统剪贴板刚记进一条）。 */
     fun refreshClipboard() {
-        if (openPanel == PanelKind.CLIPBOARD) open(PanelKind.CLIPBOARD)
+        if (openPanel == PanelKind.CLIPBOARD || openPanel == PanelKind.PHRASES) open(openPanel!!)
     }
 
     /** 候选展开开着时换上这一帧的拼音与候选。 */

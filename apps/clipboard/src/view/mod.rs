@@ -5,6 +5,7 @@ mod card;
 mod devices;
 mod editor;
 mod icons;
+mod phrases;
 mod toolbar;
 
 use bamboo_slip::taffy::{Dimension, FlexDirection, LengthPercentage, NodeId, Rect, Size, Style};
@@ -151,6 +152,7 @@ pub fn view(
     let mut children = match &app.editing {
         Some(editing) => editor::editor(ui, &context, editing, size)?,
         None if app.showing_devices => devices::devices(ui, &context)?,
+        None if app.showing_phrases => phrases::phrases(ui, &context)?,
         None => vec![toolbar::toolbar(ui, &context)?, list(ui, &context, size)?],
     };
     if let Some(menu) = &app.menu {

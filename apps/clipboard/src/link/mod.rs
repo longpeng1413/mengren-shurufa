@@ -16,6 +16,7 @@ use crate::system::{Signal, computer_name};
 pub use pairing::Pairing;
 
 pub struct SyncLink {
+    config: Option<PathBuf>,
     service: Option<SyncService>,
 
     /// 数据库文件，同步数据放它旁边。
@@ -28,8 +29,9 @@ pub struct SyncLink {
 }
 
 impl SyncLink {
-    pub fn new(database: &Path) -> Self {
+    pub fn new(database: &Path, config: Option<&Path>) -> Self {
         Self {
+            config: config.map(Path::to_owned),
             service: None,
             database: database.to_owned(),
             outbox: None,
@@ -104,6 +106,24 @@ impl SyncLink {
             Box::new(replica),
             sender,
         )?;
+        #[cfg(windows)]
+        if let Some(path) = self.config.clone() {
+            let directory = path
+                .parent()
+                .ok_or("Configuration has no parent directory")?
+                .to_owned();
+            let source = directory.clone();
+            service.set_phrase_source(
+                &directory,
+                Box::new(move || {
+                    let config = qingjian_platform::Config::load(&path).map_err(|_| {
+                        std::io::Error::other("Cannot read local phrase configuration")
+                    })?;
+                    qingjian_learning::SyncedPhrases::new(&source)
+                        .from_custom(&config.custom_phrases)
+                }),
+            );
+        }
         #[cfg(windows)]
         {
             service.set_private_receiver(settings.private_receive);

@@ -98,6 +98,10 @@ class QingjianInputMethodService :
         override fun onSyncEvent(type: String, event: JSONObject) {
             val glow = neon?.takeIf { ClipboardSync.neonEnabled(this@QingjianInputMethodService) }
             when (type) {
+                "phrases" -> {
+                    engine.reloadPhrases(ClipboardStore.userDir(this@QingjianInputMethodService))
+                    panel?.refreshClipboard()
+                }
                 "started" -> glow?.start()
                 "progress" -> glow?.speed(event.optLong("speed"))
                 "finished" -> {
@@ -115,7 +119,7 @@ class QingjianInputMethodService :
         }
     }
 
-    /** 浮在键盘上方接管打字的编辑条（常用语编辑框、快捷翻译）；null 是没开。 */
+    /** 浮在键盘上方接管打字的编辑条（自定义短语编辑框、快捷翻译）；null 是没开。 */
     private var editor: FloatingEditor? = null
 
     private val privateUiHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -379,6 +383,7 @@ class QingjianInputMethodService :
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        engine.reloadPhrases(ClipboardStore.userDir(this))
         AppLog.info(
             "start input view: ${info.packageName}, inputType 0x${Integer.toHexString(info.inputType)}, " +
                 "imeOptions 0x${Integer.toHexString(info.imeOptions)}, restarting $restarting",
@@ -489,14 +494,14 @@ class QingjianInputMethodService :
         keyboard.languageChoice = composer.language.ordinal
         keyboard.enterLabel = editor?.enterLabel ?: enterLabel
         val fullWidth = composer.options.fullWidthPunctuation
-        // 滑行只给拼音全键盘与英文键盘（常用语编辑条的英文键盘也算）：双拼、五笔、日语的字母不是这样拼词的
+        // 滑行只给拼音全键盘与英文键盘（自定义短语编辑条的英文键盘也算）：双拼、五笔、日语的字母不是这样拼词的
         keyboard.swipeLayout = composer.page == Composer.Page.LETTERS && (
             editor?.lettersOnly == true || (!composer.nineKey && !composer.zhuyin && !composer.shuangpin && !composer.wubi && !composer.japanese)
         )
         when {
             composer.page == Composer.Page.NUMBERS -> keyboard.setRows(KeyboardLayout.numbers(), side = true)
             composer.page == Composer.Page.SYMBOLS -> keyboard.setRows(KeyboardLayout.symbols(composer.chinese, fullWidth))
-            // 常用语的输入码只收字母，九宫格、注音打不出来，换成英文全键盘
+            // 自定义短语的输入码只收字母，九宫格、注音打不出来，换成英文全键盘
             editor?.lettersOnly == true -> keyboard.setRows(KeyboardLayout.qwerty(chinese = false))
             composer.nineKey -> keyboard.setRows(KeyboardLayout.nineKey(fullWidth), side = true)
             composer.zhuyin -> keyboard.setRows(KeyboardLayout.zhuyin(fullWidth))
@@ -723,7 +728,7 @@ class QingjianInputMethodService :
         toast("这里不能直接发图片，已放进剪贴板，长按输入框粘贴")
     }
 
-    /** 加 / 改常用语：收起面板，键盘上方摆编辑框，打的字进编辑框；完成或收起回常用语页。 */
+    /** 加 / 改自定义短语：收起面板，键盘上方摆编辑框，打的字进编辑框；完成或收起回自定义短语页。 */
     override fun editPhrase(phrase: PhraseItem?, group: String) {
         closeEditor()
         closePanel()
@@ -829,7 +834,7 @@ class QingjianInputMethodService :
 
     override fun prepareVoice() = composer.prepareVoice()
 
-    // 走 [connection]：快捷翻译、常用语编辑条开着时字进编辑条
+    // 走 [connection]：快捷翻译、自定义短语编辑条开着时字进编辑条
     override fun composeVoice(text: String) {
         val connection = connection ?: return
         connection.setComposingText(text, 1)

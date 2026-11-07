@@ -4,6 +4,10 @@ use super::received_item::ReceivedItem;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SyncEvent {
+    /// 自定义短语入库；正文不进入事件或系统剪贴板。
+    PhrasesReceived {
+        count: usize,
+    },
     /// 私密事件绝不携带内容。
     PrivateReceived,
 

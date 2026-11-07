@@ -3,7 +3,7 @@ package app.qingjian.inputmethod.core.store
 import app.qingjian.inputmethod.core.Native
 import org.json.JSONObject
 
-/** 常用语编辑要守的规则（缺省分组、输入码长度），从 Rust 侧取，与常用语落盘时的裁剪一致。 */
+/** 自定义短语编辑要守的规则（缺省分组、输入码长度），从 Rust 侧取，与自定义短语落盘时的裁剪一致。 */
 object PhraseRules {
     private val json: JSONObject by lazy {
         runCatching { Native.phraseRules() }.getOrNull()?.let(::JSONObject) ?: JSONObject()

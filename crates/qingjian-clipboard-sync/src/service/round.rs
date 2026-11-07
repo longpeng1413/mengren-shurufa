@@ -36,6 +36,7 @@ pub(crate) fn handle_stream<S: std::io::Read + std::io::Write>(
         Opening::Sync => respond(stream, address, shared),
         Opening::Capabilities => super::private::respond(stream, shared, false),
         Opening::Private => super::private::respond(stream, shared, true),
+        Opening::Phrases => super::phrases::respond(stream, shared),
         Opening::Info if address.is_some() => scan::answer(&mut stream, shared),
         Opening::Info => Err(SyncError::Handshake),
     })();
@@ -164,6 +165,9 @@ pub(super) fn sync_peer(shared: &Shared, peer: &Peer) {
         return;
     }
     shared.record_link(&peer.device_id, result.is_ok());
+    if result.is_ok() {
+        super::phrases::sync_peer(shared, peer);
+    }
     if let Err(error) = result {
         tracing::info!(%error, peer = %peer.name, "sync failed");
         // 只有 mDNS 还看得见它才算失败；看不见就是离线，上线后补传

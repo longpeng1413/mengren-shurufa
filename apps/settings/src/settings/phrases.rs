@@ -147,6 +147,20 @@ impl Settings {
 
     pub(super) fn write_phrases(&mut self, list: &[CustomPhrase]) -> Result<(), String> {
         Config::set_custom_phrases(&self.path, list)?;
+        if let Some(dir) = self.path.parent() {
+            use qingjian_learning::{Phrase, SyncedPhrases};
+            let present: Vec<_> = list.iter().map(Phrase::from_custom).collect();
+            let removed: Vec<_> = self
+                .config
+                .custom_phrases
+                .iter()
+                .filter(|p| !list.iter().any(|q| q.code == p.code && q.text == p.text))
+                .map(Phrase::from_custom)
+                .collect();
+            SyncedPhrases::new(dir)
+                .hide(&removed, &present)
+                .map_err(|e| e.to_string())?;
+        }
         self.reload();
         Ok(())
     }

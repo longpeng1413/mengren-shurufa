@@ -155,7 +155,7 @@ fn resync_interval(shared: &Shared) -> Duration {
     if lock(&shared.relay).enabled {
         return Duration::from_secs(5);
     }
-    if shared.watching.load(Ordering::Relaxed) {
+    if shared.watching.load(Ordering::Relaxed) || lock(&shared.phrases).is_some() {
         WATCH_INTERVAL
     } else {
         RESYNC_INTERVAL

@@ -5,6 +5,7 @@ mod editing;
 mod items;
 mod menu;
 mod message;
+mod phrases;
 mod signal;
 mod window;
 
@@ -32,6 +33,8 @@ pub use message::Message;
 const SHOWN_ITEMS: usize = 200;
 
 pub struct ClipboardApp {
+    pub(crate) showing_phrases: bool,
+    pub(crate) phrases: Vec<qingjian_learning::Phrase>,
     store: ClipStore,
 
     edge: Edge,
@@ -134,8 +137,10 @@ impl ClipboardApp {
         let settings = watch.settings.clone();
         let config = watch.path.clone();
         Self {
+            showing_phrases: false,
+            phrases: Vec::new(),
             store,
-            link: SyncLink::new(database),
+            link: SyncLink::new(database, config.as_deref()),
             neon: Neon::spawn(),
             neon_on: settings.sync_neon,
             name_edit: TextEdit::new(settings.device_name.as_str()),
@@ -250,13 +255,14 @@ impl ClipboardApp {
     }
 
     pub(crate) fn horizontal(&self) -> bool {
-        self.edge.horizontal()
+        !cfg!(windows) && self.edge.horizontal()
     }
 
     fn hide(&mut self) {
         self.visible = false;
         self.menu = None;
         self.editing = None;
+        self.showing_phrases = false;
         // 下次呼出回到列表；显示着的配对码也随之作废
         if self.showing_devices {
             self.close_devices();

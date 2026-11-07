@@ -16,7 +16,7 @@ use winit::window::{Icon, Theme, Window, WindowId, WindowLevel};
 
 use super::blit::blit;
 use super::clipboard::clipboard_text;
-use super::input::{key_code, modifiers, scroll};
+use super::input::{event_key, modifiers, scroll};
 use super::{HostError, WindowOptions};
 use crate::app::{App, Runner, WindowCommand};
 use crate::stage::Painted;
@@ -424,7 +424,7 @@ impl<A: App> ApplicationHandler for Handler<A> {
                 Event::Scroll { dx, dy }
             }
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
-                let key = key_code(&event.key_without_modifiers());
+                let key = event_key(&event.logical_key, &event.key_without_modifiers());
                 let typing = self.runner.interaction().text_target().is_some();
                 // 粘贴由宿主读剪贴板，当作打了这些字
                 if typing

@@ -8,6 +8,16 @@ use crate::ui::{KeyCode, Modifiers};
 /// 滚轮一格滚多远（点）。
 const LINE: f32 = 40.0;
 
+/// NumLock 开启时，小键盘的逻辑键是数字，但无修饰键值可能仍是 Home / 方向键。
+/// 只在两者都是字符时剥离修饰键，避免先移动光标、再插入数字。
+pub(super) fn event_key(logical: &Key, unmodified: &Key) -> Option<KeyCode> {
+    let key = match (logical, unmodified) {
+        (Key::Character(_), Key::Character(_)) => unmodified,
+        _ => logical,
+    };
+    key_code(key)
+}
+
 /// 字符键按不带修饰键时的字算（⌥1 是 1 不是 ¡，⇧/ 是 / 不是 ?），快捷键才认得出来；打出来的字另走文字输入。
 pub(super) fn key_code(key: &Key) -> Option<KeyCode> {
     Some(match key {
@@ -50,4 +60,40 @@ pub(super) fn scroll(delta: MouseScrollDelta, scale: f32) -> (f32, f32) {
         MouseScrollDelta::LineDelta(x, y) => (x * LINE * scale, y * LINE * scale),
     };
     (-dx, -dy)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn numpad_digits_do_not_move_the_caret() {
+        for (digit, named) in [
+            ("7", NamedKey::Home),
+            ("4", NamedKey::ArrowLeft),
+            ("6", NamedKey::ArrowRight),
+            ("1", NamedKey::End),
+            ("8", NamedKey::ArrowUp),
+        ] {
+            assert_eq!(
+                event_key(&Key::Character(digit.into()), &Key::Named(named)),
+                Some(KeyCode::Character(digit.into()))
+            );
+        }
+    }
+
+    #[test]
+    fn navigation_and_unmodified_shortcuts_are_preserved() {
+        assert_eq!(
+            event_key(
+                &Key::Named(NamedKey::ArrowLeft),
+                &Key::Named(NamedKey::ArrowLeft)
+            ),
+            Some(KeyCode::ArrowLeft)
+        );
+        assert_eq!(
+            event_key(&Key::Character("?".into()), &Key::Character("/".into())),
+            Some(KeyCode::Character("/".into()))
+        );
+    }
 }

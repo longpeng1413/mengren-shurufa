@@ -4,7 +4,7 @@ import android.view.inputmethod.InputConnection
 import app.qingjian.inputmethod.translate.TranslateBar
 
 /**
- * 浮在键盘上方、接管打字的编辑条（常用语编辑框 [PhraseEditor]、快捷翻译 [TranslateBar]）：
+ * 浮在键盘上方、接管打字的编辑条（自定义短语编辑框 [PhraseEditor]、快捷翻译 [TranslateBar]）：
  * 开着时输入法服务把 Composer 的输入连接换成它的 [connection]，键盘照常打字，字进编辑条而不是外面的输入框。
  */
 interface FloatingEditor {

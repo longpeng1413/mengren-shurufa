@@ -20,6 +20,7 @@ pub use nearby::Nearby;
 pub(super) use pending_code::PendingCode;
 
 pub(crate) struct Shared {
+    pub(in crate::service) phrases: Mutex<Option<super::phrases::PhraseState>>,
     pub identity: Identity,
 
     pub name: String,
@@ -85,6 +86,7 @@ impl Shared {
         events: Sender<SyncEvent>,
     ) -> Self {
         Self {
+            phrases: Mutex::new(None),
             identity,
             name,
             model,

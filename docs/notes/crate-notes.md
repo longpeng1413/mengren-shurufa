@@ -179,7 +179,7 @@ mac 存在 `Session::spelling`（`Host::follow_highlight`）、Windows / Linux �
   Core `InputLogger` trait 的落盘实现，`[general] input_log` 缺省开，只写本机，给离线回归评测与个人模型用）。
 - `UsageStats`：输入统计（`usage-hourly.tsv`，按小时记汉字 / 中文词 / 英文词 / 上屏 / 选词 / 首选 / 键数 / 打字毫秒 / 删过，Core `UsageMeter` trait 的实现，
   Engine 每次上屏 `Usage::of_text` + 按来源定词数，整句按 `segment_text` 切词数；键数与打字时长由 Core `Typing` 数：从这段第一键或上一次上屏起，键间停顿超过 5 秒不算。
-  壳把输入引到自己的工具框（安卓的快捷翻译原文、常用语编辑框）时 `Engine::set_metered(false)`：这些上屏不记统计（学习照常），键数时长一并清掉免得算到下一次头上。
+  壳把输入引到自己的工具框（安卓的快捷翻译原文、自定义短语编辑框）时 `Engine::set_metered(false)`：这些上屏不记统计（学习照常），键数时长一并清掉免得算到下一次头上。
   **每次上屏当场追加一行**（进程被杀、断电最多丢正在写的半行，读时跳过；末尾是半行时先换行再追加），同一时段多行读时相加；`flush` 只在追加失败过、或文件行数比时段数多 `COMPACT_AFTER` = 2000 时整理重写（原子写）。
   0.2.2 以前按天的 `usage.tsv` 照读不写（不分时段），降级回老版本时老版本只写它，两份不冲突。与输入日志无关，设置「统计」页显示，`book_scale` 折成几本《某书》）。
   派生数统一在 `usage_stats::figures`（re-export 成 `qingjian_learning::figures`）：近 7 天（`RECENT_DAYS` = 7、含今天、滚动，不按周归零；生词本「近 7 天新见」同一个 `recent_start`）、本月、累计、过去 24 小时 `last_24`、速度（`TODAY_MIN_MS` = 30 秒、平均与最快一天 `AVERAGE_MIN_MS` = 5 分钟）、首选率、一次打对、每字键数、最多 / 最快的一天、有输入天数与日均。
@@ -193,8 +193,8 @@ mac 存在 `Session::spelling`（`Host::follow_highlight`）、Windows / Linux �
   一条最多 2 万字符；同样的文字或同一张图再复制挪到最前；条数上限可设（`set_limit`，缺省 `DEFAULT_CLIPBOARD_LIMIT` = 1000），超了丢最旧的。
   图片存在 `clipboard-images/`，按内容的 64 位 FNV-1a 取名（同一张只存一份），条目删了、没别的条目用这张图就删文件。增删时整份原子重写——
   1000 条也就几百 KB，毫秒级；以后要全文搜索或上万条再换 SQLite，壳只经这个类型读写。壳只负责读系统剪贴板、把文字或图片交进来。
-- `PhraseBook`：常用语（`phrases.json`，`[{text, group, code}]`，靠前的常用）。增删改、移到最前（`move_to_top`）、分组（`groups`，「默认」总在第一）；
-  输入码只留字母、转小写、最多 32 个（`MAX_CODE_LEN`，与 Core 自定义短语一致；以前存下的超长码转换时跳过），`custom_phrases` 把带码的换成 Core `CustomPhrase`，权重都是缺省值，同一码按先后排。
+- `PhraseBook`：自定义短语（`phrases.json`，`[{text, group, code}]`，靠前的常用）。增删改、移到最前（`move_to_top`）、分组（`groups`，「默认」总在第一）；
+  输入码只留字母、转小写、最多 32 个（`MAX_CODE_LEN`，与 Core 自定义短语一致；以前存下的超长码转换时跳过），`custom_phrases` 把带码的换成 Core `CustomPhrase`，权重与启用状态保留，未设置时按默认权重 10 和启用处理，同权重按先后排。
 - 各表落盘走 Core `storage::write_atomic`（临时文件 + fsync + 改名），加载按行容错（坏行警告跳过，真读不了壳退回内存学习），
   壳激活期间每 60 秒 `Engine::flush_learning`；IMK 回调边界 `imk::catch_panic` 拦 panic、缓冲区字母原样上屏（见 architecture.md「崩溃不丢」）。
 
@@ -835,3 +835,12 @@ v0.3.7：共享 PrivateSender 弱句柄，接收权限/可用性短锁，私密�
 以 `docs/design/private-transfer.md` 的当前流程为准。Windows/Android 删除空槽启动等待，Windows 托盘改为填入现有内容；共享 `private::input::InputGate` 给手动/自动输入同一许可，任务取用后失败不清新槽。Android 复制监听归 Application，受理成功才持久化独立复制时间戳，新启动不发两分钟前的复制；JNI 受理不等于接收 ACK。IME 销毁不再清进程接收槽，锁屏/禁收仍撤销。
 
 私密发送最多四个并发目标，各目标报告 `PrivateDelivery`，本轮 `PrivateSendStarted` 清旧显示，终态 `PrivateSent.count` 只计 ACK；本机元数据事件增加但网络私密 v1 未变。两端显示逐设备确认，日志只用脱敏编号；Android 丢弃旧 poller 回调，Toast 单例替换，Windows 气泡限频和 NIF_REALTIME。密码框自动填入新配置默认关闭，已有保存的选择继续生效。
+
+
+### 猛人 0.4.0：短语收件箱与紧凑剪贴板
+
+`qingjian-learning::SyncedPhrases` 管理 `phrase-sync.json` 收件箱及 `phrase-sync-hidden.json` 本机隐藏记录；网络线程串行写收件箱，UI 只修改本机 `phrases.json` / 配置和隐藏记录，不让后台覆盖编辑文件。身份为规范化换行后的 `(code,text)` SHA-256；保留分组、权重、停用标记，重复不增加，同码冲突并存。每批最多 10000 条、正文单条 64 KiB、JSON 8 MiB；坏文件或不合法批次不覆写原文件。
+
+`qingjian-clipboard-sync::PhraseSource` 从壳读取本机快照；mode=6 经原 Noise 配对公钥认证后先交换摘要，再按发起方先发、响应方后发的顺序交换限长批次及持久化确认，避免两端大消息同时写阻塞。入库前重新检查配对；旧端不支持新 mode 时不改变配对或普通/私密同步。Windows 监听收件箱与隐藏文件变化热装配短语；Android 收到元数据事件重挂候选并刷新面板，下次展开键盘也重读。
+
+Windows 剪贴板使用 `Edge::compact_rect`，约 420×520 逻辑像素，保留选定边、居中并限制于当前显示器工作区。列表与滚轮竖排，短文卡片按内容限高；macOS 原布局保留。`bamboo-slip` 根据逻辑字符键区分 NumLock 的小键盘数字与无修饰键下的导航键，保留原字符快捷键映射。

@@ -157,13 +157,17 @@ impl Settings {
             Err(error) => tracing::warn!(%error, "改写配置里已下线的取值失败，照旧读"),
         }
         // 配置写坏了也要能打开设置：按缺省值显示、每页顶上提示，不然用户连改回来的地方都没有
-        let (config, config_error) = match Config::load(&path) {
+        let (mut config, config_error) = match Config::load(&path) {
             Ok(config) => (config, None),
             Err(error) => {
                 tracing::warn!(%error, "配置文件有错误，设置按缺省值打开");
                 (Config::default(), Some(error.to_string()))
             }
         };
+        if let Some(dir) = path.parent() {
+            config.custom_phrases =
+                qingjian_learning::merged_custom_phrases(dir, &config.custom_phrases);
+        }
         let themes = ThemeLibrary::load(paths::themes_dir().as_deref());
         let logo = Pixmap::decode_png(include_bytes!("../../assets/mengren.png"))
             .map(Arc::new)
