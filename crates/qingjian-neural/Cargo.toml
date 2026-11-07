@@ -30,7 +30,7 @@ serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 # api-24 对应随包的 ONNX Runtime 1.24.4
-ort = { version = "=2.0.0-rc.13", default-features = false, features = ["load-dynamic", "api-24"], optional = true }
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["load-dynamic", "api-24"], optional = true }
 rayon = "1.12"
 
 [dev-dependencies]
