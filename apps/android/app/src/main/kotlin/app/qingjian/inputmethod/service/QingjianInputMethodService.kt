@@ -140,6 +140,11 @@ class QingjianInputMethodService :
         panel?.bar?.showPrivateHint(hint)
     }
 
+    override fun onPrivateDismiss() {
+        runCatching { app.qingjian.inputmethod.core.Native.clipboardSyncPrivateClear() }
+        refreshPrivateHint()
+    }
+
     private fun privateInput() {
         if (shownPreedit.isNotEmpty() || editor != null) { toast(getString(R.string.private_finish_composing)); return }
         app.qingjian.inputmethod.clipboard.sync.PrivateReceive.input(this, currentInputConnection, currentInputEditorInfo?.isPasswordField() == true)

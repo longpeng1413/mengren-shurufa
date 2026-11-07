@@ -851,3 +851,22 @@ Windows 剪贴板使用 `Edge::compact_rect`，约 420×520 逻辑像素，保�
 Android `SettingsWidgets.input` 保留兼容 URI 类型的默认值，增加可选 `textInputType`，只有同步设备名传 `TYPE_CLASS_TEXT`，使系统中文 IME 可以组词提交；密码框仍独立设密码类型。SharedPreferences 保存和 JNI/JSON UTF-8 路径不变。已有配对名字的认证刷新协议未新增，仍是冻结未完成项。
 
 设置程序关于/隐私文案更正启用云服务、同步、短语与更新的联网范围。0.4.1 发布验证后暂停开发，完整原计划对照见 [冻结审计](freeze-041.md)。
+
+
+### 猛人 0.4.2 恢复开发
+
+`CandidateBarView` 的私密提示仅在无候选时呈现中间区域，logo、hide 和清除入口独立；`PrivateGesture` 只约束私密输入授权，保留 DOWN/UP 全程遮挡、多指与取消撤销，不拦截普通候选。`ToolbarOrder` 管理拖动事务，`ToolbarPanel` 处理长按、跨行移动、边缘滚动与取消，✓ 才提交设置。
+
+名称元数据 opening=7 在 `service/metadata` 以 Noise 认证公钥交换，版本 1、名称最多 256 字节、拒绝控制字符；`PeerBook::rename` 仅改已有记录，保存失败恢复内存旧值。定期普通同步成功后检查元数据，LAN 失败尝试中转。旧客户端拒绝模式不会取消配对。
+
+更新下载模块整理为 `download/`，受管摘要文件清理在 `cleanup.rs`；图片暂存由 `ClipboardImports` 集中完成 `use`/`recover`，有 JVM 文件系统故障测试。原子写失败仍清理本次临时文件并保留旧文件。中转 `socket/` 提供解析地址注入点供受控测试两地址族回退，实际连接逻辑和证书校验未放宽。
+
+用户确认的项目与明确移出本轮的两项见 [恢复记录](../plan/resume-042.md)。日志 50M / 10 天变更的私人现场证据不公开。
+
+Windows `cloud_usage` 本机 HTTP 回归服务在回复后先半关闭写方向、再等待客户端 EOF，避免 Windows 直接关闭 socket 丢弃未发送完的数据；不延长超时、不跳过累计用量断言，也不更改产品网络配置。
+
+中转内置 HTTP 健康检查写完响应后半关闭写方向，并最多等待一秒客户端 EOF，避免 Windows 立即关闭连接使客户端在读响应前收到重置。短语 TCP 隔离夹具在协议完成后双向半关闭并等待 EOF，测试仍核对真实 Noise 对账、去重和解绑拒绝；本轮未部署新中转二进制。
+
+`cloud_usage` 夹具将接口与显式代理都固定到同一本机监听地址，兼容绝对 URI 请求，避免系统代理干扰。失败会给出初次联想、释义或重载后联想的阶段及测试日志；不使用真实密钥或服务。
+
+私密发送线程在最终 `PrivateSent` / `PrivateFailed` 事件前释放 Secret 并清除 `private_sending`，使事件接收方立即开始下一次发送时不被旧的忙碌位拒绝。每设备确认和最后结果仍与真实投递对应，不增加排队或重发。

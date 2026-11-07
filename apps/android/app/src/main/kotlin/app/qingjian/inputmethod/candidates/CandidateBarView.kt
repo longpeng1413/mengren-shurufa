@@ -46,6 +46,8 @@ class CandidateBarView(
         /** 工具栏中间那排点了一个工具；调高度在这里自己处理，不会传出去。 */
         fun onToolbar(tool: ToolbarTool)
 
+        fun onPrivateDismiss()
+
         /** 工具栏左端的 logo：进功能面板。 */
         fun openFunctions()
 
@@ -94,6 +96,9 @@ class CandidateBarView(
     private var notice: Pair<String, () -> Unit>? = null
     private var privateHint: Int? = null
     private var composing = false
+    private val privateGesture = PrivateGesture()
+
+    private val privateHintShown: Boolean get() = !composing && strip.isEmpty && privateHint != null
 
     fun showPrivateHint(message: Int?) {
         if (privateHint != message) { privateHint = message; invalidate() }
@@ -200,7 +205,7 @@ class CandidateBarView(
 
     override fun onDraw(canvas: Canvas) = when {
         resizing -> resizeHandle.draw(canvas, width)
-        !composing && privateHint != null -> toolbar.drawNotice(canvas, width, context.getString(privateHint!!))
+        privateHintShown -> toolbar.drawPrivateNotice(canvas, width, context.getString(privateHint!!))
         strip.isEmpty && notice != null -> toolbar.drawNotice(canvas, width, notice!!.first)
         strip.isEmpty -> toolbar.draw(canvas, width)
         else -> {
@@ -212,11 +217,14 @@ class CandidateBarView(
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    override fun onTouchEvent(event: MotionEvent): Boolean = when {
-        privateHint != null && event.flags and 3 != 0 -> false
-        resizing -> resizeHandle.onTouch(event, width)
-        popup.showing -> onPopupTouch(event)
-        else -> gestures.onTouchEvent(event)
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        privateGesture.observe(event.actionMasked == MotionEvent.ACTION_DOWN,
+            event.flags and 3 != 0, event.pointerCount > 1 || event.actionMasked == MotionEvent.ACTION_CANCEL)
+        return when {
+            resizing -> resizeHandle.onTouch(event, width)
+            popup.showing -> onPopupTouch(event)
+            else -> gestures.onTouchEvent(event)
+        }
     }
 
     /** 钉在右端的 ⌄：与候选行同一高度居中，左边一道短竖线隔开。 */
@@ -230,7 +238,15 @@ class CandidateBarView(
     }
 
     private fun tap(x: Float, y: Float) {
-        if (!composing && privateHint != null) { listener.onToolbar(ToolbarTool.PRIVATE_INPUT); return }
+        if (privateHintShown) {
+            when {
+                toolbar.onLogo(x) -> listener.openFunctions()
+                toolbar.onHide(x, width) -> listener.hideKeyboard()
+                toolbar.onPrivateDismiss(x, width) -> listener.onPrivateDismiss()
+                privateGesture.allowed -> listener.onToolbar(ToolbarTool.PRIVATE_INPUT)
+            }
+            return
+        }
         if (expandable && x >= stripWidth) {
             listener.onExpand()
             return
@@ -256,6 +272,7 @@ class CandidateBarView(
             else -> when (val tool = toolbar.toolAt(x, width)) {
                 null -> Unit
                 ToolbarTool.RESIZE -> resizing = true
+                ToolbarTool.PRIVATE_INPUT -> if (privateGesture.allowed) listener.onToolbar(tool)
                 else -> listener.onToolbar(tool)
             }
         }

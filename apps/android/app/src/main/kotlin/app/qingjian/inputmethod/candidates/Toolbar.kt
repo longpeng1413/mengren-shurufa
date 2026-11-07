@@ -50,6 +50,28 @@ class Toolbar(
 
     fun onHide(x: Float, viewWidth: Int) = x > viewWidth - hideSlot
 
+    fun onPrivateDismiss(x: Float, viewWidth: Int) = x >= viewWidth - hideSlot - 40f * density
+
+    /** 保留两端功能入口，私密动作只占中间区域；叉号丢弃本机待用内容。 */
+    fun drawPrivateNotice(canvas: Canvas, viewWidth: Int, message: String) {
+        draw(canvas, viewWidth)
+        val right = viewWidth - hideSlot
+        card.color = palette.surface
+        canvas.drawRect(logoSlot + density, 7f * density, right - density, barHeight - 5f * density, card)
+        noticeText.color = palette.text
+        noticeText.textSize = 12f * density
+        val left = logoSlot + 8f * density
+        val textWidth = (right - 44f * density - left).coerceAtLeast(0f)
+        val shown = TextUtils.ellipsize(message, noticeText, textWidth, TextUtils.TruncateAt.END).toString()
+        val cy = barHeight / 2
+        canvas.drawText(shown, left, cy - (noticeText.descent() + noticeText.ascent()) / 2, noticeText)
+        stroke.color = palette.gloss
+        stroke.strokeWidth = 2f * density
+        val cx = right - 20f * density
+        canvas.drawLine(cx - 5f*density, cy - 5f*density, cx + 5f*density, cy + 5f*density, stroke)
+        canvas.drawLine(cx + 5f*density, cy - 5f*density, cx - 5f*density, cy + 5f*density, stroke)
+    }
+
     /** 中间那排 [x] 处的工具；落在空处（全移除了）为 null。 */
     fun toolAt(x: Float, viewWidth: Int): ToolbarTool? {
         if (tools.isEmpty()) return null

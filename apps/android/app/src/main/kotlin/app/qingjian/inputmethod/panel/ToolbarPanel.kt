@@ -4,6 +4,10 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.RectF
+import android.view.MotionEvent
+import android.view.ViewConfiguration
+import app.qingjian.inputmethod.R
+import app.qingjian.inputmethod.keyboard.Haptics
 import app.qingjian.inputmethod.panel.base.PanelIcons.Icon
 import app.qingjian.inputmethod.panel.base.PanelView
 import app.qingjian.inputmethod.panel.base.Tabs
@@ -32,7 +36,31 @@ class ToolbarPanel(
     private val columns = 5
 
     /** 正在编辑的工具栏，点 ✓ 才存。 */
-    private var placed = saved
+    private val order = ToolbarOrder(saved)
+    private var placed: List<ToolbarTool>
+        get() = order.items
+        set(value) { order.replace(value) }
+    private var dragPointer = -1
+    private var dragX = 0f
+    private var dragY = 0f
+    private val dragSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private val dragScroll = object : Runnable {
+        override fun run() {
+            if (order.dragged == null) return
+            val edge = ink.dp(30f)
+            val delta = when {
+                dragY < card.top + edge -> -ink.dp(5f)
+                dragY > card.bottom - edge -> ink.dp(5f)
+                else -> 0f
+            }
+            val lastOffset = (sectionTitle + rows(placed.size)*cellHeight - card.height()).coerceAtLeast(0f)
+            val next = (scroll.offset + delta).coerceIn(0f, lastOffset)
+            scroll.drag(next - scroll.offset)
+            moveDragged()
+            invalidate()
+            postDelayed(this,16L)
+        }
+    }
 
     private val sectionTitle get() = ink.dp(34f)
     private val cellHeight get() = ink.dp(68f)
@@ -57,7 +85,7 @@ class ToolbarPanel(
         canvas.save()
         canvas.clipRect(card)
         val top = card.top - scroll.offset
-        drawTitle(canvas, "工具栏（按这个顺序排）", top)
+        drawTitle(canvas, context.getString(R.string.toolbar_drag_order), top)
         if (placed.isEmpty()) {
             ink.text(canvas, "中间空着，从下面加", 13f, palette.gloss, card.centerX(), top + sectionTitle + cellHeight / 2)
         }
@@ -67,6 +95,11 @@ class ToolbarPanel(
             drawCell(canvas, tool, i, top + allTop + sectionTitle, if (tool in placed) Badge.PLACED else Badge.ADD)
         }
         canvas.restore()
+        order.dragged?.let { tool ->
+            val rect = RectF(dragX - ink.dp(24f), dragY - ink.dp(24f), dragX + ink.dp(24f), dragY + ink.dp(24f))
+            ink.round(canvas, rect, 12f, palette.surface)
+            ink.icon(canvas, tool.icon, dragX, dragY, 30f, palette.brand)
+        }
     }
 
     private fun drawTitle(canvas: Canvas, title: String, top: Float) {
@@ -99,8 +132,64 @@ class ToolbarPanel(
 
     /** 左上角是 ✓：存下并回到键盘。 */
     override fun onBack() {
+        finishDrag(false)
         actions.closePanel()
         if (placed != saved) actions.setChoice(Settings.KEY_TOOLBAR, ToolbarTool.format(placed))
+    }
+
+    override fun onHold(x: Float, y: Float, rawX: Float) {
+        val index = placedIndex(x,y) ?: return
+        if (!order.begin(index)) return
+        dragX = x; dragY = y
+        Haptics.tap(context)
+        parent?.requestDisallowInterceptTouchEvent(true)
+        removeCallbacks(dragScroll)
+        post(dragScroll)
+        invalidate()
+    }
+
+    private fun placedIndex(x: Float, y: Float): Int? {
+        if (!card.contains(x,y)) return null
+        val contentY = y - card.top + scroll.offset - sectionTitle
+        if (contentY < 0 || contentY >= rows(placed.size)*cellHeight) return null
+        val column = ((x-card.left)/cellWidth()).toInt().coerceIn(0,columns-1)
+        return ((contentY/cellHeight).toInt()*columns+column).takeIf { it in placed.indices }
+    }
+
+    private fun moveDragged() {
+        if (placed.isEmpty() || dragX < card.left-dragSlop || dragX > card.right+dragSlop) return
+        val contentY = (dragY-card.top+scroll.offset-sectionTitle).coerceAtLeast(0f)
+        val column = ((dragX-card.left)/cellWidth()).toInt().coerceIn(0,columns-1)
+        val index = ((contentY/cellHeight).toInt()*columns+column).coerceIn(0,placed.lastIndex)
+        order.move(index)
+    }
+
+    private fun finishDrag(cancelled: Boolean) {
+        removeCallbacks(dragScroll)
+        if (cancelled) order.cancel() else order.finish()
+        dragPointer = -1
+        parent?.requestDisallowInterceptTouchEvent(false)
+        invalidate()
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) dragPointer = event.getPointerId(0)
+        if (order.dragged == null) return super.onTouchEvent(event)
+        val pointer = event.findPointerIndex(dragPointer)
+        if (pointer < 0 || event.pointerCount != 1) { finishDrag(true); return true }
+        dragX = event.getX(pointer); dragY = event.getY(pointer)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> { moveDragged(); invalidate() }
+            MotionEvent.ACTION_UP -> { moveDragged(); finishDrag(false) }
+            MotionEvent.ACTION_CANCEL -> finishDrag(true)
+        }
+        return true
+    }
+
+    override fun onDetachedFromWindow() {
+        finishDrag(true)
+        super.onDetachedFromWindow()
     }
 
     override fun onTap(x: Float, y: Float) {

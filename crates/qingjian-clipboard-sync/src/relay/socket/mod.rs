@@ -1,7 +1,10 @@
 //! 中转 WebSocket 的 TCP/TLS 连接；逐个尝试解析出的 IPv4 与 IPv6 地址。
 
+#[cfg(test)]
+mod tests;
+
 use std::io::{Read, Write};
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -51,6 +54,16 @@ impl Write for Socket {
 }
 
 pub(super) fn open(config: &RelayConfig, route: &str) -> Result<WebSocket<Socket>, SyncError> {
+    open_resolved(config, route, |host, port| {
+        Ok((host, port).to_socket_addrs()?.take(8).collect())
+    })
+}
+
+fn open_resolved(
+    config: &RelayConfig,
+    route: &str,
+    resolve: impl FnOnce(&str, u16) -> std::io::Result<Vec<SocketAddr>>,
+) -> Result<WebSocket<Socket>, SyncError> {
     config.validate()?;
     let endpoint = format!("{}/{}", config.url, route);
     let mut request = endpoint.into_client_request().map_err(|_| invalid())?;
@@ -62,7 +75,7 @@ pub(super) fn open(config: &RelayConfig, route: &str) -> Result<WebSocket<Socket
         .to_owned();
     let secure = uri.scheme_str() == Some("wss");
     let port = uri.port_u16().unwrap_or(if secure { 443 } else { 80 });
-    let addresses: Vec<_> = (host.as_str(), port).to_socket_addrs()?.take(8).collect();
+    let addresses = resolve(&host, port)?;
     request.headers_mut().insert(
         "Authorization",
         HeaderValue::from_str(&format!("Bearer {}", config.token)).map_err(|_| invalid())?,

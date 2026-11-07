@@ -4,6 +4,7 @@ mod device;
 mod expansion;
 mod large;
 mod memory;
+mod metadata;
 mod multidirectional;
 mod phrases;
 mod private;

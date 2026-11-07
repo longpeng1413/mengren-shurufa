@@ -9,6 +9,7 @@ mod event;
 mod hello;
 mod link;
 mod locked;
+mod metadata;
 mod options;
 mod phrases;
 mod private;

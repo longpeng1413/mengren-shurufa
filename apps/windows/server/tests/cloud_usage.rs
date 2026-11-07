@@ -1,7 +1,7 @@
 //! Windows 装配回归：联想与译词补充共享累计用量，重新装配后记录保留。
 
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpListener;
+use std::net::{Shutdown, TcpListener};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -28,21 +28,27 @@ impl Translator for MissingEnglish {
     }
 }
 
-fn wait_for(mut ready: impl FnMut() -> bool) {
+fn wait_for(stage: &str, mut ready: impl FnMut() -> bool) {
     let start = Instant::now();
     while !ready() {
-        assert!(start.elapsed() < Duration::from_secs(3));
+        assert!(start.elapsed() < Duration::from_secs(3), "{stage}");
         std::thread::sleep(Duration::from_millis(5));
     }
 }
 
 #[test]
 fn prediction_gloss_fill_and_reload_keep_one_usage_file() {
+    let _ = tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .with_test_writer()
+        .try_init();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
     let config = PredictConfig {
         enabled: true,
         base_url: format!("http://{}", listener.local_addr().unwrap()),
+        // 本地夹具同时接收代理格式请求，避免本机系统代理介入这项装配测试。
+        proxy: format!("http://{}", listener.local_addr().unwrap()),
         api_key: Some("test-key".into()),
         debounce_ms: 0,
         timeout_ms: 2000,
@@ -52,7 +58,7 @@ fn prediction_gloss_fill_and_reload_keep_one_usage_file() {
         let mut users = Vec::new();
         for _ in 0..3 {
             let start = Instant::now();
-            let mut stream = loop {
+            let stream = loop {
                 match listener.accept() {
                     Ok((stream, _)) => break stream,
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
@@ -99,7 +105,12 @@ fn prediction_gloss_fill_and_reload_keep_one_usage_file() {
                 }}]
             })
             .to_string();
-            write!(stream, "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{response}", response.len()).unwrap();
+            write!(&stream, "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{response}", response.len()).unwrap();
+            // 先完成半关闭并等待客户端读完，避免 Windows 立即 close 丢弃待发送回复。
+            stream.shutdown(Shutdown::Write).unwrap();
+            let mut remaining = Vec::new();
+            reader.read_to_end(&mut remaining).unwrap();
+            assert!(remaining.is_empty());
         }
         users
     });
@@ -117,17 +128,19 @@ fn prediction_gloss_fill_and_reload_keep_one_usage_file() {
     attach_cloud(&mut engine, &config, Some(path.clone()));
     engine.set_input("kaifa");
     assert!(engine.request_prediction(None, &[]).is_some());
-    wait_for(|| engine.poll_prediction().is_some());
+    wait_for("initial prediction", || engine.poll_prediction().is_some());
     let candidate = engine.query().unwrap().candidates.items[0].clone();
     engine.commit(&candidate);
-    wait_for(|| engine.poll_glosses() == 1);
+    wait_for("gloss fill", || engine.poll_glosses() == 1);
     assert_eq!(learned.load(Ordering::Relaxed), 1);
     assert_eq!(ApiUsageStats::load(&path).unwrap().requests, 2);
 
     attach_cloud(&mut engine, &config, Some(path.clone()));
     engine.set_input("kaifa");
     assert!(engine.request_prediction(None, &[]).is_some());
-    wait_for(|| engine.poll_prediction().is_some());
+    wait_for("prediction after reload", || {
+        engine.poll_prediction().is_some()
+    });
     let users = server.join().unwrap();
     assert_eq!(users[0]["letters"], "kaifa");
     assert_eq!(users[1]["words"], json!(["开发"]));

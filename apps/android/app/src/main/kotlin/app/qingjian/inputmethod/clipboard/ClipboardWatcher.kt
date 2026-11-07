@@ -59,8 +59,7 @@ class ClipboardWatcher(private val context: Context) {
         if (uri != null && mime?.startsWith("image/") == true) {
             thread(name = "qingjian-clipboard-image") {
                 val directory = java.io.File(ClipboardStore.userDir(context), "clipboard-import").apply { mkdirs() }
-                val temporary = java.io.File.createTempFile("image-", ".tmp", directory)
-                val stored = try {
+                val stored = ClipboardImports.use(directory) { temporary ->
                     runCatching {
                         context.contentResolver.openInputStream(uri)?.use { input ->
                             temporary.outputStream().use { output ->
@@ -77,7 +76,7 @@ class ClipboardWatcher(private val context: Context) {
                             app.qingjian.inputmethod.core.Native.clipboardAddImageFile(ClipboardStore.userDir(context), temporary.path, ClipboardImageProvider.extensionOf(mime), settings.clipboardLimit)
                         } == true
                     }.getOrDefault(false)
-                } finally { temporary.delete() }
+                }
                 if (!stored) return@thread
                 ClipboardSync.changed()
                 main.post { onChanged?.invoke() }

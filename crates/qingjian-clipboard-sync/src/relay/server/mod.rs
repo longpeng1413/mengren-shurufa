@@ -74,6 +74,10 @@ fn handle(
                         body
                     );
                     let _ = tcp.write_all(response.as_bytes());
+                    let _ = tcp.shutdown(std::net::Shutdown::Write);
+                    // Windows 立即 close 可能重置连接；给读取响应后的客户端一次有界 EOF 等待。
+                    let _ = tcp.set_read_timeout(Some(Duration::from_secs(1)));
+                    let _ = tcp.read(&mut [0u8; 1]);
                     return;
                 }
                 break;

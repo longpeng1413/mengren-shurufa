@@ -1,6 +1,6 @@
 # 青简 Android
 
-本工作区的发行产品为猛人 Android，当前 v0.4.1；应用 ID 为 `com.mengren.shurufa`，Kotlin namespace 和 JNI 名称仍为 `app.qingjian.inputmethod`，不要因品牌名替换源码包路径。猛人改版范围见 [说明](../../docs/design/mengren-public.md)，同步和私密输入见 [使用文档](../../docs/user/help/mengren-relay.md)。本机正式构建入口为 `mengren/build.ps1`，保留既有 APK 签名；下文为共享架构与通用构建参考。
+本工作区的发行产品为猛人 Android，当前 v0.4.2；应用 ID 为 `com.mengren.shurufa`，Kotlin namespace 和 JNI 名称仍为 `app.qingjian.inputmethod`，不要因品牌名替换源码包路径。猛人改版范围见 [说明](../../docs/design/mengren-public.md)，同步和私密输入见 [使用文档](../../docs/user/help/mengren-relay.md)。本机正式构建入口为 `mengren/build.ps1`，保留既有 APK 签名；下文为共享架构与通用构建参考。
 
 Kotlin 的 `InputMethodService` 壳 + Rust 的 `libqingjian_android.so`。Android 的输入法跑在自己的进程里，
 没有 Server / 薄壳之分，Engine 直接装在 `.so` 里，经 JNI 调用。

@@ -452,4 +452,5 @@
     <string name="custom_phrases_count">共 %1$d 条自定义短语，打输入码可直接出</string>
     <string name="custom_phrases_empty">这组还没有自定义短语，点右上角 + 加一条</string>
     <string name="custom_phrases_added">已加入自定义短语「%1$s」</string>
+    <string name="toolbar_drag_order">工具栏（长按拖动排序）</string>
 </resources>

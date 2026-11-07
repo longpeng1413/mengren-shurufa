@@ -1,5 +1,7 @@
 //! 下载前重新获取并验证签名索引，流式写入、校验大小与 SHA256 后才交给安装器。
 
+mod cleanup;
+
 use crate::{Asset, Target, UpdateError};
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
@@ -27,27 +29,7 @@ pub fn download_release(
         return Err(UpdateError::Cancelled);
     }
     std::fs::create_dir_all(cache)?;
-    // 只清理本应用缓存中超过一天的安装包与残片，不涉及用户文件。
-    if let Ok(entries) = std::fs::read_dir(cache) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if let Ok(meta) = entry.metadata()
-                && meta.is_file()
-                && !entry.file_type().is_ok_and(|kind| kind.is_symlink())
-                && matches!(
-                    path.extension().and_then(|extension| extension.to_str()),
-                    Some("apk" | "exe" | "part")
-                )
-                && meta
-                    .modified()
-                    .ok()
-                    .and_then(|time| time.elapsed().ok())
-                    .is_some_and(|age| age > Duration::from_secs(86400))
-            {
-                let _ = std::fs::remove_file(path);
-            }
-        }
-    }
+    cleanup::prune(cache, std::time::SystemTime::now());
     // 目的文件名取摘要，远程文件名、版本号均不参与本机路径拼接。
     let extension = match target.platform {
         "windows" => "exe",

@@ -53,9 +53,14 @@ fn round(a: &Arc<Shared>, b: &Arc<Shared>) -> Result<(), SyncError> {
             crate::channel::read_opening(&mut stream).unwrap(),
             Opening::Phrases
         );
-        respond(stream, &remote)
+        let result = respond(&mut stream, &remote);
+        // 测试服务等客户端消费完最后一帧再关闭，避免 Windows close 的时序干扰断言。
+        let _ = stream.shutdown(std::net::Shutdown::Write);
+        let mut remaining = Vec::new();
+        let _ = stream.read_to_end(&mut remaining);
+        result
     });
-    let stream = TcpStream::connect(address).unwrap();
+    let mut stream = TcpStream::connect(address).unwrap();
     stream
         .set_read_timeout(Some(std::time::Duration::from_secs(3)))
         .unwrap();
@@ -65,7 +70,9 @@ fn round(a: &Arc<Shared>, b: &Arc<Shared>) -> Result<(), SyncError> {
         last_address: None,
         last_seen: None,
     };
-    let result = initiate(stream, a, &peer);
+    let result = initiate(&mut stream, a, &peer);
+    let _ = stream.shutdown(std::net::Shutdown::Write);
+    let _ = stream.read_to_end(&mut Vec::new());
     let remote = server.join().unwrap();
     result.and(remote)
 }

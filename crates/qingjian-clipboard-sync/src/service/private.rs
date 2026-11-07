@@ -94,12 +94,13 @@ pub(super) fn send_once(shared: Arc<Shared>, secret: Secret) -> bool {
                     tasks.into_iter().map(|task| task.join().unwrap_or(0)).sum::<usize>()
                 });
             }
+            drop(secret);
+            shared.private_sending.store(false, Ordering::SeqCst);
             shared.emit(if count == 0 {
                 SyncEvent::PrivateFailed
             } else {
                 SyncEvent::PrivateSent { count }
             });
-            shared.private_sending.store(false, Ordering::SeqCst);
         });
     if spawned.is_err() {
         shared.private_sending.store(false, Ordering::SeqCst);

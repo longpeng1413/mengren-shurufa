@@ -44,6 +44,7 @@ pub enum Opening {
     Capabilities,
     Private,
     Phrases,
+    Metadata,
 }
 
 pub(crate) fn noise_params(with_psk: bool) -> NoiseParams {
@@ -85,6 +86,7 @@ pub(crate) fn connect_mode<S: Read + Write>(
         Opening::Capabilities => 4,
         Opening::Private => 5,
         Opening::Phrases => 6,
+        Opening::Metadata => 7,
         _ => MODE_SYNC,
     }])?;
     let channel = SecureChannel::handshake(stream, identity, None, true)?;
@@ -106,6 +108,7 @@ pub fn read_opening<S: Read>(stream: &mut S) -> Result<Opening, SyncError> {
         4 => Ok(Opening::Capabilities),
         5 => Ok(Opening::Private),
         6 => Ok(Opening::Phrases),
+        7 => Ok(Opening::Metadata),
         other => Err(SyncError::Protocol(format!("unknown mode {other}"))),
     }
 }

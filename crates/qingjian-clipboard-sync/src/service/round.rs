@@ -37,6 +37,7 @@ pub(crate) fn handle_stream<S: std::io::Read + std::io::Write>(
         Opening::Capabilities => super::private::respond(stream, shared, false),
         Opening::Private => super::private::respond(stream, shared, true),
         Opening::Phrases => super::phrases::respond(stream, shared),
+        Opening::Metadata => super::metadata::respond(stream, shared),
         Opening::Info if address.is_some() => scan::answer(&mut stream, shared),
         Opening::Info => Err(SyncError::Handshake),
     })();
@@ -166,6 +167,7 @@ pub(super) fn sync_peer(shared: &Shared, peer: &Peer) {
     }
     shared.record_link(&peer.device_id, result.is_ok());
     if result.is_ok() {
+        super::metadata::sync_peer(shared, peer);
         super::phrases::sync_peer(shared, peer);
     }
     if let Err(error) = result {

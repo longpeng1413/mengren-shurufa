@@ -86,6 +86,27 @@ impl PeerBook {
         Ok(())
     }
 
+    /// 已认证连接更新已有名字；不能添加未知公钥，保存失败恢复内存原值。
+    pub(crate) fn rename(&mut self, public: &[u8; 32], name: &str) -> Result<bool, SyncError> {
+        let id = hex(public);
+        let peer = self
+            .peers
+            .iter_mut()
+            .find(|peer| peer.device_id == id)
+            .ok_or(SyncError::UnknownPeer)?;
+        if peer.name == name {
+            return Ok(false);
+        }
+        let previous = std::mem::replace(&mut peer.name, name.to_owned());
+        if let Err(error) = self.save() {
+            if let Some(peer) = self.peers.iter_mut().find(|peer| peer.device_id == id) {
+                peer.name = previous;
+            }
+            return Err(error);
+        }
+        Ok(true)
+    }
+
     /// 解除配对，之后对方连不进来。
     pub fn remove(&mut self, device_id: &str) -> Result<(), SyncError> {
         self.peers.retain(|peer| peer.device_id != device_id);

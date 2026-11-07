@@ -1,6 +1,6 @@
 # docs
 
-当前 0.4.1 为冻结收尾版；[原计划对照与未完成项](notes/freeze-041.md)、[用户版本状态](user/help/mengren-freeze.md)。发布验证后暂停开发，不自动推进剩余清单。
+0.4.1 冻结已取消，当前 0.4.2；[0.4.1 历史审计](notes/freeze-041.md)、[用户版本状态](user/help/mengren-freeze.md)。当前任务见[恢复开发记录](plan/resume-042.md)，不自动恢复用户已取消的范围。
 
 猛人当前资料入口：[改版范围](design/mengren-public.md)、[当前待办](plan/todo.md#猛人当前进度与待办)、[v0.3.7 私密问题分析](notes/private-transfer-037-review.md)、[同步使用](user/help/mengren-relay.md)、[真机清单](user/help/mengren-testing.md) 和 [内置更新](user/help/mengren-updates.md)。本机私人原设计与开发笔记不列入公开导出。上游路线图和历史工程记录保留原时点，不代表猛人当前验收状态。
 
