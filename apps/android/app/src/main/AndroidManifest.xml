@@ -49,6 +49,7 @@
         <activity android:name=".settings.page.KeyboardSettingsActivity" android:exported="false" />
         <activity android:name=".settings.page.ClipboardSettingsActivity" android:exported="false" />
         <activity android:name=".settings.page.CloudSettingsActivity" android:exported="false" />
+        <activity android:name=".settings.page.FlickSymbolsActivity" android:exported="false" />
         <activity android:name=".settings.page.AppearanceActivity" android:exported="false" />
         <activity android:name=".settings.page.AboutActivity" android:exported="false" />
         <activity android:name=".settings.page.StatsActivity" android:exported="false" />

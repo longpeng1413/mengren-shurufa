@@ -331,6 +331,26 @@ pub struct Theme {
 }
 
 impl Theme {
+    /// 仅覆盖手机候选格的左右留白，布局与点击区域同步生成。
+    pub fn with_strip_padding(&self, padding: f32) -> Self {
+        use file::node::Length;
+        let mut theme = self.clone();
+        let padding = if padding.is_finite() {
+            padding.clamp(2.0, 24.0)
+        } else {
+            8.0
+        };
+        if let Some(cell) = Arc::make_mut(&mut theme.file)
+            .components
+            .get_mut("strip_cell")
+            && let Some(edges) = &mut cell.layout.padding
+        {
+            edges.left = Length::Points(padding);
+            edges.right = Length::Points(padding);
+        }
+        theme
+    }
+
     /// 缺省内置主题，浅色。
     pub fn light() -> Self {
         Self::default_builtin().clone()

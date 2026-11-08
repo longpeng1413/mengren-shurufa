@@ -18,6 +18,7 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_renderStrip<'lo
     scale: jfloat,
     dark: jboolean,
     visible_width: jint,
+    padding: jfloat,
 ) -> jstring {
     if handle == 0 {
         return std::ptr::null_mut();
@@ -29,7 +30,7 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_renderStrip<'lo
     };
     let highlighted = usize::try_from(highlighted).ok();
     let painted = catch_unwind(AssertUnwindSafe(|| {
-        strip.paint(highlighted, scale, dark == JNI_TRUE)
+        strip.paint(highlighted, scale, dark == JNI_TRUE, padding)
     }));
     let meta = match painted {
         Ok(Ok(meta)) => meta,

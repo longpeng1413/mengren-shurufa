@@ -55,6 +55,9 @@ class KeyboardSettingsActivity : PageActivity() {
                 ui.toggle(R.string.flick_symbols_title, R.string.flick_symbols_note, settings.flickSymbols) {
                     prefs.edit().putBoolean(Settings.KEY_FLICK_SYMBOLS, it).apply()
                 },
+                ui.link(R.string.flick_symbols_customize, null) {
+                    startActivity(Intent(this, FlickSymbolsActivity::class.java))
+                },
                 ui.toggle(R.string.long_press_upper_title, R.string.long_press_upper_note, settings.longPressUpper) {
                     prefs.edit().putBoolean(Settings.KEY_LONG_PRESS_UPPER, it).apply()
                 },

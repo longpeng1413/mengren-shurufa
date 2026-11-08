@@ -26,8 +26,17 @@ class AppearanceActivity : PageActivity() {
     override fun content(): List<View> {
         val settings = Settings.load(this)
         val dark = settings.appearance.dark(this)
+        val livePreview = FrameLayout(this).apply { addView(preview(settings, dark)) }
         return listOf(
-            spaced(preview(settings, dark), 20),
+            spaced(livePreview, 20),
+            ui.group(null,
+                ui.slider(R.string.candidate_spacing, R.string.candidate_spacing_note, 2, 24, settings.candidatePadding, 1, { "$it dp" }) { value ->
+                    prefs.edit().putInt("candidate_padding", value).apply()
+                    livePreview.removeAllViews()
+                    livePreview.addView(preview(settings.copy(candidatePadding = value), dark))
+                },
+                ui.action(R.string.candidate_spacing_reset, null) { prefs.edit().remove("candidate_padding").apply(); rebuild() },
+            ),
             ui.group(
                 null,
                 ui.segmentedRow(R.string.section_appearance, Appearance.entries.map { getString(it.label) }, settings.appearance.ordinal) {
@@ -53,7 +62,7 @@ class AppearanceActivity : PageActivity() {
     /** 当前主题、外观与字号下的候选条和键盘，候选条按实际大小画。 */
     private fun preview(settings: Settings, dark: Boolean): View {
         val density = resources.displayMetrics.density
-        val strip = Themes.preview(settings.theme, dark, density, settings.textSize.scale)
+        val strip = Themes.preview(settings.theme, dark, density, settings.textSize.scale, settings.candidatePadding)
         return framed(ThemePreview(this, strip, Palette.of(settings.theme, dark), aspect = 0.42f, keyRadiusDp = 6f), selected = false)
     }
 

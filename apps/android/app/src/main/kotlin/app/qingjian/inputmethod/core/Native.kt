@@ -94,7 +94,7 @@ internal object Native {
     external fun reset(handle: Long)
 
     /** 画最新一帧的候选条，返回尺寸与可点区域的 JSON；[highlighted] 为负不高亮，[visibleWidth] 以内的候选记成看到过（生词本次数）。画不出来返回 null。 */
-    external fun renderStrip(handle: Long, highlighted: Int, scale: Float, dark: Boolean, visibleWidth: Int): String?
+    external fun renderStrip(handle: Long, highlighted: Int, scale: Float, dark: Boolean, visibleWidth: Int, padding: Float): String?
 
     /** 候选条换主题（内置主题 id）与字号档（[textScale] 是候选字与译文一起的倍数）。 */
     external fun setAppearance(handle: Long, theme: String, textScale: Float)
@@ -106,7 +106,7 @@ internal object Native {
     external fun keyboardPalette(theme: String, dark: Boolean): String?
 
     /** 主题预览：前 8 字节是宽、高（大端），后面是预乘 RGBA；画不出为 null。渲染器不能跨线程，固定在一条线程上调。 */
-    external fun themePreview(theme: String, dark: Boolean, scale: Float, textScale: Float): ByteArray?
+    external fun themePreview(theme: String, dark: Boolean, scale: Float, textScale: Float, padding: Float): ByteArray?
 
     /** 把上次 [renderStrip] 的像素（预乘 RGBA）拷进直接缓冲区；缓冲区不够大返回 false。 */
     external fun copyStrip(handle: Long, buffer: java.nio.ByteBuffer): Boolean

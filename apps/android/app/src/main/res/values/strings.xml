@@ -458,4 +458,16 @@
     <string name="custom_phrases_empty">这组还没有自定义短语，点右上角 + 加一条</string>
     <string name="custom_phrases_added">已加入自定义短语「%1$s」</string>
     <string name="toolbar_drag_order">工具栏（长按拖动排序）</string>
+    <string name="candidate_spacing">候选词间距</string>
+    <string name="candidate_spacing_note">调整每个候选词左右的留白（2–24 dp），上方实时预览；默认 8 dp，数字越小越紧凑。</string>
+    <string name="candidate_spacing_reset">恢复默认间距</string>
+    <string name="flick_symbols_customize">自定义上滑符号</string>
+    <string name="flick_symbols_customize_note">按字母分别设置，应用于全键盘、英文和双拼的字母键。留空恢复默认；九宫格数字和微软双拼 Shift 手势保持原样。</string>
+    <string name="flick_symbol_edit">编辑按键</string>
+    <string name="flick_symbol_default">默认 %1$s</string>
+    <string name="flick_symbol_title">%1$s 键上滑符号</string>
+    <string name="flick_symbol_edit_note">输入符号、数字或短组合（最多 8 个字符）；留空恢复默认。键面角标和长按符号同时更新。</string>
+    <string name="flick_symbol_invalid">最多 8 个字符，不能包含空格或控制字符</string>
+    <string name="flick_symbols_reset">恢复全部默认符号</string>
+    <string name="flick_symbols_reset_note">清除自定义符号，恢复各语言原有的角标。</string>
 </resources>

@@ -1,5 +1,6 @@
 package app.qingjian.inputmethod.core
 
+import app.qingjian.inputmethod.settings.Settings
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Handler
@@ -211,7 +212,7 @@ class Engine(context: Context, private val onReady: () -> Unit) {
      */
     fun renderStrip(highlighted: Int, dark: Boolean, visibleWidth: Int): StripImage? {
         if (!ready) return null
-        val meta = Native.renderStrip(handle, highlighted, density, dark, visibleWidth)?.let(::JSONObject) ?: return null
+        val meta = Native.renderStrip(handle, highlighted, density, dark, visibleWidth, Settings.preferences(app).getInt("candidate_padding", 8).coerceIn(2,24).toFloat())?.let(::JSONObject) ?: return null
         val width = meta.getInt("width")
         val height = meta.getInt("height")
         if (width <= 0 || height <= 0) return null

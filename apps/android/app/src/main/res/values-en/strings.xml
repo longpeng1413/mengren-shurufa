@@ -82,4 +82,16 @@
     <string name="custom_phrases_empty">No custom phrases in this group; tap + to add</string>
     <string name="custom_phrases_added">Added to custom phrases: %1$s</string>
     <string name="toolbar_drag_order">Toolbar (hold and drag to reorder)</string>
+    <string name="candidate_spacing">Candidate spacing</string>
+    <string name="candidate_spacing_note">Adjust padding on each side (2–24 dp). Preview updates above. Default: 8 dp; smaller values are more compact.</string>
+    <string name="candidate_spacing_reset">Reset candidate spacing</string>
+    <string name="flick_symbols_customize">Customize swipe-up symbols</string>
+    <string name="flick_symbols_customize_note">Configure each letter for full, English and double-pinyin keyboards. Leave blank for language defaults. Nine-key digits and Microsoft double-pinyin Shift gestures stay unchanged.</string>
+    <string name="flick_symbol_edit">Edit key</string>
+    <string name="flick_symbol_default">Default %1$s</string>
+    <string name="flick_symbol_title">Swipe-up symbol for %1$s</string>
+    <string name="flick_symbol_edit_note">Enter a symbol, digit or short sequence (up to 8 characters). Leave blank to restore defaults. Key hints and long-press symbols update together.</string>
+    <string name="flick_symbol_invalid">Use up to 8 characters without whitespace or control characters</string>
+    <string name="flick_symbols_reset">Reset all swipe-up symbols</string>
+    <string name="flick_symbols_reset_note">Remove custom symbols and restore the original hints for each language.</string>
 </resources>

@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import app.qingjian.inputmethod.core.InputOptions
 import app.qingjian.inputmethod.core.store.SettingChoices
 import app.qingjian.inputmethod.keyboard.HapticStrength
+import app.qingjian.inputmethod.keyboard.layout.FlickSymbols
 import app.qingjian.inputmethod.theme.Appearance
 import app.qingjian.inputmethod.theme.TextSize
 
@@ -36,6 +37,7 @@ data class Settings(
     val swipeInput: Boolean,
     /** 在键上往上一划上屏键上角标的数字或符号（缺省开），不用长按出气泡。 */
     val flickSymbols: Boolean,
+    val flickSymbolOverrides: Map<Char, String>,
     /** 长按字母键不滑直接抬手出大写（缺省关，出角标符号）；气泡照样弹，滑着选不受影响。 */
     val longPressUpper: Boolean,
     /** 按住空格左右滑逐字挪光标（缺省开）；关了空格上横滑不响应。 */
@@ -71,6 +73,7 @@ data class Settings(
     val appearance: Appearance,
     /** 候选字号档。 */
     val textSize: TextSize,
+    val candidatePadding: Int,
     /** 工具栏中间那排放的工具，按勾的先后排（#777）。 */
     val toolbar: List<ToolbarTool>,
 ) {
@@ -170,6 +173,9 @@ data class Settings(
                 keepChinese = prefs.getBoolean(KEY_KEEP_CHINESE, true),
                 voiceHoldSpace = prefs.getBoolean(KEY_VOICE_HOLD_SPACE, true),
                 swipeInput = prefs.getBoolean(KEY_SWIPE_INPUT, false),
+                flickSymbolOverrides = FlickSymbols.LETTERS.mapNotNull { char ->
+                    prefs.getString("${FlickSymbols.PREFIX}$char", null)?.takeIf(FlickSymbols::valid)?.let { char to it }
+                }.toMap(),
                 flickSymbols = prefs.getBoolean(KEY_FLICK_SYMBOLS, true),
                 longPressUpper = prefs.getBoolean(KEY_LONG_PRESS_UPPER, false),
                 spaceCursor = prefs.getBoolean(KEY_SPACE_CURSOR, true),
@@ -206,6 +212,7 @@ data class Settings(
                 theme = prefs.getString(KEY_THEME, null) ?: DEFAULT_THEME,
                 appearance = Appearance.of(prefs.getString(KEY_APPEARANCE, null)),
                 textSize = TextSize.of(prefs.getString(KEY_TEXT_SIZE, null)),
+                candidatePadding = prefs.getInt("candidate_padding", 8).coerceIn(2,24),
                 toolbar = ToolbarTool.parse(prefs.getString(KEY_TOOLBAR, null)),
             )
         }

@@ -94,12 +94,14 @@ impl StripPainter {
         highlighted: Option<usize>,
         scale: f32,
         dark: bool,
+        padding: f32,
     ) -> Result<StripMeta, AndroidError> {
         self.content.highlighted = highlighted.filter(|&i| i < self.content.rows.len());
         let theme = if dark { &self.dark } else { &self.light };
+        let theme = theme.with_strip_padding(padding);
         let rendered = self
             .renderer
-            .render(&self.content, Layout::Strip, theme, scale)?;
+            .render(&self.content, Layout::Strip, &theme, scale)?;
         let offset = (rendered.content_x, rendered.content_y);
         let background = theme.variable("surface").map_or(0, appearance::argb);
         let meta = StripMeta {

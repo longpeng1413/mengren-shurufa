@@ -77,3 +77,54 @@ fn without_pinyin_the_candidates_start_at_the_top() {
         .unwrap();
     assert_eq!(rendered.candidates_top(), 0);
 }
+
+#[test]
+fn adjustable_padding_changes_width_and_hits_without_changing_height() {
+    let mut renderer = renderer().expect("system fonts required for spacing verification");
+    let frame = scenes::nihao();
+    for theme in Theme::builtins() {
+        for dark in [false, true] {
+            let base = theme.with_dark(dark).with_animations(false);
+            let compact = renderer
+                .render(&frame, Layout::Strip, &base.with_strip_padding(2.0), 2.0)
+                .unwrap();
+            let roomy = renderer
+                .render(&frame, Layout::Strip, &base.with_strip_padding(24.0), 2.0)
+                .unwrap();
+            assert!(
+                compact.pixmap.width() < roomy.pixmap.width(),
+                "{}",
+                theme.id()
+            );
+            assert_eq!(compact.pixmap.height(), roomy.pixmap.height());
+            assert_eq!(compact.candidates_top(), roomy.candidates_top());
+            for i in 0..frame.rows.len() {
+                let a = compact
+                    .hits
+                    .iter()
+                    .find(|h| h.target == HitTarget::Candidate(i))
+                    .unwrap();
+                let b = roomy
+                    .hits
+                    .iter()
+                    .find(|h| h.target == HitTarget::Candidate(i))
+                    .unwrap();
+                assert!(a.width < b.width);
+                assert_eq!(a.height, b.height);
+                assert!(a.x + a.width <= compact.pixmap.width() as f32);
+            }
+            let invalid = renderer
+                .render(
+                    &frame,
+                    Layout::Strip,
+                    &base.with_strip_padding(f32::NAN),
+                    2.0,
+                )
+                .unwrap();
+            let default = renderer
+                .render(&frame, Layout::Strip, &base.with_strip_padding(8.0), 2.0)
+                .unwrap();
+            assert_eq!(invalid.pixmap.width(), default.pixmap.width());
+        }
+    }
+}

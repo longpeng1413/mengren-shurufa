@@ -1,6 +1,6 @@
 # 猛人输入法
 
-**已按用户要求恢复开发，当前版本 0.4.3。** [下载与更新](https://github.com/longpeng1413/mengren-shurufa/releases/latest) · [当前版本与验收范围](docs/user/help/mengren-freeze.md)。
+**已按用户要求恢复开发，当前版本 0.4.4。** [下载与更新](https://github.com/longpeng1413/mengren-shurufa/releases/latest) · [当前版本与验收范围](docs/user/help/mengren-freeze.md)。
 
 使用跨网络剪贴板与私密发送，请阅读[客户端配置](docs/user/help/mengren-relay.md)和[自建中转部署](mengren/relay/README.md)。
 
@@ -102,4 +102,4 @@ macOS 与 Windows 版本仍处于测试阶段。安装后先选中青简，在�
   </a>
 </p>
 
-本轮变更与验收范围见[0.4.3 计划](docs/plan/resume-043.md)。
+本轮变更与验收范围见[0.4.4 计划](docs/plan/resume-044.md)。

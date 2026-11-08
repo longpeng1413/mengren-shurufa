@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
+import app.qingjian.inputmethod.keyboard.layout.FlickSymbols
 import app.qingjian.inputmethod.keyboard.layout.Key
 import app.qingjian.inputmethod.keyboard.layout.KeySlot
 import app.qingjian.inputmethod.keyboard.layout.KeyboardMetrics
@@ -192,7 +193,7 @@ class KeyboardView(
     }
 
     fun setRows(rows: List<List<Key>>, side: Boolean = false) {
-        this.rows = rows
+        this.rows = FlickSymbols.apply(rows, settings.flickSymbolOverrides)
         this.side.enabled = side
         pressed.clear()
         relayout()
