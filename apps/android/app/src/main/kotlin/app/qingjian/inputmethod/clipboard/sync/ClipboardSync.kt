@@ -159,7 +159,7 @@ object ClipboardSync {
         main.post {
             runCatching {
                 context.getSystemService(ClipboardManager::class.java)
-                    ?.setPrimaryClip(ClipData.newPlainText("Qingjian", text))
+                    ?.setPrimaryClip(ClipData.newPlainText(context.getString(app.qingjian.inputmethod.R.string.app_name), text))
             }
         }
     }

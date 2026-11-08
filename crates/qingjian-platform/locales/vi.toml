@@ -26,7 +26,7 @@ light = "Sáng"
 dark = "Tối"
 
 [renderer]
-qingjian = "Trình vẽ Qingjian"
+qingjian = "Trình vẽ tích hợp"
 system = "Hệ thống vẽ"
 
 [key_hint]
@@ -94,7 +94,7 @@ is_config = "Đây là tệp cấu hình, không phải tệp cụm từ; cài �
 no_tab = "Chữ và mã gõ phải cách nhau bằng một Tab"
 skipped_entry = "mục {entry}: {reason}"
 skipped_line = "dòng {line} (“{text}”): {reason}"
-unreadable = "Không đọc được tệp này: đây không phải tệp cụm từ do Qingjian xuất, cũng không phải văn bản mỗi dòng một mục “chữ<Tab>mã gõ”"
+unreadable = "Không đọc được tệp này: đây không phải tệp cụm từ do Mengren xuất, cũng không phải văn bản mỗi dòng một mục “chữ<Tab>mã gõ”"
 
 [settings_file]
 invalid = "Cài đặt trong tệp này có lỗi: {error}"

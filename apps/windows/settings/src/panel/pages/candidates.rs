@@ -2,7 +2,10 @@
 
 use qingjian_platform::{Appearance, CandidateRenderer, FontSize, LayoutMode, PreeditMode};
 use qingjian_render::ThemeLibrary;
-use windows_reactor::*;
+use windows_reactor::{
+    AutoSuggestBox, Button, Callback, ChildrenControl, ComboBox, ContentControl, LayoutControl,
+    NumberBox, StackPanel, ToggleSwitch, View, ViewContext,
+};
 
 use crate::panel::controls::{field, mode_combo, page};
 use crate::panel::{Message, Settings};
@@ -43,7 +46,7 @@ pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> 
         ),
         field(
             "主题",
-            "只对青简渲染器生效；樱花只有浅色，其余主题按上面的外观切换浅色与深色。",
+            "只对猛人输入法渲染器生效；樱花只有浅色，其余主题按上面的外观切换浅色与深色。",
             ComboBox::new()
                 .items_source(themes.themes().iter().map(|theme| theme.name().to_owned()))
                 .selected_index(
@@ -75,7 +78,7 @@ pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> 
         ),
         field(
             "渲染引擎",
-            "青简渲染器让候选窗口在各平台一致。",
+            "猛人输入法渲染器让候选窗口在各平台一致。",
             mode_combo(
                 &CandidateRenderer::ALL,
                 g.renderer,
@@ -85,7 +88,7 @@ pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> 
         ),
         field(
             "字体",
-            "只对青简渲染器生效；留空用系统字体，没装的字体自动回到系统字体。",
+            "只对猛人输入法渲染器生效；留空用系统字体，没装的字体自动回到系统字体。",
             AutoSuggestBox::new()
                 .width(260.0)
                 .text(font_text)
@@ -96,7 +99,7 @@ pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> 
         ),
         field(
             "候选字号",
-            "单位是点，清空或填 0 回到主题的字号；行高跟着缩放。只对青简渲染器生效。",
+            "单位是点，清空或填 0 回到主题的字号；行高跟着缩放。只对猛人输入法渲染器生效。",
             size_box(
                 g.candidate_font_size,
                 theme.theme_size("candidate"),
@@ -105,7 +108,7 @@ pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> 
         ),
         field(
             "译文字号",
-            "单位是点，清空或填 0 回到主题的字号。只对青简渲染器生效。",
+            "单位是点，清空或填 0 回到主题的字号。只对猛人输入法渲染器生效。",
             size_box(
                 g.annotation_font_size,
                 theme.theme_size("annotation"),
@@ -138,7 +141,7 @@ pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> 
         ),
         field(
             "悬浮状态条",
-            "桌面上常驻、可拖动的小条：点「中 / 英」切换模式（开着双拼时还显示方案名），点「，。」切全角 / 半角标点，点齿轮打开设置。只在当前输入法是青简时显示，拖到哪下次还在哪。",
+            "桌面上常驻、可拖动的小条：点「中 / 英」切换模式（开着双拼时还显示方案名），点「，。」切全角 / 半角标点，点齿轮打开设置。只在当前输入法是猛人输入法时显示，拖到哪下次还在哪。",
             ToggleSwitch::new()
                 .is_on(settings.config.status_bar.enabled)
                 .on_toggled(context.callback(Message::StatusBar)),

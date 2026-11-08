@@ -190,7 +190,7 @@ fn spawn(program: &str, args: &[&str]) -> Result<(), String> {
         })
 }
 
-/// 日志目录里的文件加配置文件与系统信息（[`system_info::report`]）打成桌面上的 `qingjian-logs-<日期>.zip`（不带目录层级）。
+/// 日志目录里的文件加配置文件与系统信息（[`system_info::report`]）打成桌面上的 `mengren-shurufa-logs-<日期>.zip`（不带目录层级）。
 /// 配置文件里可能写着云服务密钥，打包的是抹掉密钥的副本。
 fn export_logs(config: &Path) -> Result<PathBuf, String> {
     let dir = paths::log_dir().ok_or(tr("action.no_log_dir"))?;
@@ -217,7 +217,7 @@ fn export_logs(config: &Path) -> Result<PathBuf, String> {
         files.push(system);
     }
     let desktop = desktop().ok_or(tr("action.no_desktop"))?;
-    let zip = desktop.join(format!("qingjian-logs-{}.zip", today()));
+    let zip = desktop.join(format!("mengren-shurufa-logs-{}.zip", today()));
     let _ = std::fs::remove_file(&zip);
     // Windows 10 起自带 bsdtar，`-a` 按扩展名出 zip；macOS 与 Linux 用 zip
     let status = if cfg!(windows) {

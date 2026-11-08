@@ -26,7 +26,7 @@ light = "Light"
 dark = "Dark"
 
 [renderer]
-qingjian = "Qingjian renderer"
+qingjian = "Built-in renderer"
 system = "System drawing"
 
 [key_hint]
@@ -94,7 +94,7 @@ is_config = "This is a configuration file, not a phrase file; import settings on
 no_tab = "The text and the code must be separated by a Tab"
 skipped_entry = "entry {entry}: {reason}"
 skipped_line = "line {line} (“{text}”): {reason}"
-unreadable = "Can't read this file: it's neither a phrase file exported by Qingjian nor text with one “text<Tab>code” entry per line"
+unreadable = "Can't read this file: it's neither a phrase file exported by Mengren nor text with one “text<Tab>code” entry per line"
 
 [settings_file]
 invalid = "The settings in this file have errors: {error}"

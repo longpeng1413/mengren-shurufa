@@ -32,7 +32,13 @@ fn main() {
 fn embed_icon() {
     const ICON: &str = "../tsf/resources/qingjian.ico";
     println!("cargo:rerun-if-changed={ICON}");
-    if let Err(error) = winresource::WindowsResource::new().set_icon(ICON).compile() {
+    if let Err(error) = winresource::WindowsResource::new()
+        .set("ProductName", "猛人输入法")
+        .set("FileDescription", "猛人输入法服务")
+        .set("CompanyName", "猛人")
+        .set_icon(ICON)
+        .compile()
+    {
         println!("cargo:warning=嵌入 Server 图标失败: {error}");
     }
 }

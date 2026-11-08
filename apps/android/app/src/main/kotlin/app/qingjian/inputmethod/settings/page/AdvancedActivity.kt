@@ -50,7 +50,7 @@ class AdvancedActivity : PageActivity() {
     )
 
     private fun pickTarget(request: Int = CREATE_ZIP) {
-        val name = if (request == PACK_LOGS) "qingjian-logs" else "qingjian-data"
+        val name = if (request == PACK_LOGS) "mengren-shurufa-logs" else "mengren-shurufa-data"
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
             .addCategory(Intent.CATEGORY_OPENABLE)
             .setType("application/zip")
@@ -95,8 +95,8 @@ class AdvancedActivity : PageActivity() {
     }
 
     private fun shareLogs() {
-        thread(name = "qingjian-logs") {
-            val file = runCatching { LogPack.forSharing(this, "qingjian-logs-${LocalDate.now()}.zip") }
+        thread(name = "mengren-shurufa-logs") {
+            val file = runCatching { LogPack.forSharing(this, "mengren-shurufa-logs-${LocalDate.now()}.zip") }
                 .onFailure { AppLog.error("log export failed: ${android.util.Log.getStackTraceString(it)}") }
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
@@ -119,7 +119,7 @@ class AdvancedActivity : PageActivity() {
     }
 
     private fun packLogs(target: Uri) {
-        thread(name = "qingjian-logs") {
+        thread(name = "mengren-shurufa-logs") {
             val message = runCatching { LogPack.save(this, target) }.fold(
                 { if (it == 0) getString(R.string.logs_export_empty) else getString(R.string.logs_export_done, it) },
                 {

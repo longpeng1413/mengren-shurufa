@@ -15,7 +15,7 @@ use crate::view::Page;
 use crate::view::parts::actions::with_notice;
 
 /// 随包领域词库名字的统一前缀。
-const DOMAIN_PREFIX: &str = "青简领域词库：";
+const DOMAIN_PREFIX: &str = "猛人输入法领域词库：";
 
 /// 一本用户导入的词库或一套码表：`toggle` 给了就是勾选开关（是否开着、点了发什么），没给只写名字（码表在下拉框里选）；
 /// 后面是条数与许可证，`removable` 的带「移除」。给了 `info` 的名字后面跟 ⓘ（链到文档），这一行也能搜到。

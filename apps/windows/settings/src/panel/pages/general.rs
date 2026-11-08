@@ -224,14 +224,14 @@ pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> 
         ),
         field(
             "启用内置英文模式",
-            "关掉后青简固定中文模式：切换键与任务栏、悬浮状态条上的「中」「英」按钮都不再切到英文，需要英文时用系统快捷键（Win + Space）切到别的输入法。",
+            "关掉后猛人输入法固定中文模式：切换键与任务栏、悬浮状态条上的「中」「英」按钮都不再切到英文，需要英文时用系统快捷键（Win + Space）切到别的输入法。",
             ToggleSwitch::new()
                 .is_on(g.english_mode)
                 .on_toggled(context.callback(Message::EnglishMode)),
         ),
         field(
             "默认英文模式",
-            "青简启动时使用英文；按应用记忆时，没有记录的应用也从英文开始。更改这两项会重置已记住的状态。",
+            "猛人输入法启动时使用英文；按应用记忆时，没有记录的应用也从英文开始。更改这两项会重置已记住的状态。",
             ToggleSwitch::new()
                 .is_on(g.default_english)
                 .is_enabled(g.english_mode)
@@ -239,7 +239,7 @@ pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> 
         ),
         field(
             "按应用记住中英模式",
-            "切回应用时恢复它上次的中英状态，同一应用的窗口共用。重启青简后重新使用默认模式；关掉则所有应用共用一份。",
+            "切回应用时恢复它上次的中英状态，同一应用的窗口共用。重启猛人输入法后重新使用默认模式；关掉则所有应用共用一份。",
             ToggleSwitch::new()
                 .is_on(g.remember_mode_per_app)
                 .is_enabled(g.english_mode)

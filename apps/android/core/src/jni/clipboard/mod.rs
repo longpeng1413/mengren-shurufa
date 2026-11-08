@@ -2,6 +2,7 @@
 //! 拆词与重挂常用语要用引擎，带句柄。
 
 mod sync;
+mod verification;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;

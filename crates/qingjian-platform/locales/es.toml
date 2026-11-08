@@ -26,7 +26,7 @@ light = "Claro"
 dark = "Oscuro"
 
 [renderer]
-qingjian = "Renderizador de Qingjian"
+qingjian = "Renderizador integrado"
 system = "Dibujo del sistema"
 
 [key_hint]
@@ -94,7 +94,7 @@ is_config = "Es un archivo de configuración, no de frases; los ajustes se impor
 no_tab = "El texto y el código deben ir separados por un tabulador"
 skipped_entry = "entrada {entry}: {reason}"
 skipped_line = "línea {line} («{text}»): {reason}"
-unreadable = "No se puede leer este archivo: no es un archivo de frases exportado por Qingjian ni un texto con una entrada «texto<Tab>código» por línea"
+unreadable = "No se puede leer este archivo: no es un archivo de frases exportado por Mengren ni un texto con una entrada «texto<Tab>código» por línea"
 
 [settings_file]
 invalid = "Los ajustes de este archivo tienen errores: {error}"

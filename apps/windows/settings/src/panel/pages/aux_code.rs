@@ -6,7 +6,10 @@ use std::path::PathBuf;
 use qingjian_core::is_valid_aux_code_key;
 use qingjian_dictionary::{DictionaryError, aux_code_table_info, import_aux_code_table};
 use qingjian_platform::code_tables;
-use windows_reactor::*;
+use windows_reactor::{
+    Button, ChildrenControl, ContentControl, FontWeight, KeyedView, LayoutControl, Orientation,
+    PasswordBox, PasswordRevealMode, StackPanel, TextBlock, ToggleSwitch, View, ViewContext,
+};
 
 use crate::panel::controls::{check_row, entry_title, feedback, field, note, page, repo_resource};
 use crate::panel::recorder::Recorder;
@@ -162,7 +165,7 @@ pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> 
                     .on_click(context.message(Message::ImportCodeTable))
                     .content("导入码表…"),
                 note(
-                    "接受 Rime 的 .dict.yaml（要有词、码两列）与现成的 .qj。码表由你自己取得，青简不随包分发第三方形码表。",
+                    "接受 Rime 的 .dict.yaml（要有词、码两列）与现成的 .qj。码表由你自己取得，猛人输入法不随包分发第三方形码表。",
                 ),
             )),
         note(

@@ -2,7 +2,10 @@
 
 use qingjian_platform::UpdateChannel;
 use qingjian_update::Checker;
-use windows_reactor::*;
+use windows_reactor::{
+    Button, ChildrenControl, ComboBox, ContentControl, FontWeight, KeyedView, Orientation,
+    StackPanel, TextBlock, ToggleSwitch, View, ViewContext,
+};
 
 use crate::panel::controls::{field, note, page};
 use crate::panel::{Message, Settings};
@@ -12,7 +15,8 @@ pub(crate) const VERSION: &str = env!("QINGJIAN_VERSION");
 
 pub(crate) const WEBSITE_URL: &str = "https://qingjian.app";
 
-pub(crate) const REPOSITORY_URL: &str = "https://github.com/qingjian-team";
+pub(crate) const REPOSITORY_URL: &str = "https://github.com/longpeng1413/mengren-shurufa";
+pub(crate) const UPSTREAM_REPOSITORY_URL: &str = "https://github.com/qingjian-team/qingjian";
 
 /// 与仓库根 `LICENSE` 一致。
 const LICENSE_NOTE: &str = "自由软件，GPL-3.0-or-later 许可证：可以自由使用、修改与再分发，修改后分发须同样开源。官方渠道免费。";
@@ -47,7 +51,7 @@ const ATTRIBUTIONS: &[(&str, &str)] = &[
     ),
 ];
 
-const PRIVACY_NOTE: &str = "青简不上传任何数据。开着「自动检查更新」时每天向官网读一次版本列表，请求不带任何标识，上面可以关。开着云联想时，光标附近的文字与拼音会发给你在「云服务」页填的 AI 服务商（缺省 DeepSeek）的服务器，不经过作者。「高级」页的输入日志只写在本机，可以关掉或清空。";
+const PRIVACY_NOTE: &str = "基础输入与本地学习在设备上处理。开启云服务、有道或语音时，本次请求发送给所选服务商；开启设备同步时，普通剪贴板和自定义短语会经加密通道发送到已配对设备，可使用自有中转。私密接收内容不写系统剪贴板或普通历史。检查更新只请求猛人 GitHub 的版本与安装包。输入日志可在「高级」页关闭或清空；完整边界见项目隐私说明。";
 
 const FEEDBACK_NOTE: &str = "遇到问题点「打包日志到桌面」，把生成的 zip 发给作者即可（含三个进程的日志与配置文件，不含密钥）。缺省日志不含你敲的内容；排查排序问题时作者可能请你在「高级」页临时打开详细日志。";
 
@@ -90,10 +94,11 @@ pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> 
     }
     let body = StackPanel::new().spacing(12.0).children([
         TextBlock::new()
-            .text(format!("青简 Windows {VERSION}"))
+            .text(format!("猛人输入法 Windows {VERSION}"))
             .font_size(16.0)
             .font_weight(FontWeight::SEMI_BOLD)
             .into(),
+        note("基于青简输入法改版的猛人输入法"),
         // QINGJIAN_BUILD 由 build.rs 从 git 取
         note(&format!(
             "构建 {}",
@@ -105,10 +110,13 @@ pub(crate) fn view(settings: &Settings, context: &mut ViewContext<Settings>) -> 
             .children((
                 Button::new()
                     .on_click(context.message(Message::OpenWebsite))
-                    .content("官网"),
+                    .content("青简官网"),
+                Button::new()
+                    .on_click(context.message(Message::OpenUpstreamRepository))
+                    .content("青简 GitHub"),
                 Button::new()
                     .on_click(context.message(Message::OpenRepository))
-                    .content("GitHub"),
+                    .content("猛人 GitHub"),
                 Button::new()
                     .on_click(context.message(Message::OpenDataDir))
                     .content("打开数据目录"),

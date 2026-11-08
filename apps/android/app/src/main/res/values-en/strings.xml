@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="clipboard_code_fill">Code %1$s · Tap to fill</string>
+    <string name="clipboard_code_masked">Code copied · Tap to fill</string>
+    <string name="clipboard_sensitive_fill">Private content copied · Tap to fill</string>
+    <string name="clipboard_suggestion_changed">Clipboard changed. Review the new suggestion before filling.</string>
+    <string name="clipboard_suggestion_blocked">Close windows covering the keyboard, then tap to fill.</string>
     <string name="update_section">Software updates</string>
     <string name="update_auto">Automatically check for updates</string>
     <string name="update_auto_note">Check official Mengren releases daily without sending typed text or account data.</string>

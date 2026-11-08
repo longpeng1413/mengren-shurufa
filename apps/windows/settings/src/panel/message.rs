@@ -142,4 +142,5 @@ pub(crate) enum Message {
     UpdateChecked(Option<Result<qingjian_update::UpdateState, String>>),
     OpenDownload,
     OpenRepository,
+    OpenUpstreamRepository,
 }

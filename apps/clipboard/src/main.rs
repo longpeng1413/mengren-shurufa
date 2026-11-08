@@ -168,7 +168,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             forced_dark,
             acrylic,
         ),
-        WindowOptions::new("Qingjian Clipboard", (420.0, 360.0))
+        WindowOptions::new(crate::i18n::tr("tray.tip"), (420.0, 360.0))
             .panel()
             .acrylic(acrylic),
     )?;

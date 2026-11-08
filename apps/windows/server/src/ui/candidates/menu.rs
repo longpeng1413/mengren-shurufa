@@ -65,7 +65,7 @@ pub(super) fn install() -> Result<()> {
         CreateWindowExW(
             WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
             CLASS_NAME,
-            w!("青简候选菜单"),
+            w!("猛人输入法候选菜单"),
             WS_POPUP,
             0,
             0,

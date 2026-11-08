@@ -12,7 +12,7 @@ characters = "{count} characters"
 file_count = "{count} items"
 
 [tray]
-tip = "Qingjian Clipboard"
+tip = "Mengren Clipboard"
 open = "Open panel"
 pause = "Pause recording"
 settings = "Settings"

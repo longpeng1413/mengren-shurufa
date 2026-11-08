@@ -203,7 +203,7 @@ class ProcessTextActivity : Activity() {
 
     private fun copy() {
         val text = translated ?: return
-        getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("青简翻译", text))
+        getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(getString(R.string.process_text_label), text))
         Toast.makeText(this, R.string.process_text_copied, Toast.LENGTH_SHORT).show()
         finish()
     }

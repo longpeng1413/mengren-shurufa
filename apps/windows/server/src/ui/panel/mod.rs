@@ -90,7 +90,7 @@ impl PanelWindow {
             CreateWindowExW(
                 WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
                 CLASS_NAME,
-                w!("青简符号面板"),
+                w!("猛人输入法符号面板"),
                 WS_POPUP,
                 0,
                 0,

@@ -56,7 +56,7 @@ impl KeyHintWindow {
                     | WS_EX_NOACTIVATE
                     | WS_EX_TRANSPARENT,
                 CLASS_NAME,
-                w!("青简键位提示"),
+                w!("猛人输入法键位提示"),
                 WS_POPUP,
                 0,
                 0,

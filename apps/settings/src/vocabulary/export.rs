@@ -84,7 +84,7 @@ fn html(language: &str, words: &[(&str, &VocabularyEntry)]) -> String {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>青简生词本</title>
+<title>猛人输入法生词本</title>
 <style>
 :root {{ --text: #1f2a24; --muted: #6b7a72; --line: #dfe5e1; --page: #fbfcfb; --known: #9aa7a0; }}
 @media (prefers-color-scheme: dark) {{
@@ -107,7 +107,7 @@ tr.known td {{ color: var(--known); }}
 </head>
 <body>
 <main>
-<h1>青简生词本</h1>
+<h1>猛人输入法生词本</h1>
 <p>{language} · {count} 个词 · 导出于 {today}</p>
 <table>
 <thead><tr><th>译词</th><th>中文</th><th>例句</th><th>看到</th><th>最近</th></tr></thead>

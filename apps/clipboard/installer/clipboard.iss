@@ -1,4 +1,4 @@
-﻿; 青简剪贴板的独立安装脚本（Inno Setup）。随输入法内置的那份由 apps\windows\installer\qingjian.iss 装，这里给只要剪贴板的人。
+; 青简剪贴板的独立安装脚本（Inno Setup）。随输入法内置的那份由 apps\windows\installer\qingjian.iss 装，这里给只要剪贴板的人。
 ;
 ; 按用户装到 %LOCALAPPDATA%\Programs\Qingjian Clipboard，不要管理员；只有一个 exe，界面文案、图标都编在里面。
 ; 开机启动由托盘菜单开关（写 HKCU 的 Run），卸载时一并删掉；历史与配置在 %LOCALAPPDATA%\Qingjian 与 %APPDATA%\Qingjian，卸载不动。
@@ -13,8 +13,8 @@
 #ifndef AppVersionNumeric
   #define AppVersionNumeric AppVersion
 #endif
-#define AppName "青简剪贴板"
-#define Publisher "青简"
+#define AppName "猛人剪贴板"
+#define Publisher "猛人"
 #define WebsiteUrl "https://github.com/qingjian-team/qingjian-clipboard"
 ; 脚本相对仓库根（ime/）：installer → clipboard → apps → ime
 #define Repo "..\..\.."

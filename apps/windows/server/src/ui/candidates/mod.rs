@@ -117,7 +117,7 @@ impl CandidateWindow {
             CreateWindowExW(
                 WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
                 CLASS_NAME,
-                w!("青简候选"),
+                w!("猛人输入法候选"),
                 WS_POPUP,
                 0,
                 0,

@@ -34,6 +34,7 @@ pub mod spacing;
 pub mod storage;
 pub mod swipe;
 pub mod traditional;
+pub mod verification_code;
 pub mod vietnamese;
 pub mod voice;
 pub mod zhuyin;

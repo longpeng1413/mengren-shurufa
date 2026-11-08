@@ -404,6 +404,7 @@ impl Component for Settings {
                 }
             }
             Message::OpenRepository => open_with_explorer(about::REPOSITORY_URL),
+            Message::OpenUpstreamRepository => open_with_explorer(about::UPSTREAM_REPOSITORY_URL),
 
             // 下拉被清空 / 越界：不改
             _ => {}
@@ -411,7 +412,7 @@ impl Component for Settings {
     }
 
     fn view(&self, _input: &(), context: &mut ViewContext<Self>) -> View {
-        context.window_title("青简旧版设置");
+        context.window_title("猛人输入法旧版设置");
         let item = |tag: &str, label: &str, symbol| {
             KeyedView::new(
                 tag,
@@ -441,7 +442,7 @@ impl Component for Settings {
         ];
         NavigationView::new()
             .pane_display_mode(NavigationViewPaneDisplayMode::Left)
-            .pane_title("青简")
+            .pane_title("猛人输入法")
             .open_pane_length(220.0)
             .is_pane_open(true)
             .is_pane_toggle_button_visible(false)

@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="clipboard_code_fill">验证码 %1$s · 点此填入</string>
+    <string name="clipboard_code_masked">验证码已复制 · 点此填入</string>
+    <string name="clipboard_sensitive_fill">私密内容已复制 · 点此填入</string>
+    <string name="clipboard_suggestion_changed">剪贴板已变化，请确认新内容后再点填入</string>
+    <string name="clipboard_suggestion_blocked">请关闭遮挡键盘的悬浮窗后再点填入</string>
     <string name="cloud_models">获取模型列表并选择</string>
     <string name="service_routes">按功能选择服务</string>
     <string name="service_edit">配置哪家服务</string>

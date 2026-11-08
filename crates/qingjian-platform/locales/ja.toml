@@ -26,7 +26,7 @@ light = "ライト"
 dark = "ダーク"
 
 [renderer]
-qingjian = "青簡レンダラー"
+qingjian = "内蔵レンダラー"
 system = "システム描画"
 
 [key_hint]
@@ -94,7 +94,7 @@ is_config = "これは設定ファイルで、フレーズファイルではあ�
 no_tab = "文字と入力コードはタブで区切ってください"
 skipped_entry = "{entry} 件目：{reason}"
 skipped_line = "{line} 行目「{text}」：{reason}"
-unreadable = "このファイルを読み込めません。青簡が書き出したフレーズファイルでも、「文字<Tab>入力コード」を 1 行 1 件で書いたテキストでもありません"
+unreadable = "このファイルを読み込めません。猛人輸入法が書き出したフレーズファイルでも、「文字<Tab>入力コード」を 1 行 1 件で書いたテキストでもありません"
 
 [settings_file]
 invalid = "このファイルの設定に誤りがあります：{error}"

@@ -26,7 +26,7 @@ light = "浅色"
 dark = "深色"
 
 [renderer]
-qingjian = "青简渲染器"
+qingjian = "内置渲染器"
 system = "系统绘制"
 
 [key_hint]
@@ -94,7 +94,7 @@ is_config = "这是配置文件，不是短语文件；设置在「高级」页�
 no_tab = "文字与输入码之间要用 Tab 隔开"
 skipped_entry = "第 {entry} 条：{reason}"
 skipped_line = "第 {line} 行「{text}」：{reason}"
-unreadable = "读不了这个文件：既不是青简导出的短语文件，也不是「文字<Tab>输入码」一行一条的文本"
+unreadable = "读不了这个文件：既不是猛人输入法导出的短语文件，也不是「文字<Tab>输入码」一行一条的文本"
 
 [settings_file]
 invalid = "这个文件里的设置有错：{error}"

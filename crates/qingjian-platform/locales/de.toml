@@ -26,7 +26,7 @@ light = "Hell"
 dark = "Dunkel"
 
 [renderer]
-qingjian = "Qingjian-Renderer"
+qingjian = "Integrierter Renderer"
 system = "Systemzeichnung"
 
 [key_hint]
@@ -94,7 +94,7 @@ is_config = "Das ist eine Konfigurationsdatei, keine Phrasendatei; Einstellungen
 no_tab = "Text und Code müssen durch einen Tab getrennt sein"
 skipped_entry = "Eintrag {entry}: {reason}"
 skipped_line = "Zeile {line} („{text}“): {reason}"
-unreadable = "Diese Datei ist nicht lesbar: Sie ist weder eine von Qingjian exportierte Phrasendatei noch Text mit einem Eintrag „Text<Tab>Code“ pro Zeile"
+unreadable = "Diese Datei ist nicht lesbar: Sie ist weder eine von Mengren exportierte Phrasendatei noch Text mit einem Eintrag „Text<Tab>Code“ pro Zeile"
 
 [settings_file]
 invalid = "Die Einstellungen in dieser Datei sind fehlerhaft: {error}"

@@ -14,6 +14,9 @@ fn embed_icon() {
         println!("cargo:rerun-if-changed={icon}");
     }
     if let Err(error) = winresource::WindowsResource::new()
+        .set("ProductName", "猛人输入法")
+        .set("FileDescription", "猛人剪贴板")
+        .set("CompanyName", "猛人")
         .set_icon_with_id(ICON, "1")
         .set_icon_with_id(TRAY_DARK, "2")
         .set_icon_with_id(TRAY_LIGHT, "3")

@@ -47,6 +47,9 @@ class CandidateBarView(
         fun onToolbar(tool: ToolbarTool)
 
         fun onPrivateDismiss()
+        fun onClipboardInput()
+        fun onClipboardDismiss()
+        fun onClipboardBlocked()
 
         /** 工具栏左端的 logo：进功能面板。 */
         fun openFunctions()
@@ -95,10 +98,16 @@ class CandidateBarView(
     /** 工具栏位置上的一句提示与点它要做的事；null 是没有提示。几秒后、出候选或点过就收起。 */
     private var notice: Pair<String, () -> Unit>? = null
     private var privateHint: Int? = null
+    private var clipboardHint: String? = null
     private var composing = false
     private val privateGesture = PrivateGesture()
 
     private val privateHintShown: Boolean get() = !composing && strip.isEmpty && privateHint != null
+    private val clipboardHintShown: Boolean get() = !composing && strip.isEmpty && privateHint == null && clipboardHint != null
+
+    fun showClipboardHint(message: String?) {
+        if (clipboardHint != message) { clipboardHint = message; invalidate() }
+    }
 
     fun showPrivateHint(message: Int?) {
         if (privateHint != message) { privateHint = message; invalidate() }
@@ -108,7 +117,7 @@ class CandidateBarView(
         invalidate()
     }
 
-    private val toolbarShown: Boolean get() = !resizing && strip.isEmpty && notice == null && privateHint == null
+    private val toolbarShown: Boolean get() = !resizing && strip.isEmpty && notice == null && privateHint == null && clipboardHint == null
 
     /** 候选能用的宽度：有 ⌄ 时让出那一格。 */
     private val stripWidth: Int get() = if (expandable) width - expandSlot.toInt() else width
@@ -206,6 +215,7 @@ class CandidateBarView(
     override fun onDraw(canvas: Canvas) = when {
         resizing -> resizeHandle.draw(canvas, width)
         privateHintShown -> toolbar.drawPrivateNotice(canvas, width, context.getString(privateHint!!))
+        clipboardHintShown -> toolbar.drawPrivateNotice(canvas, width, clipboardHint!!)
         strip.isEmpty && notice != null -> toolbar.drawNotice(canvas, width, notice!!.first)
         strip.isEmpty -> toolbar.draw(canvas, width)
         else -> {
@@ -238,6 +248,16 @@ class CandidateBarView(
     }
 
     private fun tap(x: Float, y: Float) {
+        if (clipboardHintShown) {
+            when {
+                toolbar.onLogo(x) -> listener.openFunctions()
+                toolbar.onHide(x, width) -> listener.hideKeyboard()
+                toolbar.onPrivateDismiss(x, width) -> listener.onClipboardDismiss()
+                privateGesture.allowed -> listener.onClipboardInput()
+                else -> listener.onClipboardBlocked()
+            }
+            return
+        }
         if (privateHintShown) {
             when {
                 toolbar.onLogo(x) -> listener.openFunctions()

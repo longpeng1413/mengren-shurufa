@@ -870,3 +870,11 @@ Windows `cloud_usage` 本机 HTTP 回归服务在回复后先半关闭写方向�
 `cloud_usage` 夹具将接口与显式代理都固定到同一本机监听地址，兼容绝对 URI 请求，避免系统代理干扰。失败会给出初次联想、释义或重载后联想的阶段及测试日志；不使用真实密钥或服务。
 
 私密发送线程在最终 `PrivateSent` / `PrivateFailed` 事件前释放 Secret 并清除 `private_sending`，使事件接收方立即开始下一次发送时不被旧的忙碌位拒绝。每设备确认和最后结果仍与真实投递对应，不增加排队或重发。
+
+## 0.4.3 验证码候选与品牌
+
+- `qingjian-core::verification_code::extract` 只处理调用方传入的有界文本/标签，支持纯 4–8 位数字及验证码语义中的唯一数字码；不读平台剪贴板，不存储或记录正文。Android JNI `clipboardVerificationCode` 暴露该规则。
+- Android `ClipboardSuggestions` 读取当前剪贴板，利用 Android 16 已有 OTP 分类作为可选辅助；`ClipboardSuggestionState` 管理复制后五分钟、关闭/使用抑制和切换输入框。点击前核对时间、正文指纹、实际填入文本和敏感标记，解锁与遮挡条件继续生效；直接 commitText，不走学习记录。敏感文本默认保留原文，只有明确分类或提取值与原文一致时采用数字码。
+- 候选条的普通候选优先，跨设备私密提示优先于本机复制建议。键盘收起释放建议正文，保留已消费标记；失效建议不靠重开键盘延长有效期。
+- 三个日志导出入口统一 `mengren-shurufa-logs-日期.zip`；安卓备份 `mengren-shurufa-data-日期.zip`。Windows 四个产品资源补齐猛人产品名/描述。品牌核对入口 `mengren/audit-brand.py`，完整范围见 `docs/notes/brand-043-audit.md`。
+- 官方依据：[ClipDescription 时间戳和分类](https://developer.android.com/reference/android/content/ClipDescription)、[Android 16 OTP 分类常量](https://developer.android.com/reference/android/view/textclassifier/TextClassifier#TYPE_OTP)。仅读取已复制的内容，不新增短信权限。

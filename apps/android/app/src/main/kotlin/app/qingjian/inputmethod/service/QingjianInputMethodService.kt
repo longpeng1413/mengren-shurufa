@@ -90,6 +90,7 @@ class QingjianInputMethodService :
     private var reopenPanel: PanelKind? = null
 
     private val clipboardWatcher get() = (application as app.qingjian.inputmethod.QingjianApp).clipboardWatcher
+    private val clipboardSuggestions by lazy { app.qingjian.inputmethod.clipboard.ClipboardSuggestions(this) }
 
     private var neon: NeonEdgeView? = null
 
@@ -138,7 +139,17 @@ class QingjianInputMethodService :
             else -> null
         }
         panel?.bar?.showPrivateHint(hint)
+        panel?.bar?.showClipboardHint(if (isInputViewShown && editor == null) clipboardSuggestions.label() else null)
     }
+
+    override fun onClipboardInput() {
+        if (!isInputViewShown || shownPreedit.isNotEmpty() || editor != null) return
+        clipboardSuggestions.input(currentInputConnection)
+        refreshPrivateHint()
+    }
+
+    override fun onClipboardDismiss() { clipboardSuggestions.dismiss(); refreshPrivateHint() }
+    override fun onClipboardBlocked() = clipboardSuggestions.blocked()
 
     override fun onPrivateDismiss() {
         runCatching { app.qingjian.inputmethod.core.Native.clipboardSyncPrivateClear() }
@@ -428,6 +439,8 @@ class QingjianInputMethodService :
     override fun onWindowHidden() {
         privateUiHandler.removeCallbacks(privateHintRefresh)
         panel?.bar?.showPrivateHint(null)
+        panel?.bar?.showClipboardHint(null)
+        clipboardSuggestions.hide()
         super.onWindowHidden()
         AppLog.info("window hidden")
         // 猛人输入法：收起键盘，删除键的撤回记录清空（只在内存里，不留到下次）

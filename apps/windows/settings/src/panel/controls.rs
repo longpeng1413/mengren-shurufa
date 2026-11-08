@@ -38,7 +38,7 @@ pub(super) fn log_dir() -> Option<PathBuf> {
     Some(dir)
 }
 
-/// 把整个日志目录加 `config.toml` 打成 `qingjian-logs-<日期>.zip` 放到桌面，再在资源管理器里选中它——
+/// 把整个日志目录加 `config.toml` 打成 `mengren-shurufa-logs-<日期>.zip` 放到桌面，再在资源管理器里选中它——
 /// 用户反馈问题时一个附件搞定。压缩交给 PowerShell 的 Compress-Archive，不为此拉一个压缩库；
 /// 桌面路径也让 PowerShell 取（OneDrive 会把桌面挪到别处）。脚本先写成临时 .ps1 再跑，免得命令行引号转义。
 pub(super) fn export_logs() {
@@ -53,7 +53,7 @@ pub(super) fn export_logs() {
         sources.push(format!("'{}'", config.display()));
     }
     let zip_name = format!(
-        "qingjian-logs-{}.zip",
+        "mengren-shurufa-logs-{}.zip",
         jiff::Zoned::now().strftime("%Y-%m-%d")
     );
     let script = format!(

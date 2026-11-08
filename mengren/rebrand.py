@@ -57,7 +57,6 @@ TEXT = [
         ('app_name = "青简"', 'app_name = "猛人输入法"'),
         ('在青简里切换中文与英文', '在猛人输入法里切换中文与英文'),
         ('clipboard = "青简剪贴板"', 'clipboard = "猛人剪贴板"'),
-        ('privacy = "青简不上传任何数据', 'privacy = "猛人输入法不上传任何数据'),
         ('file_name = "青简自定义短语-', 'file_name = "猛人输入法自定义短语-'),
         ('file_name = "青简生词本-', 'file_name = "猛人输入法生词本-'),
         ('file_name = "青简设置-', 'file_name = "猛人输入法设置-'),
@@ -92,7 +91,15 @@ COLORS = '''<?xml version="1.0" encoding="utf-8"?>
     <color name="mengren_launcher_background">#1A0503</color>
 </resources>
 '''
+LAUNCHER_FALLBACK = '''<?xml version="1.0" encoding="utf-8"?>
+<!-- 猛人输入法：旧前景资源也指向既定天马猛素材，避免回退时出现竹简。 -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@mipmap/mengren_launcher_foreground"
+    android:filter="true"
+    android:gravity="fill" />
+'''
 WRITE = [
+    ('apps/android/app/src/main/res/drawable/ic_launcher_foreground.xml', LAUNCHER_FALLBACK),
     ('apps/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml', ADAPTIVE_ICON),
     ('apps/android/app/src/main/res/drawable/ic_brand.xml', BRAND_DRAWABLE),
     ('apps/android/app/src/main/res/values/mengren_colors.xml', COLORS),
