@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 仓库现状
 
-本工作区为基于青简改版的猛人输入法，当前产品版本为 Windows / Android v0.4.4（2026-11-08，安卓上滑符号自定义与候选间距个性化）。Core 平台无关，各平台只做壳；下面的 crate 地图及上游 macOS/Linux 资料继续作为架构参考，不表示本轮要扩展所有平台。
+本工作区为基于青简改版的猛人输入法，当前产品版本为 Android v0.4.5（2026-11-09，安卓本机离线语音识别，首次按平台独立发版）、Windows v0.4.4（2026-11-08）。Core 平台无关，各平台只做壳；下面的 crate 地图及上游 macOS/Linux 资料继续作为架构参考，不表示本轮要扩展所有平台。
 当前范围见 `docs/design/mengren-public.md`，猛人进度与剩余项见 `docs/plan/todo.md`；`docs/plan/roadmap.md` 主体为上游路线图。2026-11-07 v0.3.8 发布后，用户确认原有手机到另一手机及桌面设备的私密路线通过；新增 Windows 设备的普通/私密互传尚未联通，用户已确认仅看见附近/中转设备，尚未配对；先逐对完成六位码配对。0.4.0 修复 Windows 小键盘配对码输入顺序，并加入自定义短语同步及紧凑竖排剪贴板。源码没有三台设备上限，六台逻辑设备中转互传扩容测试已通过，不将逻辑测试当作新增真实设备已通过。此前 v0.3.7 故障历史见 `docs/notes/private-transfer-037-review.md`。
 
 ## 目录地图
@@ -17,6 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `crates/qingjian-learning`：用户侧落盘：词频 / 用户词 / 个人 n-gram / 敲错表（`FrequencyLearner`）、输入日志（`InputLog`）、输入统计（`UsageStats`）、词汇记录（`VocabularyBook`）。
 - `crates/qingjian-predict`：云联想 `CloudPredictor`（OpenAI 兼容接口）与释义兜底 `CloudGlossFiller`；`PredictConfig` 是 `[predict]` 分节。
 - `crates/qingjian-voice`：云端语音识别，实现 Core 的 `Transcriber`；现在是火山引擎豆包流式语音识别 `VolcengineTranscriber`（WebSocket + rustls，后台线程）。
+- `crates/qingjian-voice-offline`：本机离线语音识别，实现 Core 的 `Transcriber`：sherpa-onnx（运行时加载）跑 SenseVoice，含模型下载、校验、清理；安卓「语音识别」的「本机离线」选项用它。
 - `crates/qingjian-lm`：整句转换的 bigram 语言模型 `BigramModel`，另有读知意 `zh.ngram` 的 `TrigramModel` 与插值用的 `MixedModel`。
 - `crates/qingjian-neural`：本地神经模型推理，`hanzhang/`（含章字级 Transformer：`CharScorer` 打分、`P2c` 按拼音生成整句）与 `zhiyi/`（知意选词模型）。
 - `crates/qingjian-format`：`.qj` 数据容器（mmap 读、零拷贝视图、写入器、哈希索引）。
@@ -67,8 +68,12 @@ apps/macos/scripts/bundle.sh --install        # mac 壳装到 ~/Library/Input Me
 
 - 2026-11-07 用户已明确恢复打包与发布授权：发布 v0.3.8 供手机/电脑通过检查更新进行真机复测，替代此前暂停要求。保留原 v0.3.7 标签与附件，不将本版编译/自动测试通过写成真机故障已全面解决。
 - 本机主仓库 origin 指向 `longpeng1413/mengren-shurufa-private-archive`（私有）。公开仓库为 `longpeng1413/mengren-shurufa`，只接受审查后的独立源码变更；禁止把主仓库的分支、历史或 --mirror 推过去。
-- 每轮完整升级通过检查后可按既有授权发布； Windows 与安卓产品版本同步递增，不用 -dev 发布；不跳过必要检查，不把编译通过称为真机验收。
-- 先运行 `mengren/build.ps1` 生成两端包，再用 `mengren/release.py --version X.Y.Z --notes mengren/releases/vX.Y.Z.md --gitleaks <工具路径> --publish` 导出、扫描、提交公开源码，发布签名索引与安装包。脚本会保留 GitHub 独立修改，遇同文件冲突先合并，禁止覆盖或强推。
+- **按平台独立发版（2026-11-08 用户最新要求）：哪边有实际改动，哪边才递增产品版本、构建和发布。** 仅安卓改动不升级 Windows，仅 Windows 改动不升级安卓；未改动平台保持原版本和原安装包，不为统一版本号、发布标签或满足旧脚本检查而重新打包。正式包不用 -dev；不跳过必要检查，不把编译通过称为真机验收。
+- 共享代码改动先评估各平台实际运行行为和兼容性，只发布受影响的平台；文件位于共享 crate 本身不是两端同时发版的理由。确实影响两端时分别验证后发布，版本号仍独立管理。协议变化须说明最低兼容版本、旧端是否仍可互传及必要升级范围，不能仅按两端版本号是否相同判断兼容。
+- 构建时显式选平台：安卓用 `mengren/build.ps1 -Android`，Windows 用 `mengren/build.ps1 -Windows`；只有两端都需交付时才使用默认的两端构建。每个平台随包组件内部保持安装器要求的版本一致，跨平台不要求相同。
+- 发布说明和交接记录分别列出 Android / Windows 的版本与实际变化；只改文档不触发软件版本递增或安装包发布。已发布的 0.4.4 两端包是历史事实，保留标签和附件，不回退、不重发。
+- **发布工具已按平台独立适配（2026-11-09，用于 0.4.5）。** `mengren/release.py` 必须用 `--platform android` / `--platform windows` 指明本次发版平台（两端都发写两次），只校验、只上传所选平台的新包；签名索引以 GitHub latest 上一版已验签索引为底稿，把本版加在最前，其他平台原有版本、下载地址和摘要原样保留。混合版本的客户端挑选由 `qingjian-update` 的测试覆盖，要求见 `docs/notes/release.md`。
+- 通过相关检查后，沿用 `mengren/release.py` 的源码导出、隐私扫描、独立公开历史追加、签名和草稿附件校验流程。脚本须保留 GitHub 独立修改，遇同文件冲突先合并，禁止覆盖或强推。
 - 更新仅来自猛人仓库，信任猛人专用公钥。签名私钥、安卓签名备份、私人说明和早期设计素材不公开；私钥在 `mengren/private/` 以 DPAPI 加密保存，不打印、不提交，不换掉已安装 APK 的签名。
 - 每次新包成功并校验后，本机安装包目录每个平台只留最新包，旧包送回收站。发布附件用 ASCII 拼音名；用户设置和已安装目录不能作为旧包清理。
 

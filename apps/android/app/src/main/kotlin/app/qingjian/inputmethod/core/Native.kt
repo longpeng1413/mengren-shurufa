@@ -267,4 +267,19 @@ internal object Native {
 
     /** 识别的一件事（`{kind, text}`，kind 是 partial / final / error）；没有为 null。 */
     external fun pollVoice(handle: Long): String?
+
+    /** 离线语音模型状态：`{installed, bytes, total, downloading, received, loaded}`。[root] 是模型根目录。 */
+    external fun voiceModelStatus(root: String): String?
+
+    /** 下载离线语音模型，阻塞到下完、出错或取消，只能在后台线程调；回 `{ok}` 或 `{error}`。[proxy] 为空不走代理。 */
+    external fun voiceModelDownload(root: String, proxy: String): String?
+
+    /** 让正在下载的模型停下（留着半截，下次续传）。 */
+    external fun voiceModelCancel()
+
+    /** 删掉离线语音模型（下载中不删）；回 `{ok}` 或 `{error}`。 */
+    external fun voiceModelDelete(root: String): String?
+
+    /** 启动时清理：旧版本模型、超过 7 天没续上的半截下载。 */
+    external fun voiceModelCleanup(root: String)
 }

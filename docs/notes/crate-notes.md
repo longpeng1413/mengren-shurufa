@@ -248,6 +248,16 @@ Windows 的 `Router::recompose` 在输入清空时调用 `Engine::cancel_predict
 `test_connection` 识别半秒静音、阻塞到有结果，设置页「测试连接」用。错误文案：`#[error]` 英文给日志，`VoiceError::describe` 中文给用户。
 rustls 与 `webpki-roots` 提到了工作区依赖，与 `qingjian-predict` 的 `rustls` feature 共用一份。
 
+## crates/qingjian-voice-offline
+
+本机离线语音识别，实现 Core 的 `Transcriber`：sherpa-onnx 的 C 接口跑 SenseVoice Small int8。与 `qingjian-voice` 分开是因为这里要 `unsafe` 调 C，那边 `forbid(unsafe_code)`。
+- `library/`：libloading 运行时加载 `sherpa-onnx-c-api`（Windows 先按完整路径载随包的 `onnxruntime.dll`，避开 System32 的旧版；安卓先按名字找，APK 里的库不一定解压到磁盘）。`config.rs` 逐字段对齐 2.0.1 版的 `SherpaOnnxOfflineRecognizerConfig`，尾部再垫 512 字节零；加载时核对 `SherpaOnnxGetVersionStr` 等于 `EXPECTED_VERSION`，不等就当库不可用。换库版本要对着新的绑定 / 头文件重核布局，并同步 `apps/android/app/build.gradle.kts` 的 `sherpaVersion` / `sherpaSha256`。
+- `recognizer.rs`：建识别器（`use_itn = 1`、贪心解码、CPU），一次识别整段，结果取 `GetOfflineStreamResultAsJson` 的 `text`；内部一把锁串行解码。
+- `shared.rs`：进程里一份识别器，按模型目录复用；`IDLE` 3 分钟没人用由后台线程释放（还有会话拿着 `Arc` 时不放）。
+- `transcriber/`：每段一个后台线程，约 0.9 秒重识别一次当前段当中间结果；`segmenter.rs` 在当前段超过 20 秒时于 10～20 秒间最安静的 0.1 秒处切段，中英文接缝英文补空格。
+- `model/`：`SpeechModel` 管 `<root>/sensevoice-int8-2024-07-17/`：`installed`（`.verified` 标记 + 大小）、`size`、`delete`、`cleanup`（别的版本文件夹、7 天前的 `.part`）；`download` 用 tokio 单线程运行时 + reqwest（rustls、内置根证书、可走代理）写 `.part`、Range 续传、30 秒无数据算卡住，下完核对 SHA-256 再改名，全部通过写标记。模型地址与哈希写死，和猛人快传同一份。
+- 验证：`cargo run -p qingjian-voice-offline --example transcribe -- <模型根目录> <引擎库目录> <WAV>`；本机可用猛人快传的模型与 pub 缓存里 `sherpa_onnx_windows` 的 x64 DLL。
+
 ## crates/qingjian-format
 
 `.qj` 数据容器（`Container` mmap 读、`Writer` 写、`Table<T>` / `Text` 零拷贝视图、`hash` 可落盘哈希索引、`Metadata` 名称 / 许可证 / 署名）。
@@ -815,7 +825,7 @@ Windows Server 受控退出使用 ExitCode 返回以刷新既有 tracing 队列�
 
 Windows 的后台任务集中在 `apps/settings/src/jobs/update/`，只把校验后的路径交给系统安装器；旧配置通过 Server 一次性迁移到默认检查开启，后续保留用户选择。安卓 `update/` 只做系统代理、状态展示与 PackageInstaller 会话，SHA256、签名验证和版本挑选仍在 Rust。
 
-`mengren/release.py` 在 Windows 上验证两端安装包版本和 APK 原签名，再把审查后的源码追加到独立公开历史；私钥、签名备份、私人说明、设计素材和原私有历史不上传。签名工具支持 Windows 系统随机源及 DPAPI 密钥文件，私钥始终不打印。
+`mengren/release.py` 当前仍在 Windows 上强制验证两端同版本的安装包和 APK 原签名，再把审查后的源码追加到独立公开历史。2026-11-08 用户改为平台独立发行：下次发版前必须适配指定平台、仅校验/上传该端新包，并在最新签名索引中保留其他平台原有效版本与下载地址；不得为通过脚本而递增无改动平台版本。此项目前仅更新文档，工具尚待适配，验收见 [发版说明](release.md)。私钥、签名备份、私人说明、设计素材和原私有历史不上传。签名工具支持 Windows 系统随机源及 DPAPI 密钥文件，私钥始终不打印。
 
 
 ## 猛人 0.3.5 公网中转

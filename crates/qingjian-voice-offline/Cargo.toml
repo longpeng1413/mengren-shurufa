@@ -1,0 +1,22 @@
+[package]
+name = "qingjian-voice-offline"
+description = "本机离线语音识别：sherpa-onnx + SenseVoice，实现 Core 的 Transcriber；含模型下载、校验与清理"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+libloading = "0.8"
+qingjian-core.workspace = true
+reqwest = { workspace = true, features = ["rustls-no-provider"] }
+rustls.workspace = true
+serde_json.workspace = true
+sha2 = "0.11"
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+webpki-roots.workspace = true

@@ -1,3 +1,6 @@
+import java.net.URI
+import java.security.MessageDigest
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +9,7 @@ plugins {
 // 仓库根（ime/）：Rust workspace 与随包数据都从这里取。
 val repoRoot = rootDir.resolve("../..").canonicalFile
 val nativeLibs = layout.buildDirectory.dir("native/jniLibs")
+val sherpaLibs = layout.buildDirectory.dir("sherpa/jniLibs")
 val bundledAssets = layout.buildDirectory.dir("bundled/assets")
 
 // 版本号取 core/Cargo.toml；versionCode = 主*10000 + 次*100 + 修订，-dev 与正式版同号
@@ -65,6 +69,7 @@ android {
 
     sourceSets["main"].apply {
         jniLibs.srcDir(nativeLibs)
+        jniLibs.srcDir(sherpaLibs)
         assets.srcDir(bundledAssets)
     }
 }
@@ -120,8 +125,80 @@ val stageData by tasks.registering(Sync::class) {
     }
 }
 
+// 本机离线语音识别的引擎（sherpa-onnx，Apache-2.0）：取 pub.dev 上 sherpa_onnx_android_arm64 包里预编译好的两个库，
+// 版本必须与 crates/qingjian-voice-offline 的 EXPECTED_VERSION 及其结构体布局一致，换版本要一起改。
+// 包缓存在 data/third_party/sherpa-onnx/（已忽略），只留当前版本；核对 SHA-256，不对就删了重下。
+val sherpaVersion = "2.0.1"
+val sherpaSha256 = "eceb1fd5de24d07c5aa618f6fa913f3f950018e6c009b899d076ba08209d08ec"
+val sherpaArchive = repoRoot.resolve("data/third_party/sherpa-onnx/sherpa_onnx_android_arm64-$sherpaVersion.tar.gz")
+
+fun sha256Of(file: File): String = MessageDigest.getInstance("SHA-256").let { digest ->
+    file.inputStream().use { input ->
+        val buffer = ByteArray(1 shl 16)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            digest.update(buffer, 0, read)
+        }
+    }
+    digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+val fetchSherpa by tasks.registering {
+    group = "qingjian"
+    description = "下载 sherpa-onnx 安卓库（pub.dev 包 sherpa_onnx_android_arm64 $sherpaVersion），校验 SHA-256"
+    outputs.file(sherpaArchive)
+    outputs.upToDateWhen { sherpaArchive.isFile && sha256Of(sherpaArchive) == sherpaSha256 }
+    doLast {
+        val folder = sherpaArchive.parentFile
+        folder.mkdirs()
+        // 旧版本的包不再用，删掉
+        folder.listFiles()?.filter { it.name != sherpaArchive.name }?.forEach { it.delete() }
+        val name = "sherpa_onnx_android_arm64-$sherpaVersion.tar.gz"
+        val mirrors = listOf("https://pub.flutter-io.cn/api/archives/$name", "https://pub.dev/api/archives/$name")
+        val partial = File(folder, "$name.part")
+        val ok = mirrors.any { url ->
+            runCatching {
+                URI(url).toURL().openStream().use { input -> partial.outputStream().use { input.copyTo(it) } }
+                sha256Of(partial) == sherpaSha256
+            }.getOrDefault(false)
+        }
+        if (!ok) {
+            partial.delete()
+            throw GradleException("下载 sherpa-onnx 安卓库失败或校验不通过：$name")
+        }
+        sherpaArchive.delete()
+        partial.renameTo(sherpaArchive)
+    }
+}
+
+val stageSherpa by tasks.registering(Sync::class) {
+    group = "qingjian"
+    description = "把 sherpa-onnx 的 C 接口库与 onnxruntime 放进 jniLibs"
+    dependsOn(fetchSherpa)
+    from(tarTree(resources.gzip(sherpaArchive))) {
+        include("android/src/main/jniLibs/arm64-v8a/libsherpa-onnx-c-api.so")
+        include("android/src/main/jniLibs/arm64-v8a/libonnxruntime.so")
+        eachFile { path = "arm64-v8a/$name" }
+        includeEmptyDirs = false
+    }
+    into(sherpaLibs)
+}
+
+// 随包分发的第三方库的许可原文（sherpa-onnx 的 Apache-2.0 在同一个 pub 包里）
+val stageLicenses by tasks.registering(Sync::class) {
+    group = "qingjian"
+    description = "把随包第三方库的许可原文放进 assets/licenses/"
+    dependsOn(fetchSherpa)
+    from(tarTree(resources.gzip(sherpaArchive))) {
+        include("LICENSE")
+        rename { "sherpa-onnx-LICENSE.txt" }
+    }
+    into(bundledAssets.map { it.dir("licenses") })
+}
+
 tasks.named("preBuild") {
-    dependsOn(cargoNdk, stageData)
+    dependsOn(cargoNdk, stageData, stageSherpa, stageLicenses)
 }
 
 dependencies {

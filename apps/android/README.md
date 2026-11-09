@@ -50,8 +50,9 @@ cd apps/android
 adb logcat -s qingjian        # Rust 侧日志
 ```
 
-`preBuild` 之前会跑两个任务：`cargoNdk`（`cargo ndk` 编 arm64-v8a 的 release `.so`）与 `stageData`
-（`data/generated/` 有 `dict.qj` 就带产品数据，没有退回 `assets/sample/` 样例）。只编 arm64。
+`preBuild` 之前会跑这几个任务：`cargoNdk`（`cargo ndk` 编 arm64-v8a 的 release `.so`）、`stageData`
+（`data/generated/` 有 `dict.qj` 就带产品数据，没有退回 `assets/sample/` 样例）、`stageSherpa` 与 `stageLicenses`
+（离线语音引擎：从 pub.dev 镜像下载固定版本的 `sherpa_onnx_android_arm64` 包并核对 SHA-256，缓存在 `data/third_party/sherpa-onnx/`，只取 `libsherpa-onnx-c-api.so`、`libonnxruntime.so` 与许可原文）。只编 arm64。
 
 装好后打开「青简」，按页面上两步启用并切换输入法。
 

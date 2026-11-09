@@ -1,5 +1,7 @@
 //! 语音的出口：识别结果上屏（各种识别方式共用），识别配置与测试连接，以及 Rust 侧识别方的录音进出与取结果。
-//! 配置是 [`VoiceSettings`] 的 JSON（含解好的密钥），只在内存里过一下，不进日志。
+//! 配置是 [`VoiceSettings`] 的 JSON（含解好的密钥），只在内存里过一下，不进日志。离线模型的下载与管理在 [`model`]。
+
+mod model;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 

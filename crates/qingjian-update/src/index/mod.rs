@@ -137,6 +137,36 @@ mod tests {
         assert_eq!(newest("0.1.4", WINDOWS, UpdateChannel::Beta), None);
     }
 
+    /// 猛人按平台独立发版：安卓单独到 0.4.5，Windows 停在 0.4.4，两条记录都留在同一份索引里。
+    #[test]
+    fn platforms_keep_their_own_latest_version() {
+        const ANDROID: Target = Target {
+            platform: "android",
+            cpu: "arm64",
+        };
+        let index = Index::parse(
+            br#"{
+              "schema_version": 1,
+              "releases": [
+                {"version": "0.4.5", "channel": "stable", "assets": [{"platform": "android", "cpu": "arm64"}]},
+                {"version": "0.4.4", "channel": "stable",
+                 "assets": [{"platform": "android", "cpu": "arm64"}, {"platform": "windows", "cpu": "x86_64"}]}
+              ]
+            }"#,
+        )
+        .unwrap();
+        let pick = |current: &str, target| {
+            index
+                .for_target(&Version::parse(current).unwrap(), target, false)
+                .map(|available| available.version)
+        };
+        assert_eq!(pick("0.4.4", ANDROID).as_deref(), Some("0.4.5"));
+        assert_eq!(pick("0.4.3", ANDROID).as_deref(), Some("0.4.5"));
+        assert_eq!(pick("0.4.5", ANDROID), None);
+        assert_eq!(pick("0.4.4", WINDOWS), None, "no empty upgrade");
+        assert_eq!(pick("0.4.3", WINDOWS).as_deref(), Some("0.4.4"));
+    }
+
     #[test]
     fn unknown_schema_is_rejected() {
         let error = Index::parse(br#"{"schema_version": 2, "releases": []}"#).unwrap_err();

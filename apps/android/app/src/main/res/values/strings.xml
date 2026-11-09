@@ -77,7 +77,7 @@
 
     <string name="section_try">试一试</string>
     <string name="try_hint">在这里试打</string>
-    <string name="voice_unavailable">语音输入还不能用，先在猛人输入法的「语音识别」里选好识别服务</string>
+    <string name="voice_unavailable">语音输入还不能用，先在猛人输入法的「语音识别」里选好识别服务（选本机离线要先下载模型）</string>
     <string name="voice_no_permission">没有麦克风权限，到系统设置里允许猛人输入法使用麦克风</string>
     <string name="voice_done">完成</string>
 
@@ -173,7 +173,7 @@
     <string name="process_text_copied">已复制译文</string>
     <string name="translate_no_cloud">快捷翻译要先在猛人输入法「设置 → 云端大模型」里填好接口和密钥</string>
     <string name="translate_needs_setup">快捷翻译要先填写云端大模型，点这里去设置</string>
-    <string name="voice_needs_setup">语音输入要先选好识别服务，点这里去设置</string>
+    <string name="voice_needs_setup">语音输入要先选好识别服务（本机离线要先下载模型），点这里去设置</string>
     <string name="clipboard_limit_value">%1$d 条</string>
     <string name="section_size">尺寸</string>
     <string name="height_title">键盘高度</string>
@@ -284,12 +284,23 @@
     <string name="voice_provider">识别服务</string>
     <string name="voice_provider_none">不用</string>
     <string name="voice_provider_volcengine">火山引擎 · 豆包语音</string>
+    <string name="voice_provider_offline">本机离线（免费）</string>
     <string name="voice_resource">识别模型</string>
     <string name="voice_resource_hourly">小时版（按识别时长）</string>
     <string name="voice_resource_concurrent">并发版（按并发路数）</string>
     <string name="voice_key">API Key</string>
     <string name="voice_none_note">没选识别服务时语音输入用不了</string>
     <string name="voice_note">填写豆包语音 API Key，选择已开通的 2.0 模型。流式识别边说边出字；录音文件识别在说完后提交，等待时间较长。只使用选定模型，不自动换模型。</string>
+    <string name="voice_offline_model">离线语音模型</string>
+    <string name="voice_offline_installed">已下载，占用 %1$s</string>
+    <string name="voice_offline_missing">还没下载，约 %1$s</string>
+    <string name="voice_offline_partial">下载了一部分（%1$s / %2$s），再点下载会从断点继续</string>
+    <string name="voice_offline_downloading">下载中 %1$d%%（%2$s / %3$s）</string>
+    <string name="voice_offline_download">下载模型</string>
+    <string name="voice_offline_cancel">取消下载</string>
+    <string name="voice_offline_test">测试识别</string>
+    <string name="voice_offline_delete">删除模型</string>
+    <string name="voice_offline_note">在手机上识别，不联网、不收费，录音不离开手机。模型约 229 MB，第一次使用前下载（来自 GitHub，国内网络可能要开代理，代理设置与检查更新相同），下载可取消、可断点续传、下完自动校验。说话时边说边出字，说完一般一两秒内出最终结果；中文效果好，英文也能识别。模型空闲 3 分钟后从内存释放，之后第一次说话要多等一两秒。识别模型 SenseVoice 遵循 FunASR 模型许可，识别引擎 sherpa-onnx 为 Apache-2.0 许可。</string>
     <string name="export_title">导出数据</string>
     <string name="export_value">存为 zip</string>
     <string name="export_running">导出中…</string>
@@ -321,7 +332,7 @@
     <string name="about_local_title">全部在本机</string>
     <string name="about_local_note">打字、词库、学习数据和统计都只在这台手机上；只有填了云端大模型或语音识别，才会把要翻译的文字或录音发给那家服务</string>
     <string name="about_license_title">开源许可</string>
-    <string name="about_license_note">GPL-3.0-or-later</string>
+    <string name="about_license_note">GPL-3.0-or-later；离线语音引擎 sherpa-onnx（Apache-2.0）与 onnxruntime（MIT）随包分发，许可原文在安装包 assets/licenses/ 里；离线语音模型 SenseVoice 按 FunASR 模型许可单独下载</string>
 
     <!-- App 的设置 tab 与拆开后的二级页 -->
     <string name="tab_settings">设置</string>

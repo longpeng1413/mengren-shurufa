@@ -4375,7 +4375,7 @@ checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
 name = "qingjian-android"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "bamboo-slip-i18n",
  "jiff",
@@ -4390,6 +4390,7 @@ dependencies = [
  "qingjian-translate",
  "qingjian-update",
  "qingjian-voice",
+ "qingjian-voice-offline",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -4831,6 +4832,22 @@ dependencies = [
  "tracing",
  "tungstenite",
  "uuid",
+ "webpki-roots",
+]
+
+[[package]]
+name = "qingjian-voice-offline"
+version = "0.1.1"
+dependencies = [
+ "libloading 0.8.9",
+ "qingjian-core",
+ "reqwest",
+ "rustls",
+ "serde_json",
+ "sha2 0.11.0",
+ "thiserror 2.0.21",
+ "tokio",
+ "tracing",
  "webpki-roots",
 ]
 

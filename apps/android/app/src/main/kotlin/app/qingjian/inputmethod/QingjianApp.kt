@@ -15,6 +15,7 @@ class QingjianApp : Application() {
         app.qingjian.inputmethod.clipboard.sync.ClipboardSync.apply(this)
         clipboardWatcher.start()
         app.qingjian.inputmethod.update.Updates.start(this)
+        app.qingjian.inputmethod.voice.VoiceModel.cleanup(this)
         app.qingjian.inputmethod.cloud.MemberAccount.start(this)
     }
 }

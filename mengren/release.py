@@ -1,4 +1,8 @@
-"""发布经检查的猛人源码和两端安装包；原开发仓库历史始终留在私有库。"""
+"""发布经检查的猛人源码和本次有改动平台的安装包；原开发仓库历史始终留在私有库。
+
+按平台独立发版：`--platform android` / `--platform windows`（两端都改了就写两次）。只检查、只上传所选平台的新包；
+签名索引在上一版已验签索引的基础上把本版加在最前，未发版平台原有的版本、下载地址和摘要原样保留。
+"""
 
 import argparse
 import ctypes
@@ -16,6 +20,14 @@ import uuid
 ROOT = Path(__file__).resolve().parent.parent
 REPO = "longpeng1413/mengren-shurufa"
 PUBLIC_ID = 1447865709
+ASSET_PREFIX = f"https://github.com/{REPO}/releases/download/v"
+# 各平台的产品配置：发哪个平台，就要求哪几个文件的版本等于本次版本。
+PLATFORM_CONFIGS = {
+    "android": ["apps/android/core/Cargo.toml"],
+    "windows": ["apps/clipboard/Cargo.toml", "apps/settings/Cargo.toml", "apps/windows/server/Cargo.toml",
+                "apps/windows/tsf/Cargo.toml", "apps/windows/settings/Cargo.toml"],
+}
+PLATFORM_NAMES = {"android": "安卓", "windows": "Windows"}
 
 
 def run(*args, cwd=ROOT, capture=False):
@@ -42,6 +54,41 @@ def digest(path):
     return value.hexdigest()
 
 
+def previous_index(folder, signer):
+    """取当前 GitHub latest 的签名索引并验签；它是这次合并的底稿。"""
+    folder.mkdir(parents=True, exist_ok=True)
+    run("gh", "release", "download", "--repo", REPO, "--pattern", "releases.json", "--pattern", "releases.json.sig",
+        "--dir", folder, "--clobber")
+    run(signer, "verify", folder / "releases.json")
+    index = json.loads((folder / "releases.json").read_text(encoding="utf-8"))
+    if index.get("schema_version") != 1 or not isinstance(index.get("releases"), list):
+        raise SystemExit("上一版索引格式不认识，停止发布")
+    for release in index["releases"]:
+        for asset in release.get("assets", []):
+            if not asset.get("url", "").startswith(f"{ASSET_PREFIX}{release['version']}/"):
+                raise SystemExit(f"上一版索引里有不属于本仓库对应版本的下载地址：{asset.get('url')}")
+    return index
+
+
+def version_key(text):
+    return tuple(int(part) for part in text.split("."))
+
+
+def merge_index(previous, entry, platforms):
+    """新版本放最前，旧记录原样保留；所选平台不能已有同版本或更新的版本。"""
+    for release in previous["releases"]:
+        if release["version"] == entry["version"]:
+            raise SystemExit(f"索引里已有 {entry['version']}，禁止重复发布")
+        released = {asset["platform"] for asset in release.get("assets", [])}
+        if released & set(platforms) and version_key(release["version"]) > version_key(entry["version"]):
+            raise SystemExit(f"{release['version']} 比本次更新，不能发布旧版本")
+    kept = {asset["platform"] for release in previous["releases"] for asset in release.get("assets", [])}
+    for platform in sorted(set(PLATFORM_CONFIGS) - set(platforms)):
+        if platform not in kept:
+            raise SystemExit(f"上一版索引里没有 {platform} 的安装包，单端发布会让它失去更新")
+    return {"schema_version": 1, "releases": [entry] + previous["releases"]}
+
+
 def save(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -50,6 +97,8 @@ def save(path, value):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--platform", action="append", required=True, choices=sorted(PLATFORM_CONFIGS),
+                        help="本次有实际改动、要发新包的平台；两端都发就写两次")
     parser.add_argument("--notes", type=Path, required=True)
     parser.add_argument("--gitleaks", type=Path, required=True)
     parser.add_argument("--publish", action="store_true")
@@ -58,9 +107,11 @@ def main():
     version = args.version
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise SystemExit("只发布 X.Y.Z 正式版")
-    for relative in ["apps/android/core/Cargo.toml", "apps/clipboard/Cargo.toml", "apps/settings/Cargo.toml", "apps/windows/server/Cargo.toml", "apps/windows/tsf/Cargo.toml", "apps/windows/settings/Cargo.toml"]:
-        if f'version = "{version}"' not in (ROOT / relative).read_text(encoding="utf-8"):
-            raise SystemExit(f"产品版本不一致：{relative}")
+    platforms = sorted(set(args.platform))
+    for platform in platforms:
+        for relative in PLATFORM_CONFIGS[platform]:
+            if f'version = "{version}"' not in (ROOT / relative).read_text(encoding="utf-8"):
+                raise SystemExit(f"{platform} 产品版本不是 {version}：{relative}")
     repo = gh_json(f"repos/{REPO}")
     if repo["id"] != PUBLIC_ID or repo["private"]:
         raise SystemExit("目标必须是已确认的独立公开仓库")
@@ -118,6 +169,7 @@ def main():
     dist.mkdir(parents=True, exist_ok=True)
     packages = [("android", "arm64", "猛人输入法-安卓-*.apk", f"mengren-shurufa-android-v{version}.apk"),
                 ("windows", "x86_64", "猛人输入法-Windows-*-setup.exe", f"mengren-shurufa-windows-x64-v{version}-setup.exe")]
+    packages = [package for package in packages if package[0] in platforms]
     assets = []
     sdk = args.sdk
     if sdk is None:
@@ -162,16 +214,17 @@ def main():
                        "sha256": digest(destination), "size": destination.stat().st_size})
     notes = args.notes.read_text(encoding="utf-8")
     lines = [line[2:].strip() for line in notes.splitlines() if line.startswith("- ")]
-    index = {"schema_version": 1, "releases": [{"version": version, "channel": "stable", "date": str(datetime.now(timezone(timedelta(hours=8))).date()), "notes": lines, "assets": assets}]}
-    save(dist / "releases.json", index)
     signer = ROOT / "target/release/qingjian-release-sign.exe"
+    entry = {"version": version, "channel": "stable", "date": str(datetime.now(timezone(timedelta(hours=8))).date()), "notes": lines, "assets": assets}
+    index = merge_index(previous_index(work / "previous-index", signer), entry, platforms)
+    save(dist / "releases.json", index)
     run(signer, "sign", dist / "releases.json", "--key-file", private / "update-signing.dpapi")
     run(signer, "verify", dist / "releases.json")
     uploads = [dist / Path(asset["url"]).name for asset in assets] + [dist / "releases.json", dist / "releases.json.sig"]
     sums = dist / f"SHA256SUMS-v{version}.txt"
     sums.write_text("".join(f"{digest(path)}  {path.name}\n" for path in uploads), encoding="utf-8")
     uploads.append(sums)
-    save(dist / "prepared.json", {"version": version, "commit": commit, "files": len(manifest), "uploads": {path.name: digest(path) for path in uploads}})
+    save(dist / "prepared.json", {"version": version, "platforms": platforms, "commit": commit, "files": len(manifest), "uploads": {path.name: digest(path) for path in uploads}})
     print(f"Prepared {version}: {commit}, {len(manifest)} files", flush=True)
     if not args.publish:
         return
@@ -195,7 +248,7 @@ def main():
     if release:
         run("gh","release","upload",f"v{version}","--repo",REPO,"--clobber",*uploads)
     else:
-        run("gh", "release", "create", f"v{version}", "--repo", REPO, "--verify-tag", "--draft", "--title", f"猛人输入法 v{version} 正式版", "--notes-file", args.notes.resolve(), *uploads)
+        run("gh", "release", "create", f"v{version}", "--repo", REPO, "--verify-tag", "--draft", "--title", f"猛人输入法 v{version} 正式版（{'、'.join(PLATFORM_NAMES[name] for name in platforms)}）", "--notes-file", args.notes.resolve(), *uploads)
     release=find_release(version)
     if not release or not release["draft"]:
         raise SystemExit("未找到本次发布草稿，停止发布")
@@ -207,7 +260,9 @@ def main():
             raise SystemExit("草稿附件校验不一致，未公开 Release")
     gh_json("--method","PATCH",f"repos/{REPO}/releases/{release['id']}","-F","draft=false","-f","make_latest=true")
     save(state_path, {"version": version, "commit": commit, "manifest": manifest})
-    save(dist / "published.json", {"version": version, "commit": commit, "url": f"https://github.com/{REPO}/releases/tag/v{version}", "verified_uploads": len(uploads)})
+    save(dist / "published.json", {"version": version, "platforms": platforms, "commit": commit, "url": f"https://github.com/{REPO}/releases/tag/v{version}", "verified_uploads": len(uploads)})
+    # 本次源码导出与上一版索引只在发布过程中用；收据在 release-dist 里，公开后删掉这份临时导出（每次约 90 MB）。
+    shutil.rmtree(work, ignore_errors=True)
     print(f"Published https://github.com/{REPO}/releases/tag/v{version}", flush=True)
 
 
