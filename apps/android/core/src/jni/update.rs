@@ -113,3 +113,14 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_updateCancel(
 ) {
     CANCELLED.store(true, Ordering::Relaxed);
 }
+
+/// 猛人 GitHub 最新正式版的发布页，与桌面端「下载」打开的是同一个地址；关于页显示并可用浏览器打开。
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_updateDownloadPage<'local>(
+    env: JNIEnv<'local>,
+    _this: JObject<'local>,
+) -> jstring {
+    env.new_string(qingjian_update::DOWNLOAD_URL)
+        .map(JString::into_raw)
+        .unwrap_or(std::ptr::null_mut())
+}

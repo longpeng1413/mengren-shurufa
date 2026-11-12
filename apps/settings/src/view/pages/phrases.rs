@@ -1,4 +1,4 @@
-//! 「自定义短语」页：每条一行（开关、输入码、权重、内容的开头、编辑），末尾新增与导入导出；macOS 另有「也用系统的文本替换」。
+//! 「自定义短语」页：最前是新增与导入导出，下面每条一行（开关、输入码、权重、内容的开头、编辑）；macOS 另有「也用系统的文本替换」。
 //! 新增、编辑在对话框里改，保存时整张表校验。
 
 use bamboo_slip::taffy::{
@@ -28,10 +28,8 @@ pub fn phrases(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, RenderE
     let config = &page.settings.config;
     let mut out = Vec::new();
 
+    // 新增与导入导出排在最前：短语多了不用滚到底才找得到
     let mut rows = Vec::new();
-    for (index, phrase) in config.custom_phrases.iter().enumerate() {
-        rows.push(phrase_row(ui, page, index, phrase)?);
-    }
     let add =
         Button::new(tr("phrases.add")).build(ui, theme, "add-phrase", Message::OpenPhrase(None))?;
     rows.push(with_notice(
@@ -71,6 +69,9 @@ pub fn phrases(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, RenderE
             .control(buttons),
         "phrases-transfer",
     )?);
+    for (index, phrase) in config.custom_phrases.iter().enumerate() {
+        rows.push(phrase_row(ui, page, index, phrase)?);
+    }
     out.push(section_title(ui, theme, tr("phrases.section_phrases"))?);
     out.push(group(ui, theme, &rows)?);
 

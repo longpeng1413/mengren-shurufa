@@ -13,6 +13,7 @@ internal object Native {
     external fun updateDownload(current: String, version: String, proxy: String, cache: String): String?
     external fun updateProgress(): Long
     external fun updateCancel()
+    external fun updateDownloadPage(): String
 
     external fun cloudModels(settings: String): String?
     external fun memberStart(host: String, proxy: String): String?

@@ -16,7 +16,20 @@ import kotlin.concurrent.thread
 object UpdateInstaller {
     var foreground: WeakReference<Activity>? = null
     var confirmation: Intent? = null
-    private val installing = AtomicBoolean(false)
+
+    /**
+     * 只在写包、提交会话的那几秒拦重复点击。不等系统回报结果：有的系统在确认框里点取消后不回调，
+     * 等结果会让「立即更新」一直没反应（键盘与设置同进程，进程不退出就恢复不了）。
+     */
+    private val writing = AtomicBoolean(false)
+
+    /** 本进程最近一次提交的安装会话；作废的旧会话补发的结果不认（-1 为本进程还没装过）。 */
+    @Volatile var session: Int = -1
+        private set
+
+    /** 正在写包或提交；没在写时界面上残留的「正在准备安装」可以改回「可以安装」。 */
+    val busy: Boolean get() = writing.get()
+
     @Suppress("DEPRECATION")
     private fun verify(context: Context, apk: File) {
         val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
@@ -28,22 +41,26 @@ object UpdateInstaller {
         val next = if (Build.VERSION.SDK_INT >= 28) candidate.signingInfo?.apkContentsSigners else candidate.signatures
         require(!old.isNullOrEmpty() && old.toSet() == next?.toSet())
     }
+
     fun install(context: Context) {
-        if (!installing.compareAndSet(false, true)) return
+        if (!writing.compareAndSet(false, true)) return
         val app = context.applicationContext
         val apk = Updates.pending(app)
-        if (apk == null) { installing.set(false); Updates.fail(app, "package"); return }
+        if (apk == null) { writing.set(false); Updates.fail(app, "package"); return }
+        confirmation = null
         Updates.status(app, "installing")
         thread(name = "mengren-package-install") {
             var sessionId: Int? = null
             val installer = app.packageManager.packageInstaller
             try {
                 verify(app, apk)
+                // 上次确认框被取消却没回调的会话还挂着，先作废，再开新的
+                installer.mySessions.forEach { runCatching { installer.abandonSession(it.sessionId) } }
                 val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
                     setAppPackageName(app.packageName); setSize(apk.length())
                     if (Build.VERSION.SDK_INT >= 31) setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
                 }
-                val id = installer.createSession(params); sessionId = id
+                val id = installer.createSession(params); sessionId = id; session = id
                 installer.openSession(id).use { session ->
                     apk.inputStream().use { input -> session.openWrite("base.apk", 0, apk.length()).use { output -> input.copyTo(output, 1024 * 1024); session.fsync(output) } }
                     val intent = Intent(app, UpdateInstallReceiver::class.java)
@@ -52,9 +69,13 @@ object UpdateInstaller {
                 }
             } catch (_: Exception) {
                 sessionId?.let { runCatching { installer.abandonSession(it) } }
-                installing.set(false); Updates.fail(app, "package")
+                Updates.fail(app, "package")
+            } finally {
+                writing.set(false)
             }
         }
     }
-    fun finished() { installing.set(false) }
+
+    /** 系统回报了结果（成功、取消或失败）：留着的确认界面不再有用。 */
+    fun finished() { confirmation = null }
 }

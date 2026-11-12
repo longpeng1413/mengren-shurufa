@@ -60,7 +60,14 @@ if ($Android) {
         & .\gradlew.bat assembleRelease --console=plain '-Pkotlin.incremental=false' `
             '-Dhttp.proxyHost=127.0.0.1' '-Dhttp.proxyPort=7897' '-Dhttps.proxyHost=127.0.0.1' '-Dhttps.proxyPort=7897'
         if ($LASTEXITCODE -ne 0) { throw "安卓编译失败（退出码 $LASTEXITCODE）" }
-    } finally { Pop-Location }
+    } finally {
+        # Gradle / Kotlin 常驻进程会占着调用方的输出管道，后台调用本脚本时会一直等不到结束；编完就停掉
+        & .\gradlew.bat --stop | Out-Null
+        Get-CimInstance Win32_Process -Filter "Name='java.exe'" |
+            Where-Object { $_.CommandLine -match 'KotlinCompileDaemon' } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Pop-Location
+    }
     Remove-Item Env:CARGO_TARGET_DIR
     $apk = Join-Path $Out "猛人输入法-安卓-$stamp.apk"
     Copy-Item (Join-Path $Repo 'apps\android\app\build\outputs\apk\release\app-release.apk') $apk

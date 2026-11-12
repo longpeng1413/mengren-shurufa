@@ -27,6 +27,7 @@
     <string name="update_install">Update now</string>
     <string name="update_offer">Version %1$s · %2$d MB</string>
     <string name="update_cancel">Cancel download</string>
+    <string name="update_github">Download on GitHub</string>
     <string name="update_proxy">Update proxy (blank uses system)</string>
     <string name="update_network_note">Downloads are verified before system installation. Settings are preserved. Allow Mengren in your per-app proxy list.</string>
     <string name="update_permission_title">Allow update installation</string>

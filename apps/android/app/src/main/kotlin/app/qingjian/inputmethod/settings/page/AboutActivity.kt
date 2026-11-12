@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings as AndroidSettings
+import app.qingjian.inputmethod.core.Native
 import app.qingjian.inputmethod.update.Updates
 import app.qingjian.inputmethod.update.UpdateInstaller
 import java.lang.ref.WeakReference
@@ -29,6 +30,10 @@ class AboutActivity : PageActivity() {
         if (permissionPending) {
             permissionPending = false
             if (!packageManager.canRequestPackageInstalls()) { Updates.prefs(this).edit().putBoolean("install_requested", false).apply(); Updates.fail(this, "permission") }
+        }
+        // 确认框取消后有的系统不回调：没在写包时把残留的「正在准备安装」改回「可以安装」，可以再点一次
+        if (Updates.prefs(this).getString("status", "") == "installing" && !UpdateInstaller.busy && Updates.pending(this) != null) {
+            Updates.status(this, "ready")
         }
         rebuild(); maybeInstall()
     }
@@ -88,6 +93,10 @@ class AboutActivity : PageActivity() {
             if (notes.isNotBlank()) rows += ui.text(notes, 13f, ui.colors.secondary)
         }
         if (state == "downloading") rows += ui.action(R.string.update_cancel, null) { Updates.cancel(this) }
+        val page = Native.updateDownloadPage()
+        rows += ui.action(R.string.update_github, page.removePrefix("https://")) {
+            runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(page))) }
+        }
         rows += ui.input(R.string.update_proxy, store.getString("proxy", "").orEmpty(), store.getString("proxy", "").orEmpty(), secret = false) { store.edit().putString("proxy", it.trim()).apply() }
         return rows
     }
