@@ -12,7 +12,7 @@ Each phrase is a row on the page: an on/off switch (labelled with the input code
 
 Adding and editing happen in a card that pops up:
 
-- **输入码 (Input code)**: 1–32 lowercase English letters, such as `dz`. No digits: while typing, digit keys pick candidates. To give a numbered symbol like ⑪ a code, spell it in letters, such as `yqsy`; circled numbers and circled ideographs (㊣) can also be found in the [symbol panel](../input/punctuation.md#Symbol-panel) by searching 序号 or 带圈汉字.
+- **输入码 (Input code)**: 1–32 lowercase English letters (such as `dz`), or 1–32 digits (such as `1981`, see [Number phrases](#Number-phrases)). Letters and digits can't be mixed in one code: while typing pinyin, digit keys pick candidates. To give a numbered symbol like ⑪ a code, spell it in letters, such as `yqsy`; circled numbers and circled ideographs (㊣) can also be found in the [symbol panel](../input/punctuation.md#Symbol-panel) by searching 序号 or 带圈汉字.
 - **权重 (Weight)**: a whole number from 1 to 999, 10 for a new phrase. Under the same input code, heavier phrases come first; weights can be equal, and equal ones keep their order on the page.
 - **内容 (Content)**: can span several lines and contain spaces, addresses, long replies or punctuation, and is committed exactly as written. The box wraps to its width; for very long content it grows to at most 12 lines and then shows the lines around the cursor.
 
@@ -21,6 +21,15 @@ Click 保存 (Save) to apply; `Esc` or 取消 (Cancel) discards the changes. Whe
 For example, add two phrases for `ee`: `：` with weight 20 and `；` with weight 10. Type `ee` and press Space to get ：, or press 2 to get ；.
 
 In the candidate window, a multi-line phrase is shown on one line (line breaks drawn as `↵`), and a very long one shows only its first 30 or so Chinese-character widths followed by …; the full content is still what gets committed.
+
+## Number phrases
+
+A phrase whose input code is all digits is for long numbers such as phone, ID or bank card numbers, for example input code `1981` with content `19813451919`. Typing the first few digits of the code is enough; when several match, the one whose code is exactly what you typed comes first, the rest by weight. Available on Windows and Android (Mengren 0.4.6 onward); macOS and Linux don't support it yet (you can save one, but it doesn't show up while typing).
+
+- **Windows**: when you aren't typing pinyin and the digits you type start a number phrase's code, they stay in the pinyin line and the phrases appear as candidates. `Space` commits the first one; use the arrow keys or the mouse for the others. Digit keys are part of the number here and don't pick candidates. `Enter` commits the digits as typed. A digit that matches no phrase commits everything typed so far as is, so other numbers come out normally; letters and punctuation also commit the digits first. Digits typed right after a letter, digit or decimal point don't trigger it (you're in the middle of a model name or number).
+- **Android**: digits are committed as usual, and the candidate bar offers the phrases that start with those digits; tap one to replace the digits with its full content, or ignore it.
+- The numbers stay in your local settings and paired devices: number phrases aren't sent to the cloud AI suggestions and aren't learned.
+- For syncing across devices, both ends need the versions above: older versions reject a sync batch that contains number phrases (your existing phrases are left alone); sync again after updating.
 
 ## Time variables
 

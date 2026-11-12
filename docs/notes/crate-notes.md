@@ -131,8 +131,13 @@ mac 存在 `Session::spelling`（`Host::follow_highlight`）、Windows / Linux �
   英文模式下也插（#763）：以前这里有 `english_mode` 早退，英文短语如 `dont` → `don't` 在 Caps Lock 亮着时不出；
   但只插内容不含汉字的短语（`sentence::is_han` 判），中文短语（含中文模式右键「置顶」按拼音加的那条）在英文模式按空格会直接上屏中文，维护者评审时指出过（`uu` → 文本、`he` → 和）。
   时间变量（#800，`custom_phrase::expand_variables`）在 `insert_custom_phrases` 里按当时的本地时间换掉，候选文字就是上屏文字；`stored_text` 对 `Custom(n)` 按 `scope_phrases` 的名次找回带变量的原文，置顶 / 取消置顶才认得。
+- 数字短语（`engine/number.rs`，输入码全是数字，`custom_phrase::is_number_code`）：不走拼音，按已敲数字的**前缀**匹配（`number_phrases`：码正好相等的在前，其余按权重，同文只留一条）。
+  桌面壳在没组句、上一个上屏字不是字母 / 数字 / 小数点时问 `number_input(c)`，接得住就 `push`；缓冲区全是数字时 `number_mode()` 为真，
+  `query` 只出这些短语（`scope_phrases` 也换成它，`Custom(n)` 名次对得上），不记查询摘要、不发云联想、不给「置顶」。
+  手机壳不组句：`number_completions(光标前文字)` 给（删几个字符，上屏文字），沿用邮箱 / 算式补全的通道。注音、九宫格的数字是音节 / 字母键，不参与。
+  同步：旧版 `phrase_sync::validate` 认为数字码不合法，收到含数字短语的批次整批拒收（不写文件），两端都要升级。
 - `custom_phrase::merge_replacements` 把平台给的「输入码 → 短语」表（macOS 系统文本替换）并进配置里的自定义短语：每条用缺省权重接在后面，
-  输入码不是小写字母、已有同码同文本的跳过；Core 不管数据从哪来。
+  输入码不合法（`valid_code`：全小写字母或全数字）、已有同码同文本的跳过；Core 不管数据从哪来。
 - 拼写纠错（`correction`）：整段一处编辑的变体里相邻换位允许末尾音节没敲完（`loose_segmentation`，`mignt` → `ming t…`；
   有「每个音节都完整、末尾不是落单单字母」的变体时残尾变体不参与，免得 `keyyi` 的 可以 被 `ke yi y…` 抢走），
   纠正之间比较时换位减 `TypoCosts::correction_transpose_discount`（1 nat，CLI `--tune correction-transpose=`），与原样比不减；
@@ -199,7 +204,7 @@ mac 存在 `Session::spelling`（`Host::follow_highlight`）、Windows / Linux �
   图片存在 `clipboard-images/`，按内容的 64 位 FNV-1a 取名（同一张只存一份），条目删了、没别的条目用这张图就删文件。增删时整份原子重写——
   1000 条也就几百 KB，毫秒级；以后要全文搜索或上万条再换 SQLite，壳只经这个类型读写。壳只负责读系统剪贴板、把文字或图片交进来。
 - `PhraseBook`：自定义短语（`phrases.json`，`[{text, group, code}]`，靠前的常用）。增删改、移到最前（`move_to_top`）、分组（`groups`，「默认」总在第一）；
-  输入码只留字母、转小写、最多 32 个（`MAX_CODE_LEN`，与 Core 自定义短语一致；以前存下的超长码转换时跳过），`custom_phrases` 把带码的换成 Core `CustomPhrase`，权重与启用状态保留，未设置时按默认权重 10 和启用处理，同权重按先后排。
+  输入码纯数字的原样留着（数字短语），否则只留字母、转小写，最多 32 个（`MAX_CODE_LEN`，与 Core 自定义短语一致；以前存下的超长码转换时跳过），`custom_phrases` 把带码的换成 Core `CustomPhrase`，权重与启用状态保留，未设置时按默认权重 10 和启用处理，同权重按先后排。
 - 各表落盘走 Core `storage::write_atomic`（临时文件 + fsync + 改名），加载按行容错（坏行警告跳过，真读不了壳退回内存学习），
   壳激活期间每 60 秒 `Engine::flush_learning`；IMK 回调边界 `imk::catch_panic` 拦 panic、缓冲区字母原样上屏（见 architecture.md「崩溃不丢」）。
 

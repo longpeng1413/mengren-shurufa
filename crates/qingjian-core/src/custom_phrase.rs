@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::i18n::{tr, tr_args};
 
-/// 输入码最长几个字母。
+/// 输入码最长几个字符。
 pub const MAX_CODE_LEN: usize = 32;
 
 /// 新建短语的权重。
@@ -23,7 +23,7 @@ pub const WEIGHTS: RangeInclusive<u32> = 1..=999;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "StoredPhrase")]
 pub struct CustomPhrase {
-    /// 小写英文字母输入码，1–32 个字符。
+    /// 输入码，1–32 个字符：全是小写英文字母，或全是数字（数字短语，见 [`is_number_code`]）。
     pub code: String,
 
     /// 原样上屏的文本，保留空格和换行。
@@ -170,13 +170,22 @@ pub fn validate_phrases(phrases: &[CustomPhrase]) -> Result<(), String> {
     Ok(())
 }
 
-/// 输入码能不能当自定义短语用：1–[`MAX_CODE_LEN`] 个小写英文字母。
+/// 输入码能不能当自定义短语用：1–[`MAX_CODE_LEN`] 个小写英文字母，或同样长度的纯数字。
+/// 字母和数字混着的不行：组句中数字键是选候选，`a1` 打不出来。
 pub fn valid_code(code: &str) -> bool {
-    !code.is_empty() && code.len() <= MAX_CODE_LEN && code.bytes().all(|c| c.is_ascii_lowercase())
+    !code.is_empty()
+        && code.len() <= MAX_CODE_LEN
+        && (code.bytes().all(|c| c.is_ascii_lowercase()) || is_number_code(code))
+}
+
+/// 纯数字输入码（手机号、证件号这类）：不走拼音组句，按已敲数字的前缀匹配，
+/// 见 `Engine::number_input` 与 `Engine::number_completions`。
+pub fn is_number_code(code: &str) -> bool {
+    !code.is_empty() && code.bytes().all(|c| c.is_ascii_digit())
 }
 
 /// 把系统的文本替换（macOS「键盘 → 文本替换」这类「输入码 → 短语」表）并进自定义短语：
-/// 每条用缺省权重接在后面，同权重时排在用户自己的短语之后；输入码不是小写字母、短语为空、
+/// 每条用缺省权重接在后面，同权重时排在用户自己的短语之后；输入码不合法（见 [`valid_code`]）、短语为空、
 /// 或用户已有同码同文本的规则时跳过。结果保证通过 [`validate_phrases`]（前提是 `base` 本身合法）。
 pub fn merge_replacements<'a>(
     base: &[CustomPhrase],
@@ -294,8 +303,8 @@ impl CustomPhrase {
 #[cfg(test)]
 mod tests {
     use super::{
-        CustomPhrase, DEFAULT_WEIGHT, expand_variables, merge_imported, merge_replacements,
-        parse_weight, pin, unpin, validate_phrases,
+        CustomPhrase, DEFAULT_WEIGHT, MAX_CODE_LEN, expand_variables, merge_imported,
+        merge_replacements, parse_weight, pin, unpin, valid_code, validate_phrases,
     };
 
     #[test]
@@ -370,6 +379,25 @@ mod tests {
         assert_eq!(merged.len(), 4);
         assert_eq!(merged[2], CustomPhrase::new("yx", "qi@example.com"));
         assert_eq!(merged[3], CustomPhrase::new("omw", "On my way!"));
+    }
+
+    #[test]
+    fn codes_are_all_letters_or_all_digits() {
+        for code in ["dz", "1981", "0", &"9".repeat(MAX_CODE_LEN)] {
+            assert!(valid_code(code), "{code}");
+        }
+        for code in [
+            "",
+            "a1",
+            "1a",
+            "D",
+            "19-81",
+            " 1981",
+            &"9".repeat(MAX_CODE_LEN + 1),
+        ] {
+            assert!(!valid_code(code), "{code}");
+        }
+        validate_phrases(&[CustomPhrase::new("1981", "19813451919")]).unwrap();
     }
 
     #[test]

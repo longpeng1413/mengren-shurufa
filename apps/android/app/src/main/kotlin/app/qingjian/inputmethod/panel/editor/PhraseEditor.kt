@@ -25,7 +25,7 @@ import app.qingjian.inputmethod.theme.Palette
 /**
  * 加 / 改自定义短语：浮在键盘上方，键盘照常打字，打的字进这里而不是外面的输入框——
  * 输入法服务编辑时把 [connection] 当输入连接交给 Composer。上面 ⌄ 收起 / 标题 / 完成，中间正文（带字数），
- * 下面「输入码」（只收字母，最多 32 个，跟桌面自定义短语一样；点它切过去打码）与「目录」（点名字换下一组，「＋新建」打新分组名，新建中再点名字取消）。完成或收起都回自定义短语页。
+ * 下面「输入码」（全是字母或全是数字，最多 32 个，跟桌面自定义短语一样；点它切过去打码）与「目录」（点名字换下一组，「＋新建」打新分组名，新建中再点名字取消）。完成或收起都回自定义短语页。
  */
 @SuppressLint("ViewConstructor")
 class PhraseEditor(
@@ -94,10 +94,15 @@ class PhraseEditor(
             super.deleteSurroundingText(beforeLength, afterLength).also { invalidate() }
     }
 
-    /** 输入码只收字母、转小写，总长不过 [PhraseRules.maxCode]。 */
+    /**
+     * 输入码要么全是字母（转小写），要么全是数字（数字短语：手机号、证件号开头几位），按已有的第一个字符定，
+     * 不混用；总长不过 [PhraseRules.maxCode]。
+     */
     private fun filterCode(value: CharSequence): CharSequence {
         val room = (PhraseRules.maxCode - code.length).coerceAtLeast(0)
-        return value.filter { it in 'a'..'z' || it in 'A'..'Z' }.toString().lowercase().take(room)
+        val typed = value.filter { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' }.toString().lowercase()
+        val digits = (code.firstOrNull() ?: typed.firstOrNull())?.isDigit() == true
+        return typed.filter { it.isDigit() == digits }.take(room)
     }
 
     /** Composer 不在组句时发来的键：删除删光标前一个字，回车在正文里换行。 */
@@ -161,7 +166,7 @@ class PhraseEditor(
         }
         // 码长了放不下：留末尾（正在打的那头），前面用 … 代替
         val codeRoom = box.centerX() - box.left - padding - ink.measure("输入码：", 13.5f) - ink.dp(8f)
-        var shownCode = code.toString().ifEmpty { "只收字母，可不填" }
+        var shownCode = code.toString().ifEmpty { "字母或数字，可不填" }
         if (code.isNotEmpty() && ink.measure(shownCode, 14f) > codeRoom) {
             while (shownCode.length > 1 && ink.measure("…$shownCode", 14f) > codeRoom) shownCode = shownCode.drop(1)
             shownCode = "…$shownCode"

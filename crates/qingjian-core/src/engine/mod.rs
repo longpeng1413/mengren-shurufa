@@ -22,6 +22,7 @@ mod key_hint;
 mod learning;
 mod marked;
 mod mode_keys;
+mod number;
 mod panel;
 pub(crate) mod prediction;
 mod privacy;

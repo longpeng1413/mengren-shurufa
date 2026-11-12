@@ -36,6 +36,21 @@ impl Engine {
         self.last_choice_scores.borrow_mut().clear();
         self.corrected_alternates.borrow_mut().clear();
         self.forget_stale_compose();
+        // 数字短语：只出短语，不解析拼音，也不记进输入日志的查询摘要（号码不留痕）
+        if self.number_mode() {
+            let mut query = Query::custom_only(
+                self.composition.text(),
+                self.composition.cursor(),
+                false,
+                false,
+                false,
+                self.composition.scope(),
+                self.composition.rest().to_owned(),
+            );
+            self.insert_custom_phrases(&mut query.candidates.items);
+            self.traditional.apply(&mut query.candidates);
+            return Ok(query);
+        }
         let mut query = match self.query_inner() {
             Ok(query) => query,
             Err(error) => {

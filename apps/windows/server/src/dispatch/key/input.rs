@@ -104,6 +104,9 @@ impl Router {
             }
             return with_prefix(Some(mark), self.apply_key(event), c);
         }
+        if let Some(effect) = self.apply_number(c, event) {
+            return effect;
+        }
         // 英文组词中候选被关掉（Caps 亮 / 切应用）：敲过的字母先原样上屏。
         let flushed = (self.composing() && !english_candidates && self.engine.english_mode())
             .then(|| self.engine.take_raw());
@@ -137,6 +140,29 @@ impl Router {
             CommitRoute::Raw => Effect::Changed(Some(self.engine.take_raw())),
             CommitRoute::Unbound | CommitRoute::Keep => Effect::Navigated,
         })
+    }
+
+    /// 数字短语（输入码全是数字，规则见 Core 的 `Engine::number_input`）：接得住的数字留在缓冲区出短语。
+    /// 已在数字缓冲区里时：对不上的数字连同缓冲区原样上屏（打的是别的号码），空格上屏高亮的短语，
+    /// 其余可打印键先把数字原样上屏再照常分派。回车、退格这些功能键走组句的通用规则，不到这里。
+    /// 返回 `None` 照原来的分派走。
+    fn apply_number(&mut self, c: char, event: &KeyEvent) -> Option<Effect> {
+        if self.engine.number_input(c) {
+            self.engine.push(c);
+            return Some(Effect::Changed(None));
+        }
+        if !self.engine.number_mode() {
+            return None;
+        }
+        if c.is_ascii_digit() {
+            self.engine.push(c);
+            return Some(Effect::Changed(Some(self.engine.take_raw())));
+        }
+        if c == ' ' {
+            return Some(Effect::Changed(Some(self.commit_highlighted())));
+        }
+        let raw = self.engine.take_raw();
+        Some(with_prefix(Some(raw), self.apply_key(event), c))
     }
 
     /// 缓冲区里只有一个 `?`：清掉，还原成问号（按当前模式的全角设置转）。

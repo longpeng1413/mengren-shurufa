@@ -122,7 +122,9 @@ impl Engine {
         } else {
             None
         };
+        // 数字短语的号码不发给云端
         if self.english_mode
+            || self.number_mode()
             || self.modes().is_expression(scope, self.zhuyin)
             || (nine_key_pinyin.is_none()
                 && is_raw(scope, self.modes(), self.shuangpin.as_deref(), self.zhuyin))

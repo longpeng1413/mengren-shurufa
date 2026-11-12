@@ -13,7 +13,7 @@ interface FloatingEditor {
     /** Composer 不在组句时发来的键（删除、回车）。 */
     fun onKey(keyCode: Int)
 
-    /** 只收字母：键盘换成英文全键盘（九宫格、注音打不出字母）。 */
+    /** 只收字母或数字（自定义短语的输入码）：键盘换成英文全键盘（九宫格、注音打不出字母）。 */
     val lettersOnly: Boolean get() = false
 
     /** 回车键上写的字；null 用外面输入框的。 */

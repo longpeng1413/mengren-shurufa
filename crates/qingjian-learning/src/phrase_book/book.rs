@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use qingjian_core::CustomPhrase;
-use qingjian_core::custom_phrase::{MAX_CODE_LEN, valid_code};
+use qingjian_core::custom_phrase::{MAX_CODE_LEN, is_number_code, valid_code};
 use qingjian_core::storage::{read_text_lossy, write_atomic_str};
 
 use super::Phrase;
@@ -17,7 +17,7 @@ pub const DEFAULT_GROUP: &str = "默认";
 /// 最多存多少条。
 const MAX_PHRASES: usize = 10_000;
 
-/// 输入码最长几个字母，跟 Core 自定义短语的上限一致：长了挂不成短语。
+/// 输入码最长几个字符，跟 Core 自定义短语的上限一致：长了挂不成短语。
 pub const MAX_CODE_CHARS: usize = MAX_CODE_LEN;
 
 #[derive(Debug, Default)]
@@ -174,7 +174,8 @@ impl PhraseBook {
     }
 }
 
-/// 文字为空返回 `None`；分组空了归 [`DEFAULT_GROUP`]；输入码只留字母、转小写、截到 [`MAX_CODE_CHARS`]。
+/// 文字为空返回 `None`；分组空了归 [`DEFAULT_GROUP`]；输入码纯数字的原样留着（数字短语），
+/// 否则只留字母、转小写，都截到 [`MAX_CODE_CHARS`]。
 fn normalize(text: &str, group: &str, code: &str) -> Option<Phrase> {
     if text.trim().is_empty() {
         return None;
@@ -190,12 +191,15 @@ fn normalize(text: &str, group: &str, code: &str) -> Option<Phrase> {
             group
         }
         .to_owned(),
-        code: code
-            .chars()
-            .filter(char::is_ascii_alphabetic)
-            .map(|c| c.to_ascii_lowercase())
-            .take(MAX_CODE_CHARS)
-            .collect(),
+        code: if is_number_code(code.trim()) {
+            code.trim().chars().take(MAX_CODE_CHARS).collect()
+        } else {
+            code.chars()
+                .filter(char::is_ascii_alphabetic)
+                .map(|c| c.to_ascii_lowercase())
+                .take(MAX_CODE_CHARS)
+                .collect()
+        },
     })
 }
 
@@ -238,6 +242,16 @@ mod tests {
         assert_eq!(custom[0].text, "一");
         assert_eq!(custom[1].text, "二");
         assert!(qingjian_core::custom_phrase::validate_phrases(&custom).is_ok());
+    }
+
+    #[test]
+    fn number_codes_are_kept_and_mixed_codes_lose_their_digits() {
+        let mut book = PhraseBook::default();
+        book.add("19813451919", "", " 1981 ").unwrap();
+        book.add("序号", "", "Yq11").unwrap();
+        let codes: Vec<_> = book.phrases().iter().map(|p| p.code.as_str()).collect();
+        assert!(codes.contains(&"1981") && codes.contains(&"yq"));
+        assert_eq!(book.custom_phrases().len(), 2);
     }
 
     #[test]

@@ -79,7 +79,11 @@ impl Engine {
     }
 
     /// 当前输入码下出候选的短语，按出现的先后：权重从高到低，相同的按列表顺序。第 i 个就是 `CandidateKind::Custom(i + 1)`。
+    /// 数字短语按前缀匹配，见 [`Self::number_phrases`]。
     pub(super) fn scope_phrases(&self) -> Vec<&CustomPhrase> {
+        if self.number_mode() {
+            return self.number_phrases(self.composition.scope());
+        }
         let mut phrases: Vec<_> = self
             .custom_phrases
             .iter()

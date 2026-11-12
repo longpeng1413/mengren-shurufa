@@ -519,7 +519,7 @@ class QingjianInputMethodService :
         when {
             composer.page == Composer.Page.NUMBERS -> keyboard.setRows(KeyboardLayout.numbers(), side = true)
             composer.page == Composer.Page.SYMBOLS -> keyboard.setRows(KeyboardLayout.symbols(composer.chinese, fullWidth))
-            // 自定义短语的输入码只收字母，九宫格、注音打不出来，换成英文全键盘
+            // 自定义短语的输入码只收字母或数字，九宫格、注音打不出字母，换成英文全键盘（数字在数字页）
             editor?.lettersOnly == true -> keyboard.setRows(KeyboardLayout.qwerty(chinese = false))
             composer.nineKey -> keyboard.setRows(KeyboardLayout.nineKey(fullWidth), side = true)
             composer.zhuyin -> keyboard.setRows(KeyboardLayout.zhuyin(fullWidth))

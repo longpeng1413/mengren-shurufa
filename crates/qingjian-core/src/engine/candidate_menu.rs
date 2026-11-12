@@ -49,10 +49,10 @@ impl Engine {
     }
 
     /// 把这个候选置顶要建的自定义短语：(输入码, 词)。输入码就是当前作用域的字母；
-    /// 英文模式、作用域不是合法输入码（带数字、分隔符或太长）时给 `None`，壳不出「置顶」。
+    /// 英文模式、数字短语（按前缀出的，置顶对不上码）、作用域不是合法输入码（带分隔符或太长）时给 `None`，壳不出「置顶」。
     pub fn pin_target(&self, candidate: &Candidate) -> Option<(String, String)> {
         let code = self.composition.scope();
-        (!self.english_mode && crate::custom_phrase::valid_code(code))
+        (!self.english_mode && !self.number_mode() && crate::custom_phrase::valid_code(code))
             .then(|| (code.to_owned(), self.stored_text(candidate)))
     }
 

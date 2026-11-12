@@ -1,10 +1,16 @@
 //! 打字：按键、选词、删词、回车、空格与补全。
 
+use qingjian_core::CustomPhrase;
+
 use super::Session;
 use crate::frame::{Frame, FrameCandidate};
 
+/// 数字短语补全在候选条上最多显示几个字，多行、长文本截成一行。
+const NUMBER_LABEL_CHARS: usize = 24;
+
 impl Session {
-    /// 不在组句时按光标前的文字给补全（「用户名@」之后的邮箱后缀、刚打完的算式的结果），放进帧的候选；组句中不动。
+    /// 不在组句时按光标前的文字给补全（「用户名@」之后的邮箱后缀、刚打完的算式的结果、
+    /// 打出号码开头几位时的数字短语），放进帧的候选；组句中不动。
     pub fn complete(&mut self, before_cursor: &str) -> Frame {
         if !self.engine.composition().is_empty()
             || self.kana.as_ref().is_some_and(|kana| !kana.is_empty())
@@ -21,6 +27,10 @@ impl Session {
             labels.push(completion.label);
             self.completions
                 .push((completion.replace, completion.insert));
+        }
+        for (replace, text) in self.engine.number_completions(before_cursor) {
+            labels.push(CustomPhrase::preview(&text, NUMBER_LABEL_CHARS));
+            self.completions.push((replace, text));
         }
         frame.candidates = labels
             .iter()
@@ -158,5 +168,29 @@ impl Session {
     pub fn pin(&mut self, alternative: &str) -> Frame {
         self.engine.pin_nine_key(alternative);
         self.refresh(String::new())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use qingjian_core::dictionary::Dictionary;
+    use qingjian_core::{CustomPhrase, Engine};
+
+    use super::Session;
+
+    #[test]
+    fn number_phrases_complete_the_digits_before_the_cursor() {
+        let mut engine = Engine::new(Dictionary::parse("你\tni\t9000\n").unwrap());
+        engine
+            .set_custom_phrases(vec![CustomPhrase::new("1981", "19813451919")])
+            .unwrap();
+        let mut session = Session::new(engine, PathBuf::new(), PathBuf::new(), PathBuf::new());
+        let frame = session.complete("电话 198");
+        assert_eq!(frame.candidates.len(), 1);
+        let frame = session.select(0);
+        assert_eq!((frame.commit.as_str(), frame.replace), ("19813451919", 3));
+        assert!(session.complete("abc198").candidates.is_empty());
     }
 }

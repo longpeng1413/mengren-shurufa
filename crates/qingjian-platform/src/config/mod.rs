@@ -362,7 +362,7 @@ system_text_replacements = true
 
 # 自定义短语示例：取消下面各行注释后启用；同一个输入码下按权重从高到低排在普通候选前面。
 # [[custom_phrases]]
-# code = "ww"       # 输入码：1–32 个小写英文字母
+# code = "ww"       # 输入码：1–32 个小写英文字母，或 1–32 位数字（数字短语，Windows 用）
 # text = "；"       # 原样上屏的文本，可包含空格与换行；{year} {month} {day} {hour} {minute} {second} {weekday} 换成当前时间，{{ }} 是花括号本身
 # weight = 10       # 权重：1–999，可以相同，相同的按文件里的先后
 # enabled = true    # 是否启用

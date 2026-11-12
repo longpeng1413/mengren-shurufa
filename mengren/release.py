@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import uuid
@@ -87,6 +88,17 @@ def merge_index(previous, entry, platforms):
         if platform not in kept:
             raise SystemExit(f"上一版索引里没有 {platform} 的安装包，单端发布会让它失去更新")
     return {"schema_version": 1, "releases": [entry] + previous["releases"]}
+
+
+def remove_tree(path):
+    """删临时目录：只读文件先去掉只读再删；还是删不掉就说出来，不悄悄留下。"""
+    def retry(function, target, _error):
+        os.chmod(target, stat.S_IWRITE)
+        function(target)
+    try:
+        shutil.rmtree(path, onexc=retry)
+    except OSError as error:
+        print(f"临时目录没删掉，请手动删除：{path}（{error}）", flush=True)
 
 
 def save(path, value):
@@ -262,7 +274,7 @@ def main():
     save(state_path, {"version": version, "commit": commit, "manifest": manifest})
     save(dist / "published.json", {"version": version, "platforms": platforms, "commit": commit, "url": f"https://github.com/{REPO}/releases/tag/v{version}", "verified_uploads": len(uploads)})
     # 本次源码导出与上一版索引只在发布过程中用；收据在 release-dist 里，公开后删掉这份临时导出（每次约 90 MB）。
-    shutil.rmtree(work, ignore_errors=True)
+    remove_tree(work)
     print(f"Published https://github.com/{REPO}/releases/tag/v{version}", flush=True)
 
 

@@ -17,6 +17,7 @@ mod held;
 mod learning;
 mod lookup;
 mod nine_key;
+mod number;
 mod p2c_placement;
 mod panel;
 mod panel_translate;

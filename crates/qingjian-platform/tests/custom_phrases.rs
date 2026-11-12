@@ -239,7 +239,7 @@ fn exported_phrases_import_back_and_configs_are_refused() {
 /// Rime `custom_phrase.txt`：文字<Tab>输入码<Tab>权重，文件头与注释跳过，权重夹到 1–999。
 #[test]
 fn rime_style_tsv_imports() {
-    let source = "# Rime table\n---\nname: custom_phrase\n...\n\n地址\tdz\t1\n青简输入法\tqj\t5000\n没码\n你好\tnh\n⑪\tyq11\n";
+    let source = "# Rime table\n---\nname: custom_phrase\n...\n\n地址\tdz\t1\n青简输入法\tqj\t5000\n没码\n你好\tnh\n⑪\tyq11\n19813451919\t1981\n";
     bamboo_slip_i18n::pin_locale("zh-Hans");
     let (read, skipped) = qingjian_platform::import_phrases(source).unwrap();
     assert_eq!(
@@ -254,13 +254,15 @@ fn rime_style_tsv_imports() {
                 ..CustomPhrase::new("qj", "青简输入法")
             },
             CustomPhrase::new("nh", "你好"),
+            CustomPhrase::new("1981", "19813451919"),
         ]
     );
-    // #857：码里带数字的序号符号要说清是哪一行、为什么
+    // #857：码里字母混着数字的序号符号要说清是哪一行、为什么；纯数字码是数字短语，照常导入
     assert_eq!(skipped.len(), 2);
     assert_eq!(skipped[0], "第 8 行「没码」：文字与输入码之间要用 Tab 隔开");
     assert!(
-        skipped[1].starts_with("第 10 行「⑪」：输入码须为 1–") && skipped[1].contains("不能带数字"),
+        skipped[1].starts_with("第 10 行「⑪」：输入码须为 1–")
+            && skipped[1].contains("字母和数字不能混用"),
         "{}",
         skipped[1]
     );
