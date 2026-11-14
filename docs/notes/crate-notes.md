@@ -1,8 +1,8 @@
 # 各 crate 的实现要点
 
-## 猛人 0.4.4 当前增量（2026-11-08）
+## 猛人 0.4.4 实现记录（2026-11-08）
 
-安卓字母上滑符号与候选间距个性化已实现，范围见 [0.4.4 计划](../plan/resume-044.md)。本机设置 `flick_symbol_<字母>` 覆盖角标，`candidate_padding` 为每侧 2–24 dp（默认 8）；Theme::with_strip_padding 只覆盖 strip_cell 左右留白，预览和实际 JNI 同步传参。字体、候选高度、双拼声韵母和保留手势保持原语义。手机手感待用户安装确认，数字前缀短语仍是后续项。
+安卓字母上滑符号与候选间距个性化已实现，范围见 [0.4.4 计划](../plan/resume-044.md)。本机设置 `flick_symbol_<字母>` 覆盖角标，`candidate_padding` 为每侧 2–24 dp（默认 8）；Theme::with_strip_padding 只覆盖 strip_cell 左右留白，预览和实际 JNI 同步传参。字体、候选高度、双拼声韵母和保留手势保持原语义。纯数字输入码于 0.4.6 加入，Core 实现见下文 `crates/qingjian-core` 的自定义短语规则。
 
 
 CLAUDE.md 只保留目录地图与规则，每个 crate / app / tool 的实现细节收在这里：入口类型、数据文件、常数、生成命令。
