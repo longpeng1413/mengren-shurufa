@@ -9,6 +9,13 @@ impl Settings {
     /// 快捷键页的各项（含翻页键、模式键）写回缺省；辅码触发键在「输入」页，不动。
     pub(super) fn reset_shortcuts(&mut self) {
         let defaults = ShortcutConfig::default();
+        if crate::support::Feature::Voice.here() {
+            self.write(
+                "shortcut",
+                "translator",
+                qingjian_platform::KeyCombo::TRANSLATOR_DEFAULT.key_string(),
+            );
+        }
         self.write("general", "page_keys", PAGE_KEY_OPTIONS[0]);
         self.write(
             "shortcut",

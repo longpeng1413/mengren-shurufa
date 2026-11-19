@@ -85,6 +85,7 @@ pub use transfer::{export_settings, import_settings};
 pub use update::{UpdateChannel, UpdateConfig};
 pub use voice::{
     DEFAULT_RESOURCE_ID, PROVIDER_NONE, PROVIDER_OFFLINE, PROVIDER_VOLCENGINE, VoiceConfig,
+    VoiceHotkey,
 };
 
 /// 用户配置文件（TOML）。所有平台同一份格式，缺省值全部在各分节的 `Default` 里。
@@ -244,6 +245,7 @@ translation = "ctrl"
 translation_second = "shift+ctrl"
 # 把应用里选中的文字译成学习语言（要开着云服务）：译文先出现在候选窗口，回车替换选中的文字，Esc 保留原文
 translate_selection = "ctrl+alt+t"
+translator = "ctrl+alt+f"
 # Windows 组句中按需调用 AI
 predict = "ctrl+alt+j"
 # 没在打字时打开符号面板的「翻译」组（要开着云服务）：框里打一句，译文停顿后出现在光标处，回车上屏
@@ -490,10 +492,11 @@ resource_id = "volc.seedasr.sauc.duration"
 # 豆包 API Key：可留空并设 QINGJIAN_VOICE_API_KEY 环境变量；设置页填的写进配置同目录的 .env
 # api_key = ""
 api_key_env = "QINGJIAN_VOICE_API_KEY"
-# 长按 Win 键多久（毫秒）开始语音；设了下面 shortcut 时以 shortcut 为准
+# 按住右 Alt、右 Ctrl 或 Win 键多久开始录音（毫秒）
+# hotkey = "right_alt"  # right_alt / right_ctrl / win / shortcut / none
 hold_ms = 400
-# 自定义语音快捷键（修饰键 + 字母/数字/句号），设了就替代长按 Win，按下开始、松开结束；留空用长按 Win
-# shortcut = "ctrl+alt+v"
+# 自定义组合键示例
+# shortcut = "ctrl+alt+s"
 
 [status_bar]
 # 桌面上常驻、可拖动的悬浮状态条（Windows）：「中 / 英」格点一下切换模式（开着双拼时还显示方案名）、「，。」格切全角 / 半角标点、齿轮打开设置。

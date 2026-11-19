@@ -186,6 +186,18 @@ pub(super) fn on_input_settings(input: InputSettings) {
 }
 
 /// 轮询取回了右键菜单打勾用的开关状态。
+pub(crate) fn focused_document() -> Option<windows::Win32::UI::TextServices::ITfContext> {
+    let mut doc = None;
+    with_active(|service| {
+        doc = service
+            .thread_mgr
+            .borrow()
+            .as_ref()
+            .and_then(|m| unsafe { m.GetFocus().ok()?.GetTop().ok() });
+    });
+    doc
+}
+
 pub(super) fn on_indicator_state(state: IndicatorState) {
     with_active(|service| service.apply_indicator_state(state));
 }

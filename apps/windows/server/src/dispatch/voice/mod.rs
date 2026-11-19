@@ -2,7 +2,7 @@
 //!
 //! 分工与安卓一致（docs/design/voice-and-swipe.md）：录音线程把单声道 16 位 PCM 放进通道，
 //! 这里在 Router 线程上 `feed` 给识别方、定时 `poll` 事件；中间结果在自绘语音面板上显示，
-//! 最终结果经 `Engine::commit_voice` 上屏（与翻译选中文字复用 `deliver_clicked`）。
+//! 最终结果经 `Engine::commit_voice` 处理，再由发起会话取回。
 //!
 //! 录音源用 [`CaptureFactory`] 注入，保持本模块平台无关：Windows 的 `main` 注入 WASAPI 工厂，
 //! 测试注入假工厂。识别方由 [`transcriber::build`] 按 `[voice]` 配置装配。
@@ -17,9 +17,11 @@ use std::time::Instant;
 
 use qingjian_core::{NoTranscriber, Transcriber, TranscriptEvent};
 use qingjian_platform::protocol::SessionId;
-use qingjian_platform::{VoiceConfig, dirs};
+use qingjian_platform::{VoiceConfig, dirs, foreground::InputFocus};
 
 use super::Router;
+use qingjian_platform::{KeyCombo, windows_text::tr};
+type ConfigureKeys = fn(&VoiceConfig, Option<KeyCombo>);
 
 /// 一段录音的采样率；豆包与 SenseVoice 都按 16 kHz 单声道。
 pub const SAMPLE_RATE: u32 = 16_000;
@@ -40,9 +42,9 @@ pub type CaptureFactory = Arc<dyn Fn() -> Result<Capture, String> + Send + Sync>
 /// 语音面板输出端：中间文字 / 音量 / 出错提示，以及收起。窗口在 UI 线程自绘。
 pub trait VoiceSink: Send {
     /// 正在听：显示中间结果（可以是空串）与音量。
-    fn listening(&self, text: &str, level: f32);
+    fn listening(&self, text: &str, level: f32, hint: &str);
     /// 松手后还在等最终结果：面板停留，文字不变。
-    fn recognizing(&self, text: &str);
+    fn recognizing(&self, text: &str, hint: &str);
     /// 出错提示。
     fn error(&self, message: &str);
     /// 收起面板。
@@ -53,8 +55,8 @@ pub trait VoiceSink: Send {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoopVoiceSink;
 impl VoiceSink for NoopVoiceSink {
-    fn listening(&self, _text: &str, _level: f32) {}
-    fn recognizing(&self, _text: &str) {}
+    fn listening(&self, _text: &str, _level: f32, _hint: &str) {}
+    fn recognizing(&self, _text: &str, _hint: &str) {}
     fn error(&self, _message: &str) {}
     fn hide(&self) {}
 }
@@ -63,6 +65,7 @@ impl VoiceSink for NoopVoiceSink {
 struct Active {
     /// 哪个会话发起的；失焦 / 换会话时作废。
     session: SessionId,
+    focus: Option<InputFocus>,
     /// 录音流；`stop` 置位后录音线程会收尾。
     capture: Capture,
     /// 最近一次中间结果（整段，不是增量）。
@@ -79,8 +82,14 @@ pub struct VoiceRuntime {
     capture_factory: Option<CaptureFactory>,
     sink: Box<dyn VoiceSink>,
     active: Option<Active>,
+    foreground: Option<fn() -> Option<InputFocus>>,
+    pending: Option<(SessionId, Option<InputFocus>, Instant, String)>,
     /// 最近一次给面板的音量（平滑用）。
     last_level: f32,
+    notice_until: Option<Instant>,
+    from_status: bool,
+    configure_keys: ConfigureKeys,
+    listening_changed: fn(bool),
 }
 
 impl Default for VoiceRuntime {
@@ -91,12 +100,84 @@ impl Default for VoiceRuntime {
             capture_factory: None,
             sink: Box::new(NoopVoiceSink),
             active: None,
+            foreground: None,
+            pending: None,
             last_level: 0.0,
+            notice_until: None,
+            from_status: false,
+            configure_keys: |_, _| {},
+            listening_changed: |_| {},
         }
     }
 }
 
 impl Router {
+    pub fn set_voice_callbacks(&mut self, keys: ConfigureKeys, listening: fn(bool)) {
+        self.voice.configure_keys = keys;
+        self.voice.listening_changed = listening;
+    }
+    pub fn set_voice_foreground(&mut self, current: fn() -> Option<InputFocus>) {
+        self.voice.foreground = Some(current);
+    }
+
+    pub(super) fn reload_voice(&mut self, next: &super::RouterConfig) {
+        let old = &self.config.voice;
+        let new = &next.voice;
+        if (
+            old.trigger(),
+            old.shortcut,
+            old.hold_ms,
+            self.config.translator,
+        ) != (new.trigger(), new.shortcut, new.hold_ms, next.translator)
+        {
+            self.cancel_hotkey_voice();
+            (self.voice.configure_keys)(new, next.translator);
+        }
+        if old_provider_changed(&self.config.voice, new) {
+            self.configure_voice(new);
+        }
+    }
+    pub(super) fn recording(&self) -> bool {
+        self.voice
+            .active
+            .as_ref()
+            .is_some_and(|a| a.finished_at.is_none())
+    }
+    pub fn open_translator(&self) {
+        self.status.open_translator();
+    }
+    pub fn cancel_hotkey_voice(&mut self) {
+        if let Some(a) = &self.voice.active {
+            self.handle_voice_cancel(a.session);
+        }
+    }
+    pub(super) fn toggle_status_voice(&mut self) {
+        if self.recording() {
+            self.handle_hotkey_voice(false);
+        } else if self.voice.active.is_none() {
+            self.start_from_focus(true);
+        }
+    }
+    fn start_from_focus(&mut self, from_status: bool) {
+        if self.voice.active.is_some() {
+            return;
+        }
+        self.voice.from_status = from_status;
+        if !self.voice_available() {
+            self.voice.notice(tr("off"));
+            return;
+        }
+        let session = match self.voice.foreground {
+            Some(current) => current().map(|focus| focus.session),
+            None => self.mode_session.or(self.focused),
+        };
+        if let Some(session) = session.filter(|id| self.sessions.contains_key(id)) {
+            self.handle_voice_start(session);
+        } else {
+            self.voice.notice(tr("voice_focus"));
+        }
+    }
+
     /// 按配置重建识别方；启动时与配置热加载（换了服务 / 密钥）都走这里。
     pub fn configure_voice(&mut self, config: &VoiceConfig) {
         let user_dir = dirs::user_dir();
@@ -129,6 +210,11 @@ impl Router {
         if self.voice.active.is_some() || !self.voice_available() {
             return;
         }
+        let focus = self.voice.foreground.and_then(|current| current());
+        if self.voice.foreground.is_some() && focus.is_none_or(|target| target.session != session) {
+            return;
+        }
+        self.voice.pending = None;
         let factory = match &self.voice.capture_factory {
             Some(factory) => Arc::clone(factory),
             None => return,
@@ -136,14 +222,14 @@ impl Router {
         let private = self.sessions.get(&session).is_some_and(|info| info.private);
         // 私密输入不把声音送去云端：离线可用，豆包则直接拒绝（提示走面板）
         if private && !self.voice.transcriber_is_offline() {
-            self.voice.sink.error("私密输入不支持云端语音识别");
+            self.voice.notice(tr("private"));
             return;
         }
         let capture = match factory() {
             Ok(capture) => capture,
             Err(error) => {
                 tracing::warn!(%error, "语音录音启动失败");
-                self.voice.sink.error("无法打开麦克风");
+                self.voice.notice(tr("mic"));
                 return;
             }
         };
@@ -152,12 +238,16 @@ impl Router {
         self.voice.transcriber.start(SAMPLE_RATE);
         self.voice.active = Some(Active {
             session,
+            focus,
             capture,
             partial: String::new(),
             finished_at: None,
         });
         self.voice.last_level = 0.0;
-        self.voice.sink.listening("", 0.0);
+        self.voice.notice_until = None;
+        (self.voice.listening_changed)(true);
+        self.voice.sink.listening("", 0.0, self.voice.hint());
+        self.reconcile_status();
         tracing::debug!(?session, private, "语音开始");
     }
 
@@ -165,11 +255,7 @@ impl Router {
     /// 没有聚焦会话时开始无效（没有地方上屏）；结束则按正在录音的那段收尾。
     pub fn handle_hotkey_voice(&mut self, down: bool) {
         if down {
-            if let Some(session) = self.focused {
-                self.handle_voice_start(session);
-            } else {
-                tracing::debug!("语音热键按下但没有聚焦会话，忽略");
-            }
+            self.start_from_focus(false);
         } else if let Some(session) = self.voice.active.as_ref().map(|a| a.session) {
             self.handle_voice_stop(session);
         }
@@ -181,7 +267,7 @@ impl Router {
             .voice
             .active
             .as_ref()
-            .is_none_or(|a| a.session != session)
+            .is_none_or(|a| a.session != session || a.finished_at.is_some())
         {
             return;
         }
@@ -189,14 +275,23 @@ impl Router {
             active.capture.stop.store(true, Ordering::Relaxed);
             active.finished_at = Some(Instant::now());
         }
+        while let Some(chunk) = self
+            .voice
+            .active
+            .as_ref()
+            .and_then(|a| a.capture.pcm.try_recv().ok())
+        {
+            self.voice.transcriber.feed(&chunk);
+        }
         self.voice.transcriber.finish();
+        self.reconcile_status();
         let partial = self
             .voice
             .active
             .as_ref()
             .map(|a| a.partial.clone())
             .unwrap_or_default();
-        self.voice.sink.recognizing(&partial);
+        self.voice.sink.recognizing(&partial, self.voice.hint());
         tracing::debug!(?session, "语音说完，等最终结果");
     }
 
@@ -209,6 +304,7 @@ impl Router {
             .is_some_and(|a| a.session == session)
         {
             self.voice.cancel_active("取消");
+            self.reconcile_status();
         }
     }
 
@@ -216,17 +312,43 @@ impl Router {
     pub(in crate::dispatch) fn voice_abort_session(&mut self, session: SessionId) {
         if self
             .voice
+            .pending
+            .as_ref()
+            .is_some_and(|(owner, ..)| *owner == session)
+        {
+            self.voice.pending = None;
+        }
+        if self
+            .voice
             .active
             .as_ref()
             .is_some_and(|a| a.session == session)
         {
             self.voice.cancel_active("会话结束");
+            self.reconcile_status();
         }
     }
 
     /// 有没有一段语音在进行中（`next_tick` 据此缩短节拍）。
     pub(in crate::dispatch) fn voice_active(&self) -> bool {
         self.voice.active.is_some()
+            || self.voice.notice_until.is_some()
+            || self.voice.pending.is_some()
+    }
+
+    /// 语音和鼠标点选分别排队，避免在切窗口时把听写写入其他编辑框。
+    pub(super) fn take_async_commit(&mut self, session: SessionId) -> Option<String> {
+        let clicked = self.take_clicked(session);
+        if let Some((owner, focus, until, _)) = &self.voice.pending {
+            if Instant::now() >= *until || !self.voice.focus_matches(*focus) {
+                self.voice.pending = None;
+            } else if *owner == session {
+                let (_, _, _, voice) = self.voice.pending.take()?;
+                tracing::debug!(?session, "voice final delivered to input thread");
+                return Some(clicked.unwrap_or_default() + &voice);
+            }
+        }
+        clicked
     }
 
     /// tick 里驱动一次语音（rescore 的 tick 调它）。
@@ -237,6 +359,31 @@ impl Router {
     /// tick 节拍里驱动：喂录音、取事件、给面板、上屏。返回是否这一拍动了语音状态
     /// （用来缩短下个 tick 间隔——识别结果是异步来的，要尽快取）。
     pub(in crate::dispatch) fn advance_voice(&mut self) -> bool {
+        if self.voice.notice_until.is_some_and(|d| Instant::now() >= d) {
+            self.voice.notice_until = None;
+            self.voice.sink.hide();
+        }
+        if self
+            .voice
+            .pending
+            .as_ref()
+            .is_some_and(|(_, focus, until, _)| {
+                Instant::now() >= *until || !self.voice.focus_matches(*focus)
+            })
+        {
+            self.voice.pending = None;
+        }
+        if self
+            .voice
+            .active
+            .as_ref()
+            .is_some_and(|active| !self.voice.focus_matches(active.focus))
+        {
+            self.voice.cancel_active("焦点改变");
+            self.reconcile_status();
+            return true;
+        }
+        let hint = self.voice.hint();
         let Some(active) = self.voice.active.as_mut() else {
             return false;
         };
@@ -263,12 +410,13 @@ impl Router {
             if active.finished_at.is_none() {
                 self.voice
                     .sink
-                    .listening(&active.partial, self.voice.last_level);
+                    .listening(&active.partial, self.voice.last_level, hint);
             }
             return false;
         }
 
         let session = active.session;
+        let focus = active.focus;
         let mut done = false;
         for event in events {
             match event {
@@ -281,34 +429,72 @@ impl Router {
                     let text = text.trim().to_owned();
                     if !text.is_empty() {
                         let commit = self.engine.commit_voice(&text);
-                        self.deliver_clicked(session, commit);
+                        if self.voice.focus_matches(focus) {
+                            tracing::debug!(
+                                ?session,
+                                chars = commit.chars().count(),
+                                "voice final ready"
+                            );
+                            self.voice.pending = Some((
+                                session,
+                                focus,
+                                Instant::now() + std::time::Duration::from_secs(5),
+                                commit,
+                            ));
+                        }
                     }
                     done = true;
                 }
                 TranscriptEvent::Error(message) => {
-                    self.voice.sink.error(&message);
+                    self.voice.notice(&message);
                     done = true;
                 }
             }
         }
         if done {
-            self.voice.sink.hide();
-            self.voice.active = None;
+            if let Some(active) = self.voice.active.take() {
+                active.capture.stop.store(true, Ordering::Relaxed);
+            }
+            if self.voice.notice_until.is_none() {
+                self.voice.sink.hide();
+            }
+            (self.voice.listening_changed)(false);
+            self.reconcile_status();
         } else if let Some(active) = self.voice.active.as_ref() {
             // 中间结果更新面板
             if active.finished_at.is_some() {
-                self.voice.sink.recognizing(&active.partial);
+                self.voice.sink.recognizing(&active.partial, hint);
             } else {
                 self.voice
                     .sink
-                    .listening(&active.partial, self.voice.last_level);
+                    .listening(&active.partial, self.voice.last_level, hint);
             }
         }
         true
     }
 }
 
+fn old_provider_changed(old: &VoiceConfig, new: &VoiceConfig) -> bool {
+    old.provider != new.provider
+        || old.model_root != new.model_root
+        || old.resource_id != new.resource_id
+        || old.api_key != new.api_key
+        || old.api_key_env != new.api_key_env
+}
 impl VoiceRuntime {
+    fn focus_matches(&self, focus: Option<InputFocus>) -> bool {
+        self.foreground
+            .is_none_or(|current| focus.is_some() && current() == focus)
+    }
+
+    fn hint(&self) -> &'static str {
+        tr(if self.from_status { "click" } else { "hold" })
+    }
+    fn notice(&mut self, message: &str) {
+        self.sink.error(message);
+        self.notice_until = Some(Instant::now() + std::time::Duration::from_millis(2500));
+    }
+
     /// 当前是否离线识别：私密输入的判断用。
     fn transcriber_is_offline(&self) -> bool {
         // 装配时按配置记一份比探测 transcriber 类型可靠；这里用 capture 之外的标记。
@@ -320,8 +506,13 @@ impl VoiceRuntime {
         if let Some(active) = self.active.take() {
             active.capture.stop.store(true, Ordering::Relaxed);
         }
+        (self.listening_changed)(false);
+        self.notice_until = None;
         self.transcriber.cancel();
         self.last_level = 0.0;
         self.sink.hide();
     }
 }
+
+#[cfg(test)]
+mod tests;

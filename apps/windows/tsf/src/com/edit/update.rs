@@ -12,6 +12,8 @@ use windows::Win32::UI::TextServices::{
 };
 use windows::core::{Error, Result, implement};
 
+use qingjian_platform::foreground::InputFocus;
+
 use crate::com::composition::{Shared, apply};
 use crate::com::log::log;
 use crate::com::service::SharedClient;
@@ -33,12 +35,20 @@ pub(crate) struct UpdateSession {
 
     /// 本次组句拼音行；空串表示收起组句。
     preedit: String,
+
+    focus: Option<InputFocus>,
 }
 
 impl ITfEditSession_Impl for UpdateSession_Impl {
     fn DoEditSession(&self, ec: u32) -> Result<()> {
         // 从框架的 C++ 调进来：panic 不能越过 FFI。
         let result = catch_unwind(AssertUnwindSafe(|| {
+            if let Some(focus) = self.focus
+                && (InputFocus::current() != Some(focus)
+                    || crate::com::service::focused_document().as_ref() != Some(&self.context))
+            {
+                return Ok(());
+            }
             apply(
                 &self.shared,
                 &self.engine,
@@ -77,6 +87,27 @@ pub(crate) fn request_update(
         shared,
         commit,
         preedit,
+        focus: None,
+    };
+    request(context, client_id, session.into(), TF_ES_READWRITE)
+}
+
+/// 语音结果只在请求时的输入窗口和 TSF 文档仍有焦点时写入。
+pub(crate) fn request_focused_update(
+    context: &ITfContext,
+    client_id: u32,
+    engine: SharedClient,
+    shared: Rc<Shared>,
+    commit: String,
+    focus: InputFocus,
+) -> Result<()> {
+    let session = UpdateSession {
+        context: context.clone(),
+        engine,
+        shared,
+        commit: Some(commit),
+        preedit: String::new(),
+        focus: Some(focus),
     };
     request(context, client_id, session.into(), TF_ES_READWRITE)
 }

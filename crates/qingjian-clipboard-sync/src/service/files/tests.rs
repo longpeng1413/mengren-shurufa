@@ -5,11 +5,15 @@ use super::{FILE_LIMIT, cache, wire};
 #[test]
 #[ignore = "requires the address of a real LAN test peer"]
 fn physical_windows_file_socket() {
-    let address = std::env::var("MENGREN_TEST_LAN_ENDPOINT").unwrap().parse().unwrap();
-    let route = super::Route::resolve(&super::Policy::default(),address).expect("on-link physical adapter");
-    let stream=route.connect(address).expect("pinned TCP socket");
-    assert_eq!(stream.local_addr().unwrap().ip(),route.local);
-    assert_eq!(stream.ttl().unwrap(),1);
+    let address = std::env::var("MENGREN_TEST_LAN_ENDPOINT")
+        .unwrap()
+        .parse()
+        .unwrap();
+    let route = super::Route::resolve(&super::Policy::default(), address)
+        .expect("on-link physical adapter");
+    let stream = route.connect(address).expect("pinned TCP socket");
+    assert_eq!(stream.local_addr().unwrap().ip(), route.local);
+    assert_eq!(stream.ttl().unwrap(), 1);
 }
 
 #[test]
@@ -74,23 +78,36 @@ fn lengths_and_integrity() {
 fn full_destination_and_source_permission_error_propagate() {
     struct Full;
     impl std::io::Write for Full {
-        fn write(&mut self,_:&[u8])->std::io::Result<usize>{Err(std::io::ErrorKind::StorageFull.into())}
-        fn flush(&mut self)->std::io::Result<()>{Ok(())}
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::ErrorKind::StorageFull.into())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
     }
     struct Revoked;
     impl std::io::Read for Revoked {
-        fn read(&mut self,_:&mut [u8])->std::io::Result<usize>{Err(std::io::ErrorKind::PermissionDenied.into())}
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            Err(std::io::ErrorKind::PermissionDenied.into())
+        }
     }
-    assert!(wire::receive(Full, None, |_|Ok(vec![9])).is_err());
-    assert!(wire::send(Revoked,None,|_|panic!("unexpected completed frame")).is_err());
+    assert!(wire::receive(Full, None, |_| Ok(vec![9])).is_err());
+    assert!(wire::send(Revoked, None, |_| panic!("unexpected completed frame")).is_err());
 }
 
 #[test]
 fn unknown_length_stops_at_the_first_forbidden_byte() {
     use std::io::Read;
-    let mut input=std::io::repeat(123).take(FILE_LIMIT+1);
-    let mut sent=0;
-    assert!(wire::send(&mut input,None,|frame| { assert!(!frame.is_empty()); sent+=frame.len() as u64; Ok(()) }).is_err());
-    assert_eq!(input.limit(),1);
-    assert!(sent<FILE_LIMIT);
+    let mut input = std::io::repeat(123).take(FILE_LIMIT + 1);
+    let mut sent = 0;
+    assert!(
+        wire::send(&mut input, None, |frame| {
+            assert!(!frame.is_empty());
+            sent += frame.len() as u64;
+            Ok(())
+        })
+        .is_err()
+    );
+    assert_eq!(input.limit(), 1);
+    assert!(sent < FILE_LIMIT);
 }

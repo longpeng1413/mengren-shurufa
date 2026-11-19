@@ -42,6 +42,7 @@ const ACCENT: COLORREF = COLORREF(0x0053A86A);
 #[derive(Debug, Clone, Default)]
 pub(super) struct VoiceView {
     /// `listening` / `recognizing` / `error`。
+    pub(super) hint: String,
     pub(super) state: String,
     /// 中间结果或提示文字。
     pub(super) text: String,
@@ -92,7 +93,7 @@ impl VoiceWindow {
     /// 显示 / 更新。把这一拍的音量推进历史，画成滚动波形。
     pub(super) fn show(&self, mut view: VoiceView) {
         {
-            let mut history = std::mem::take(&mut view.history);
+            let mut history = std::mem::take(&mut self.view.borrow_mut().history);
             history.push(view.level);
             if history.len() > 24 {
                 history.remove(0);
@@ -210,6 +211,7 @@ fn paint_content(hdc: HDC, _client: RECT, view: &VoiceView, scale: f32) {
     }
 
     unsafe {
+        let _ = TextOutW(hdc, pad, (136.0 * scale) as i32, &utf16(&view.hint));
         SelectObject(hdc, old_font);
         let _ = DeleteObject(font.into());
         let _ = SetBkMode(hdc, BACKGROUND_MODE(old_mode as u32));
@@ -235,9 +237,7 @@ fn draw_bar(hdc: HDC, x: i32, y: i32, w: i32, h: i32) {
 }
 
 fn utf16(text: &str) -> Vec<u16> {
-    let mut v: Vec<u16> = text.encode_utf16().collect();
-    v.push(0);
-    v
+    text.encode_utf16().collect()
 }
 
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

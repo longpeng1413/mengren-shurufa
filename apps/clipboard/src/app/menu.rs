@@ -11,6 +11,7 @@ pub const MENU_DELETE: usize = 3;
 
 /// 开着的右键菜单。
 pub struct OpenedMenu {
+    pub id: String,
     pub index: usize,
 
     pub position: (f32, f32),

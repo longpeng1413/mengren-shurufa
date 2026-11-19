@@ -20,7 +20,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 use windows::core::{Error, PCWSTR, Result, w};
 
-use qingjian_platform::protocol::Frame;
+use qingjian_platform::{foreground::InputFocus, protocol::Frame};
 
 use self::context::PollContext;
 use super::composition::{Shared, preedit_string};
@@ -255,7 +255,9 @@ fn sync_mode(context: &PollContext) {
         super::service::on_reconnect_tick();
         return;
     };
-    let reply = match client.sync_mode() {
+    let focus = InputFocus::current().filter(|focus| focus.session == crate::com::session_id());
+    let document = focus.and_then(|_| super::service::focused_document());
+    let reply = match client.sync_mode(document.is_some()) {
         Ok(reply) => reply,
         Err(error) => {
             log(&format!("同步中英模式失败，断开，下一键重连: {error}"));
@@ -265,6 +267,22 @@ fn sync_mode(context: &PollContext) {
     };
     drop(guard);
     // 按键行为设置每一拍都带（DLL 不读配置文件），切换键与内置英文模式开关改完靠它生效。
+    if let Some(commit) = reply.commit {
+        if let Some(document) = document {
+            if let Err(error) = crate::com::edit::request_focused_update(
+                &document,
+                context.client_id,
+                context.engine.clone(),
+                context.shared.clone(),
+                commit,
+                focus.expect("document is only read for the foreground thread"),
+            ) {
+                log(&format!("语音编辑会话未受理: {error}"));
+            }
+        } else {
+            log("语音结果没有焦点文档");
+        }
+    }
     super::service::on_input_settings(reply.input);
     super::service::on_indicator_state(reply.indicator);
     if let Some(english) = reply.english {

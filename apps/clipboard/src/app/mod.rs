@@ -180,13 +180,23 @@ impl ClipboardApp {
     }
 
     fn reload(&mut self) {
+        let anchor = self.items.get(self.selected).map(|item| item.id.clone());
         self.items = self
             .store
             .search(self.search.text(), self.filter, SHOWN_ITEMS)
             .inspect_err(|error| tracing::warn!(%error, "clipboard search failed"))
             .unwrap_or_default();
-        self.selected = 0;
-        self.menu = None;
+        self.selected = anchor
+            .as_ref()
+            .and_then(|id| self.items.iter().position(|item| item.id == *id))
+            .unwrap_or_else(|| self.selected.min(self.items.len().saturating_sub(1)));
+        if let Some(menu) = &mut self.menu {
+            if let Some(index) = self.items.iter().position(|item| item.id == menu.id) {
+                menu.index = index;
+            } else {
+                self.menu = None;
+            }
+        }
         // 删掉、清空了的缩略图不留在内存里
         let items = &self.items;
         self.thumbnails
@@ -285,4 +295,48 @@ pub(crate) fn now_millis() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_millis() as i64)
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use qingjian_clipboard::Capture;
+    #[test]
+    fn delete_from_open_menu_after_refresh_keeps_the_target_and_neighbor() {
+        let path = Path::new(":memory:");
+        let store = ClipStore::open(path, 100).unwrap();
+        let mut app = ClipboardApp::new(
+            store,
+            path,
+            system::Watch {
+                path: None,
+                settings: Default::default(),
+                managed: false,
+            },
+            None,
+            None,
+            false,
+        );
+        for (time, text) in [(1, "older"), (2, "target"), (3, "other")] {
+            app.store
+                .add(&Capture::text(text.into(), String::new(), vec![]), time)
+                .unwrap();
+        }
+        app.reload();
+        app.selected = 1;
+        app.menu = Some(OpenedMenu {
+            index: 1,
+            id: app.items[1].id.clone(),
+            position: (1., 1.),
+        });
+        app.store
+            .add(&Capture::text("incoming".into(), String::new(), vec![]), 4)
+            .unwrap();
+        app.reload();
+        assert_eq!(app.items[app.selected].text, "target");
+        app.pick_menu(menu::MENU_DELETE);
+        app.reload();
+        assert!(app.items.iter().all(|it| it.text != "target"));
+        assert_eq!(app.items[app.selected].text, "older");
+    }
 }

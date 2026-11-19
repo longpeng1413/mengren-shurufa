@@ -1,0 +1,26 @@
+[package]
+name = "qingjian-windows-translator"
+description = "猛人输入法 Windows 翻译窗口"
+version = "0.4.9"
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "qingjian-translator"
+path = "src/main.rs"
+
+[target.'cfg(windows)'.dependencies]
+qingjian-core.workspace = true
+qingjian-platform.workspace = true
+qingjian-predict.workspace = true
+bamboo-slip-i18n.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+dotenvy.workspace = true
+windows = { version = "0.62.2", features = ["Win32_Foundation","Win32_Graphics_Gdi","Win32_Security","Win32_System_Com","Win32_System_LibraryLoader","Win32_System_Threading","Win32_UI_Controls", "Win32_UI_Controls_Dialogs","Win32_UI_HiDpi","Win32_UI_Input_KeyboardAndMouse","Win32_UI_WindowsAndMessaging","Win32_Media_Speech"] }
+
+[build-dependencies]
+embed-manifest.workspace = true
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1.31"

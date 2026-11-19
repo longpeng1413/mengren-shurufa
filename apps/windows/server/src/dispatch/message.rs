@@ -98,10 +98,18 @@ impl Router {
                 self.handle_mode_changed(session, english, vietnamese);
                 None
             }
-            ClientMessage::SyncMode { session } => {
+            ClientMessage::SyncMode {
+                accepts_commit,
+                session,
+            } => {
                 self.activate_mode(session);
                 self.handle_ime_active();
                 Some(ServerMessage::ModeSync {
+                    commit: if accepts_commit {
+                        self.take_async_commit(session)
+                    } else {
+                        None
+                    },
                     session,
                     english: Some(self.english),
                     vietnamese: Some(self.vietnamese_mode),
@@ -201,7 +209,7 @@ impl Router {
             Effect::Passthrough => (None, KeyOutcome::Passthrough),
         };
         // 点击上屏的字还没等到轮询就来了键：接在这次结果前面，免得丢
-        let commit = match (self.take_clicked(session), commit) {
+        let commit = match (self.take_async_commit(session), commit) {
             (Some(clicked), commit) => Some(clicked + commit.as_deref().unwrap_or_default()),
             (None, commit) => commit,
         };
@@ -240,7 +248,7 @@ impl Router {
         ServerMessage::Update {
             session,
             frame,
-            commit: self.take_clicked(session),
+            commit: self.take_async_commit(session),
         }
     }
 }

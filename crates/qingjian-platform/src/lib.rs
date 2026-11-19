@@ -11,6 +11,7 @@ mod config;
 pub mod dirs;
 mod error;
 pub mod extra_dictionaries;
+pub mod foreground;
 #[cfg(windows)]
 pub mod global_hotkey;
 mod i18n;
@@ -34,8 +35,10 @@ pub use config::{
     LocalModelConfig, LogLevel, MAX_PAGE_SIZE, Modifiers, NumpadDigit, PAGE_KEY_OPTIONS,
     PROVIDER_NONE, PROVIDER_OFFLINE, PROVIDER_VOLCENGINE, PageKeys, PreeditMode, Scheme,
     ShiftLetter, ShortcutConfig, SwitchKey, SwitchKeys, ThirdInputMethod, UI_LANGUAGE_DEFAULT,
-    UI_LANGUAGE_SYSTEM, UpdateChannel, UpdateConfig, VoiceConfig, ZhiyiTier, export_phrases,
-    export_settings, import_phrases, import_settings, scheme_label, scheme_name,
+    UI_LANGUAGE_SYSTEM, UpdateChannel, UpdateConfig, VoiceConfig, VoiceHotkey, ZhiyiTier,
+    export_phrases, export_settings, import_phrases, import_settings, scheme_label, scheme_name,
 };
 pub use error::ConfigError;
 pub use scheme::{SchemeMeta, SchemeSlot};
+
+pub mod windows_text;

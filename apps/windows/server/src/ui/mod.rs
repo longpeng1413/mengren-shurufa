@@ -141,18 +141,20 @@ impl CandidateSink for UiHandle {
 }
 
 impl VoiceSink for UiHandle {
-    fn listening(&self, text: &str, level: f32) {
+    fn listening(&self, text: &str, level: f32, hint: &str) {
         self.post(UiCommand::VoiceShow(Box::new(VoiceView {
-            state: "正在听…".to_owned(),
+            state: qingjian_platform::windows_text::tr("listen").to_owned(),
+            hint: hint.to_owned(),
             text: text.to_owned(),
             level,
             history: Vec::new(),
         })));
     }
 
-    fn recognizing(&self, text: &str) {
+    fn recognizing(&self, text: &str, hint: &str) {
         self.post(UiCommand::VoiceShow(Box::new(VoiceView {
-            state: "识别中…".to_owned(),
+            state: qingjian_platform::windows_text::tr("recognize").to_owned(),
+            hint: hint.to_owned(),
             text: text.to_owned(),
             level: 0.0,
             history: Vec::new(),
@@ -161,7 +163,8 @@ impl VoiceSink for UiHandle {
 
     fn error(&self, message: &str) {
         self.post(UiCommand::VoiceShow(Box::new(VoiceView {
-            state: "语音识别出错".to_owned(),
+            state: qingjian_platform::windows_text::tr("error").to_owned(),
+            hint: String::new(),
             text: message.to_owned(),
             level: 0.0,
             history: Vec::new(),
@@ -174,6 +177,9 @@ impl VoiceSink for UiHandle {
 }
 
 impl StatusSink for UiHandle {
+    fn open_translator(&self) {
+        launch_sibling("qingjian-translator.exe");
+    }
     fn show_status(&self, view: StatusView) {
         self.post(UiCommand::StatusShow(Box::new(view)));
     }

@@ -48,30 +48,70 @@ pub fn voice(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, RenderErr
             .build(ui, theme)?,
     ];
 
-    let hold = config.hold_ms.clamp(HOLD_MIN, HOLD_MAX);
-    let hold_control = Stepper::new(&tr_args("voice.hold_ms", &[("n", &hold)]))
-        .limits(hold > HOLD_MIN, hold < HOLD_MAX)
-        .build(
-            ui,
-            theme,
-            "voice-hold",
-            Message::set(
-                "voice",
-                "hold_ms",
-                hold.saturating_sub(HOLD_STEP).clamp(HOLD_MIN, HOLD_MAX) as i64,
-            ),
-            Message::set(
-                "voice",
-                "hold_ms",
-                hold.saturating_add(HOLD_STEP).clamp(HOLD_MIN, HOLD_MAX) as i64,
-            ),
-        )?;
+    let triggers = ["right_alt", "right_ctrl", "win", "shortcut", "none"];
+    use qingjian_platform::VoiceHotkey;
+    let active = match config.trigger() {
+        VoiceHotkey::RightAlt => 0,
+        VoiceHotkey::RightCtrl => 1,
+        VoiceHotkey::Win => 2,
+        VoiceHotkey::Shortcut => 3,
+        VoiceHotkey::None => 4,
+    };
+    let control = choice(
+        ui,
+        page,
+        "voice-trigger",
+        &triggers,
+        triggers[active],
+        |k| match k {
+            "right_ctrl" => tr("voice.right_ctrl"),
+            "win" => tr("voice.win"),
+            "shortcut" => tr("voice.custom"),
+            "none" => tr("voice.no_trigger"),
+            _ => tr("voice.right_alt"),
+        },
+        |value| Message::set("voice", "hotkey", value),
+    )?;
     rows.push(
-        SettingRow::new(tr("voice.hold"))
-            .info(tr("voice.hold_info"))
-            .control(hold_control)
+        SettingRow::new(tr("voice.trigger"))
+            .control(control)
             .build(ui, theme)?,
     );
+    if active == 3 {
+        rows.push(super::shortcuts::recorder(
+            ui,
+            page,
+            crate::shortcut::Shortcut::Voice,
+            tr("shortcut.need_two_modifiers"),
+            false,
+        )?);
+    }
+    if active < 3 {
+        let hold = config.hold_ms.clamp(HOLD_MIN, HOLD_MAX);
+        let hold_control = Stepper::new(&tr_args("voice.hold_ms", &[("n", &hold)]))
+            .limits(hold > HOLD_MIN, hold < HOLD_MAX)
+            .build(
+                ui,
+                theme,
+                "voice-hold",
+                Message::set(
+                    "voice",
+                    "hold_ms",
+                    hold.saturating_sub(HOLD_STEP).clamp(HOLD_MIN, HOLD_MAX) as i64,
+                ),
+                Message::set(
+                    "voice",
+                    "hold_ms",
+                    hold.saturating_add(HOLD_STEP).clamp(HOLD_MIN, HOLD_MAX) as i64,
+                ),
+            )?;
+        rows.push(
+            SettingRow::new(tr("voice.hold"))
+                .info(tr("voice.hold_info"))
+                .control(hold_control)
+                .build(ui, theme)?,
+        );
+    }
     out.push(section_title(ui, theme, tr("voice.section_trigger"))?);
     out.push(group(ui, theme, &rows)?);
 

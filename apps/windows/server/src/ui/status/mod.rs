@@ -77,9 +77,11 @@ pub(super) struct StatusBar {
 }
 
 /// 各格从左到右的动作。
-const ACTIONS: [StatusAction; 4] = [
+const ACTIONS: [StatusAction; 6] = [
     StatusAction::ToggleMode,
     StatusAction::TogglePunctuation,
+    StatusAction::ToggleVoice,
+    StatusAction::OpenTranslator,
     StatusAction::OpenSymbolPanel,
     StatusAction::OpenSettings,
 ];
@@ -190,6 +192,11 @@ impl StatusBar {
         vec![
             StatusCell::text(Self::mode_text(view), true),
             StatusCell::text(if view.full_width { "，。" } else { ",." }, view.full_width),
+            StatusCell::text(
+                qingjian_platform::windows_text::tr("speak"),
+                view.voice_active,
+            ),
+            StatusCell::text(qingjian_platform::windows_text::tr("translate"), false),
             StatusCell::text(PANEL_TEXT, false),
             StatusCell::Gear,
         ]
@@ -218,6 +225,22 @@ impl StatusBar {
                     theme.gloss_color
                 },
                 action: StatusAction::TogglePunctuation,
+            },
+            CellSpec {
+                text: qingjian_platform::windows_text::tr("speak").into(),
+                font: theme.text_font,
+                color: if view.voice_active {
+                    theme.cloud_color
+                } else {
+                    theme.gloss_color
+                },
+                action: StatusAction::ToggleVoice,
+            },
+            CellSpec {
+                text: qingjian_platform::windows_text::tr("translate").into(),
+                font: theme.text_font,
+                color: theme.gloss_color,
+                action: StatusAction::OpenTranslator,
             },
             CellSpec {
                 text: PANEL_TEXT.to_owned(),

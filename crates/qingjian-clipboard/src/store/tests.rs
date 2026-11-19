@@ -290,3 +290,25 @@ fn image_info_reads_the_png_header() {
     assert_eq!(store.image_info(&items[1].id).unwrap(), None);
     assert_eq!(store.image_info(&items[0].id).unwrap(), None);
 }
+
+#[test]
+fn delete_supersedes_an_item_with_a_future_timestamp() {
+    let mut store = ClipStore::with_connection(Connection::open_in_memory().unwrap(), 10).unwrap();
+    store
+        .add(
+            &Capture::text("remote".into(), String::new(), vec![]),
+            10_000,
+        )
+        .unwrap();
+    let id = store.search("", ClipFilter::All, 1).unwrap()[0].id.clone();
+    store.delete(&id, 500).unwrap();
+    let state: (bool, i64) = store
+        .connection
+        .query_row(
+            "SELECT deleted,updated_at FROM items WHERE id=?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(state, (true, 10_001));
+}

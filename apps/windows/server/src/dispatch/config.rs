@@ -159,6 +159,7 @@ pub struct RouterConfig {
     pub key_hint_look: (u8, u8),
 
     /// 语音识别配置（`[voice]`），新建识别方与下发触发设置用。
+    pub translator: Option<qingjian_platform::KeyCombo>,
     pub voice: VoiceConfig,
 }
 
@@ -259,6 +260,7 @@ impl From<&Config> for RouterConfig {
                 config.general.key_hint_opacity.clamp(30, 100),
                 config.general.key_hint_size.clamp(60, 150),
             ),
+            translator: config.shortcut.translator,
             voice: config.voice.clone(),
         }
     }

@@ -2,6 +2,7 @@ use qingjian_platform::protocol::{Frame, IndicatorState, InputSettings, KeyOutco
 
 /// Server 对一次「同步中英模式」轮询的答复。
 pub struct ModeSyncReply {
+    pub commit: Option<String>,
     /// `Some(true)` 切英文、`Some(false)` 切中文；`None` 没有待处理的切换。
     pub english: Option<bool>,
 

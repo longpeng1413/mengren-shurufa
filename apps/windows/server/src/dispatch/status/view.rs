@@ -4,6 +4,7 @@ use qingjian_render::Mode;
 /// 状态条一次要显示的内容。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatusView {
+    pub voice_active: bool,
     /// 英文模式（`false` 中文）。
     pub english: bool,
 

@@ -40,6 +40,11 @@ impl KeyCombo {
         key: 'v',
     };
 
+    pub const TRANSLATOR_DEFAULT: Self = Self {
+        key: 'f',
+        ..Self::TRANSLATE_DEFAULT
+    };
+
     pub const PREDICT_DEFAULT: Self = Self {
         key: 'j',
         ..Self::TRANSLATE_DEFAULT

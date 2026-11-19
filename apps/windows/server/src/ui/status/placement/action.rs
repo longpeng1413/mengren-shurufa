@@ -5,6 +5,8 @@
 pub(crate) enum StatusAction {
     /// 「中 / 英」：切模式。
     ToggleMode,
+    ToggleVoice,
+    OpenTranslator,
 
     /// 「，。/ ,.」：切全角标点。
     TogglePunctuation,

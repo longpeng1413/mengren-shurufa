@@ -85,7 +85,11 @@ fn selected_only_no_relay_no_replay_and_history_still_syncs() {
         let file = received(destination);
         assert_eq!(file.file_name().unwrap().to_str(), Some(name));
         assert_eq!(std::fs::read(&file).unwrap(), data);
-        assert_eq!(source.wait(|e| matches!(e,SyncEvent::FileStatus(_))),SyncEvent::FileStatus("sent"),"{name}");
+        assert_eq!(
+            source.wait(|e| matches!(e, SyncEvent::FileStatus(_))),
+            SyncEvent::FileStatus("sent"),
+            "{name}"
+        );
         if std::ptr::eq(source, &a) {
             assert!(!c.service().file_inbox().exists());
             send(source, name, b"second");

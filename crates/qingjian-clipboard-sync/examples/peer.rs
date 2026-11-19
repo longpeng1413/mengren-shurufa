@@ -102,7 +102,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "file" => {
                 let path = std::path::Path::new(line.trim_start_matches("file "));
                 let file = std::fs::File::open(path)?;
-                let name = path.file_name().and_then(|n| n.to_str()).ok_or("invalid name")?;
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .ok_or("invalid name")?;
                 let size = file.metadata()?.len();
                 service.send_file(file, name.to_owned(), Some(size));
             }

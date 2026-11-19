@@ -81,6 +81,9 @@ impl ClipboardApp {
                 self.search = TextEdit::new("");
                 self.filter = ClipFilter::All;
                 self.list_generation += 1;
+                self.items.clear();
+                self.selected = 0;
+                self.menu = None;
                 self.reload();
                 #[cfg(windows)]
                 let (x, y, width, height) = self.edge.compact_rect(area, scale);

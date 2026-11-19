@@ -103,6 +103,7 @@ fn status_bar_and_mode_sync_show_vietnamese() {
 
     assert_eq!(recorder.calls().last(), Some(&Some("越".to_owned())));
     match router.handle(ClientMessage::SyncMode {
+        accepts_commit: true,
         session: SessionId(2),
     }) {
         Some(ServerMessage::ModeSync {
@@ -202,7 +203,10 @@ fn mode_is_shared_by_every_app() {
 
 /// 会话取一次 `SyncMode`，返回它拿到的全局模式。
 fn synced_mode(router: &mut Router, session: SessionId) -> Option<bool> {
-    match router.handle(ClientMessage::SyncMode { session }) {
+    match router.handle(ClientMessage::SyncMode {
+        accepts_commit: true,
+        session,
+    }) {
         Some(ServerMessage::ModeSync { english, .. }) => english,
         other => panic!("SyncMode 应回 ModeSync，实际 {other:?}"),
     }

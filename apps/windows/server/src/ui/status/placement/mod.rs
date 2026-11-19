@@ -89,6 +89,10 @@ impl Placement {
                 (self.events)(StatusEvent::TogglePunctuation);
             }
             Some(StatusAction::OpenSymbolPanel) => (self.events)(StatusEvent::OpenSymbolPanel),
+            Some(StatusAction::ToggleVoice) => (self.events)(StatusEvent::ToggleVoice),
+            Some(StatusAction::OpenTranslator) => {
+                crate::ui::launch_sibling("qingjian-translator.exe")
+            }
             Some(StatusAction::OpenSettings) => crate::ui::open_settings(),
             None => {}
         }

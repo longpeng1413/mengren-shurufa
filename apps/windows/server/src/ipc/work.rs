@@ -22,5 +22,9 @@ pub enum Work {
     Wake,
 
     /// 全局语音热键（Server 的低级键盘钩子发出）：`down` 为真开始听，为假说完。
-    VoiceKey { down: bool },
+    VoiceCancel,
+    OpenTranslator,
+    VoiceKey {
+        down: bool,
+    },
 }

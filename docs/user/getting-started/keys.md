@@ -129,3 +129,7 @@ Windows 私密输入与私密发送可在实验功能分别自定义，支持 Ct
 ## 猛人 0.4.0 电脑剪贴板
 
 历史面板为紧凑竖排小窗口，滚轮上下查看。空搜索框中用 ↑ / ↓ 选择，回车粘贴，Esc 收起；原有呼出快捷键及自定义设置保留。Windows 小键盘在 NumLock 开启时按数字输入，关闭时保留方向和 Home / End；六位配对码也遵循该规则。
+
+### Windows 语音和翻译窗口
+
+按住右 Alt 说话，松开后文字写入光标。Esc 取消。Ctrl+Alt+F 呼出或收起独立翻译窗口，Ctrl+Alt+T 继续翻译选中的文字。更改快捷键及朗读操作见 [Windows 语音和翻译](../platforms/windows-voice-translate.md)。

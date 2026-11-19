@@ -3,6 +3,7 @@
 pub enum StatusEvent {
     /// 点了「中 / 英」格：翻转模式。
     ToggleMode,
+    ToggleVoice,
 
     /// 点了「，。」格：翻转当前模式的全角标点（中英各记一份）。
     TogglePunctuation,

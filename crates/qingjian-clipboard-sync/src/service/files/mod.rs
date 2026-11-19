@@ -134,7 +134,9 @@ impl SyncService {
                 outputs
                     .iter_mut()
                     .filter_map(|o| {
-                        if o.channel.receive_limited(16).ok()? != b"saved" {return None;}
+                        if o.channel.receive_limited(16).ok()? != b"saved" {
+                            return None;
+                        }
                         let _ = o.channel.send(b"done");
                         Some(())
                     })

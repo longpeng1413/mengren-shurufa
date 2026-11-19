@@ -297,6 +297,7 @@ impl Router {
         let next = RouterConfig::from(config);
         self.reload_mode(&next);
         let themes_stamp = self.config.themes_stamp;
+        self.reload_voice(&next);
         self.config = next;
         self.config.themes_stamp = themes_stamp;
         // 两个展开开关都不生效了（排布切走 / 开关关掉）：展开着的矩阵收回去，等下一帧照单行画

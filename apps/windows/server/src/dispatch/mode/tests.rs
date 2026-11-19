@@ -27,6 +27,7 @@ fn open(router: &mut Router, id: u64, app: Option<&str>) {
 
 fn sync(router: &mut Router, id: u64) -> bool {
     match router.handle(ClientMessage::SyncMode {
+        accepts_commit: true,
         session: SessionId(id),
     }) {
         Some(ServerMessage::ModeSync {

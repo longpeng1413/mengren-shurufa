@@ -81,6 +81,8 @@ pub fn serve_pipe(
             Ok(Work::Click(mouse)) => router.handle_candidate_mouse(mouse),
             Ok(Work::Panel(hit)) => router.handle_panel_mouse(hit),
             Ok(Work::Wake) => router.tick(),
+            Ok(Work::VoiceCancel) => router.cancel_hotkey_voice(),
+            Ok(Work::OpenTranslator) => router.open_translator(),
             Ok(Work::VoiceKey { down }) => router.handle_hotkey_voice(down),
             Err(RecvTimeoutError::Timeout) => continue,
             Err(RecvTimeoutError::Disconnected) => {

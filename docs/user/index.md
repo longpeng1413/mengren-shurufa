@@ -4,7 +4,7 @@ order: 0
 description: 青简输入法使用文档：安装、打字、学语言、个性化、AI 服务、各平台差异、隐私与常见问题。
 ---
 
-猛人已恢复开发，当前版本 0.4.8；当前功能与用户确认结果见[版本状态与未完成项](help/mengren-freeze.md)。
+猛人已恢复开发，当前版本为 Windows 0.4.9 与安卓 0.4.8；当前功能与用户确认结果见[版本状态与未完成项](help/mengren-freeze.md)。
 
 猛人 Windows/Android 改版用户先阅读 [云服务](cloud/mengren-services.md)、[同步与私密输入](help/mengren-relay.md) 和 [内置更新](help/mengren-updates.md)。各版本功能、已确认结果与尚待真机验证的项目见[版本状态](help/mengren-freeze.md)和[真机清单](help/mengren-testing.md)。下文保留上游基础输入说明，平台范围以对应功能页为准。
 

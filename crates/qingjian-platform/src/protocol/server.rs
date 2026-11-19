@@ -190,6 +190,10 @@ pub enum ServerMessage {
     /// 对一次 [`super::ClientMessage::SyncMode`] 的答复：当前的全局中英模式，
     /// 外加当前的按键行为设置（每一拍都带，DLL 那边热加载就靠它）。
     ModeSync {
+        /// 新 DLL 可在模式轮询时直接上屏；旧 DLL 留到下一键或 Poll。
+        #[serde(default)]
+        commit: Option<String>,
+
         /// 会话标识。
         session: SessionId,
 

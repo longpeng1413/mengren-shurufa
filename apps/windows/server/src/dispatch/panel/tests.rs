@@ -137,6 +137,7 @@ fn brackets_switch_sections_and_letters_close_and_compose() {
 fn menu_opens_without_composition_and_mouse_commits() {
     let mut router = router();
     router.handle(ClientMessage::SyncMode {
+        accepts_commit: true,
         session: SessionId(1),
     });
     router.handle(ClientMessage::Indicator {
@@ -174,6 +175,7 @@ fn menu_opens_without_composition_and_mouse_commits() {
 fn close_button_and_escape_without_composition_end_the_frame() {
     let mut router = router();
     router.handle(ClientMessage::SyncMode {
+        accepts_commit: true,
         session: SessionId(1),
     });
     router.handle(ClientMessage::Indicator {

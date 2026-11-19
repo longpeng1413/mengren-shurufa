@@ -26,7 +26,7 @@ ASSET_PREFIX = f"https://github.com/{REPO}/releases/download/v"
 PLATFORM_CONFIGS = {
     "android": ["apps/android/core/Cargo.toml"],
     "windows": ["apps/clipboard/Cargo.toml", "apps/settings/Cargo.toml", "apps/windows/server/Cargo.toml",
-                "apps/windows/tsf/Cargo.toml", "apps/windows/settings/Cargo.toml"],
+                "apps/windows/tsf/Cargo.toml", "apps/windows/settings/Cargo.toml", "apps/windows/translator/Cargo.toml"],
 }
 PLATFORM_NAMES = {"android": "安卓", "windows": "Windows"}
 

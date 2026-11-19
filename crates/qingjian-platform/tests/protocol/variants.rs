@@ -94,7 +94,10 @@ fn client_messages() -> Vec<ClientMessage> {
             english: true,
             vietnamese: true,
         },
-        ClientMessage::SyncMode { session },
+        ClientMessage::SyncMode {
+            accepts_commit: true,
+            session,
+        },
         ClientMessage::ImeSwitched { session },
         ClientMessage::Indicator {
             session,
@@ -159,6 +162,7 @@ fn server_messages() -> Vec<ServerMessage> {
             commit: None,
         },
         ServerMessage::ModeSync {
+            commit: None,
             session,
             english: Some(false),
             vietnamese: Some(false),
@@ -166,6 +170,7 @@ fn server_messages() -> Vec<ServerMessage> {
             indicator: IndicatorState::default(),
         },
         ServerMessage::ModeSync {
+            commit: None,
             session,
             english: Some(true),
             vietnamese: Some(true),

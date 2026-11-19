@@ -115,6 +115,31 @@ pub fn shortcuts(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, Rende
             false,
         )?);
     }
+    if Feature::Voice.here() {
+        let enabled = config.shortcut.translator.is_some();
+        let toggle = bamboo_slip::Switch::new(enabled).build(
+            ui,
+            theme,
+            "translator-enabled",
+            Message::set(
+                "shortcut",
+                "translator",
+                if enabled { "" } else { "ctrl+alt+f" },
+            ),
+        )?;
+        rows.push(
+            SettingRow::new(tr("shortcut.translator"))
+                .control(toggle)
+                .build(ui, theme)?,
+        );
+        rows.push(recorder(
+            ui,
+            page,
+            Shortcut::Translator,
+            tr("shortcut.need_two_modifiers"),
+            false,
+        )?);
+    }
     if Feature::TranslatePanel.here() {
         rows.push(recorder(
             ui,

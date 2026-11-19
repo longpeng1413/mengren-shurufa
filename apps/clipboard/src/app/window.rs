@@ -112,6 +112,9 @@ impl App for ClipboardApp {
                     set_clipboard(&copied);
                 }
                 if self.search.text() != before {
+                    self.items.clear();
+                    self.selected = 0;
+                    self.menu = None;
                     self.reload();
                 }
             }
@@ -214,11 +217,18 @@ impl App for ClipboardApp {
             Message::Filter(filter) => {
                 self.filter = filter;
                 self.list_generation += 1;
+                self.items.clear();
+                self.selected = 0;
+                self.menu = None;
                 self.reload();
             }
             Message::OpenMenu(index, position) => {
                 self.selected = index;
-                self.menu = Some(OpenedMenu { index, position });
+                self.menu = self.items.get(index).map(|item| OpenedMenu {
+                    id: item.id.clone(),
+                    index,
+                    position,
+                });
             }
             Message::MenuPick(pick) => self.pick_menu(pick),
             Message::CloseMenu => self.menu = None,

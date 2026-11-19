@@ -901,3 +901,9 @@ Windows `cloud_usage` 本机 HTTP 回归服务在回复后先半关闭写方向�
 - 候选条的普通候选优先，跨设备私密提示优先于本机复制建议。键盘收起释放建议正文，保留已消费标记；失效建议不靠重开键盘延长有效期。
 - 三个日志导出入口统一 `mengren-shurufa-logs-日期.zip`；安卓备份 `mengren-shurufa-data-日期.zip`。Windows 四个产品资源补齐猛人产品名/描述。品牌核对入口 `mengren/audit-brand.py`，完整范围见 `docs/notes/brand-043-audit.md`。
 - 官方依据：[ClipDescription 时间戳和分类](https://developer.android.com/reference/android/content/ClipDescription)、[Android 16 OTP 分类常量](https://developer.android.com/reference/android/view/textclassifier/TextClassifier#TYPE_OTP)。仅读取已复制的内容，不新增短信权限。
+
+### Windows 快捷键与翻译窗口
+
+Windows Server 在 UI 线程安装一个低级键盘钩子，识别语音和翻译两套快捷键。修饰键按物理左右键分别跟踪，组合键通过当前布局映射，计时器只在到达长按阈值后发送遮罩键。Router 工人线程负责音频、取消、配置热加载及会话结果交付。
+
+`apps/windows/translator` 生成 `qingjian-translator.exe`。窗口用 Win32 多行编辑控件支持 TSF，复用 CloudPredictor 后台翻译与 Windows SAPI。只有与当前输入代次匹配的响应才能刷新译文。互译语言代码单独保存在用户配置目录的 `translator-language` 文件；隐藏窗口在本进程内保留位置和内容，十分钟后退出。

@@ -87,6 +87,9 @@ impl App for Settings {
                 Ok(value) => {
                     let (section, key) = shortcut.config_key();
                     self.write(section, key, value);
+                    if shortcut == crate::shortcut::Shortcut::Voice {
+                        self.write("voice", "hotkey", "shortcut");
+                    }
                     self.recording = None;
                 }
                 Err(reason) => self.notice = Some((shortcut.title(), reason)),

@@ -187,7 +187,7 @@ impl TextService_Impl {
             .engine
             .borrow_mut()
             .as_mut()
-            .map(|client| client.sync_mode());
+            .map(|client| client.sync_mode(false));
         match reply {
             Some(Ok(reply)) => {
                 self.apply_input_settings(reply.input);

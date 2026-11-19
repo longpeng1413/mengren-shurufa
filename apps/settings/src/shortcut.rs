@@ -16,6 +16,8 @@ pub enum Shortcut {
     TranslatePanel,
     /// 呼出剪贴板面板（全局快捷键）。
     Clipboard,
+    Voice,
+    Translator,
     PrivateInput,
     PrivateSend,
     /// 辅码触发键（单个符号，不带修饰键）。
@@ -28,12 +30,14 @@ pub enum Shortcut {
 
 impl Shortcut {
     #[cfg(test)]
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 13] = [
         Self::Translation,
         Self::TranslationSecond,
         Self::TranslateSelection,
         Self::Predict,
         Self::TranslatePanel,
+        Self::Voice,
+        Self::Translator,
         Self::Clipboard,
         Self::PrivateInput,
         Self::PrivateSend,
@@ -49,6 +53,8 @@ impl Shortcut {
             Self::TranslateSelection => tr("shortcut.translate_selection"),
             Self::Predict => tr("shortcut.predict"),
             Self::TranslatePanel => tr("shortcut.translate_panel"),
+            Self::Voice => tr("voice.combo"),
+            Self::Translator => tr("shortcut.translator"),
             Self::Clipboard => tr("shortcut.clipboard"),
             Self::PrivateInput => tr("private.shortcut"),
             Self::PrivateSend => tr("private.send_shortcut"),
@@ -66,6 +72,8 @@ impl Shortcut {
             Self::TranslateSelection => ("shortcut", "translate_selection"),
             Self::Predict => ("shortcut", "predict"),
             Self::TranslatePanel => ("shortcut", "translate_panel"),
+            Self::Voice => ("voice", "shortcut"),
+            Self::Translator => ("shortcut", "translator"),
             Self::Clipboard => ("shortcut", "clipboard"),
             Self::PrivateInput => ("shortcut", "private_input"),
             Self::PrivateSend => ("shortcut", "private_send"),
@@ -82,6 +90,8 @@ impl Shortcut {
             Self::TranslateSelection
             | Self::Predict
             | Self::TranslatePanel
+            | Self::Voice
+            | Self::Translator
             | Self::Clipboard
             | Self::PrivateInput
             | Self::PrivateSend => tr("shortcut.prompt_global"),
@@ -100,6 +110,8 @@ impl Shortcut {
             Self::TranslateSelection => combo_label(shortcut.translate_selection),
             Self::Predict => combo_label(shortcut.predict),
             Self::TranslatePanel => combo_label(shortcut.translate_panel),
+            Self::Voice => config.voice.shortcut.map(combo_label).unwrap_or_default(),
+            Self::Translator => shortcut.translator.map(combo_label).unwrap_or_default(),
             Self::Clipboard => combo_label(shortcut.clipboard),
             Self::PrivateInput => combo_label(shortcut.private_input),
             Self::PrivateSend => combo_label(shortcut.private_send),
@@ -114,7 +126,11 @@ impl Shortcut {
         #[cfg(windows)]
         if matches!(
             self,
-            Self::Clipboard | Self::PrivateInput | Self::PrivateSend
+            Self::Voice
+                | Self::Translator
+                | Self::Clipboard
+                | Self::PrivateInput
+                | Self::PrivateSend
         ) && let Ok(combo) = value.parse::<KeyCombo>()
             && !same_combo(combo, config.shortcut.clipboard)
             && !same_combo(combo, config.shortcut.private_input)
@@ -207,7 +223,11 @@ impl Shortcut {
                 }
                 Ok(key.key_string())
             }
-            Self::Clipboard | Self::PrivateInput | Self::PrivateSend => {
+            Self::Voice
+            | Self::Translator
+            | Self::Clipboard
+            | Self::PrivateInput
+            | Self::PrivateSend => {
                 let key = match &press.key {
                     KeyCode::Character(text) => single(text)
                         .map(|key| {
@@ -248,10 +268,29 @@ impl Shortcut {
                 }
                 for other in [Self::Clipboard, Self::PrivateInput, Self::PrivateSend] {
                     if other != self
-                        && (self == Self::PrivateSend || other == Self::PrivateSend)
+                        && !matches!(
+                            (self, other),
+                            (Self::Clipboard, Self::PrivateInput)
+                                | (Self::PrivateInput, Self::Clipboard)
+                        )
                         && same_combo(other.combo(config), combo)
                     {
                         return Err(tr_args("shortcut.clash", &[("other", &other.title())]));
+                    }
+                }
+                if Feature::Voice.here() {
+                    for (other, configured) in [
+                        (
+                            Self::Voice,
+                            config.voice.shortcut.filter(|_| {
+                                config.voice.trigger() == qingjian_platform::VoiceHotkey::Shortcut
+                            }),
+                        ),
+                        (Self::Translator, config.shortcut.translator),
+                    ] {
+                        if self != other && configured.is_some_and(|c| same_combo(c, combo)) {
+                            return Err(tr_args("shortcut.clash", &[("other", &other.title())]));
+                        }
                     }
                 }
                 Ok(combo.key_string())
@@ -278,6 +317,21 @@ impl Shortcut {
                 {
                     let other = Self::Clipboard.title();
                     return Err(tr_args("shortcut.clash", &[("other", &other)]));
+                }
+                if Feature::Voice.here() {
+                    for (other, configured) in [
+                        (
+                            Self::Voice,
+                            config.voice.shortcut.filter(|_| {
+                                config.voice.trigger() == qingjian_platform::VoiceHotkey::Shortcut
+                            }),
+                        ),
+                        (Self::Translator, config.shortcut.translator),
+                    ] {
+                        if self != other && configured.is_some_and(|c| same_combo(c, combo)) {
+                            return Err(tr_args("shortcut.clash", &[("other", &other.title())]));
+                        }
+                    }
                 }
                 Ok(combo.key_string())
             }

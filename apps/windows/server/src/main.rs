@@ -345,7 +345,7 @@ fn main() -> ExitCode {
         "青简 Windows Server 就绪"
     );
 
-    let code = serve(router, config.voice.shortcut, config.voice.hold_ms);
+    let code = serve(router, config.voice.clone(), config.shortcut.translator);
     tracing::info!(pid = std::process::id(), ?code, "Server process stopped");
     code
 }
@@ -377,8 +377,8 @@ fn grant_appcontainer_log_access() {
 #[cfg(windows)]
 fn serve(
     mut router: Router,
-    voice_combo: Option<qingjian_platform::KeyCombo>,
-    hold_ms: u64,
+    voice: qingjian_platform::VoiceConfig,
+    translator: Option<qingjian_platform::KeyCombo>,
 ) -> ExitCode {
     use qingjian_windows_server::hotkey;
     use qingjian_windows_server::ipc::{Work, pipe};
@@ -400,10 +400,12 @@ fn serve(
     });
     // 语音热键钩子装在 UI 线程（它有消息循环）。把 work 发送端与配置带过去。
     let hotkey_work = work_tx.clone();
-    let combo = hotkey::combo_from_config(voice_combo);
-    let hold = u32::try_from(hold_ms).unwrap_or(400);
+    router.set_voice_foreground(qingjian_platform::foreground::InputFocus::current);
+    router.set_voice_callbacks(hotkey::reconfigure, |on| {
+        hotkey::LISTENING.store(on, std::sync::atomic::Ordering::Release)
+    });
     let start_hook: Box<dyn FnOnce() + Send> = Box::new(move || {
-        hotkey::install(hotkey_work, hold, combo);
+        hotkey::install(hotkey_work, &voice, translator);
     });
     // 长按 Win 的计时线程：用户按住 Win 不动时没有别的按键事件，靠它到点推进。
     let _ = std::thread::Builder::new()
@@ -432,7 +434,11 @@ fn serve(
 }
 
 #[cfg(not(windows))]
-fn serve(_router: Router) -> ExitCode {
+fn serve(
+    _router: Router,
+    _voice: qingjian_platform::VoiceConfig,
+    _translator: Option<qingjian_platform::KeyCombo>,
+) -> ExitCode {
     tracing::warn!("命名管道传输仅 Windows 提供；本平台只装配 Engine 供测试");
     ExitCode::SUCCESS
 }

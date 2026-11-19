@@ -76,6 +76,7 @@ Name: "{commonappdata}\Qingjian"; Permissions: users-modify
 Source: "{#Repo}\target\release\qingjian_tsf.dll";      DestDir: "{app}"; DestName: "{#TsfDll}"; Flags: ignoreversion uninsrestartdelete
 Source: "{#Repo}\target\i686-pc-windows-msvc\release\qingjian_tsf.dll"; DestDir: "{app}"; DestName: "{#TsfDll32}"; Flags: ignoreversion uninsrestartdelete
 Source: "{#Repo}\target\release\qingjian-settings.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#Repo}\target\release\qingjian-translator.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Repo}\target\release\qingjian-clipboard.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; 旧版设置程序（WinUI）留一个版本作回退，下个版本删掉它与下面的运行时
 Source: "{#Repo}\target\release\qingjian-settings-legacy.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -158,6 +159,8 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/im qingjian-server.exe /f"; \
   Flags: runhidden; RunOnceId: "KillServer"
 Filename: "{sys}\taskkill.exe"; Parameters: "/im qingjian-settings.exe /f"; \
   Flags: runhidden; RunOnceId: "KillSettings"
+Filename: "{sys}\taskkill.exe"; Parameters: "/im qingjian-translator.exe /f"; \
+  Flags: runhidden; RunOnceId: "KillTranslator"
 Filename: "{sys}\taskkill.exe"; Parameters: "/im qingjian-clipboard.exe /f"; \
   Flags: runhidden; RunOnceId: "KillClipboard"
 Filename: "{sys}\taskkill.exe"; Parameters: "/im qingjian-settings-legacy.exe /f"; \
@@ -247,6 +250,7 @@ begin
   RetireServerExe;
   KillProcess('qingjian-server.exe');
   KillProcess('qingjian-settings.exe');
+  KillProcess('qingjian-translator.exe');
   KillProcess('qingjian-clipboard.exe');
   KillProcess('qingjian-settings-legacy.exe');
   RetireLoadedDll('{#TsfDll}');

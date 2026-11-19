@@ -60,7 +60,7 @@ if (-not $SkipBuild) {
     Write-Host '构建 release 产物…' -ForegroundColor Cyan
     Push-Location $Repo
     try {
-        cargo build --release --locked -p qingjian-windows-server -p qingjian-windows-tsf -p qingjian-settings -p qingjian-clipboard-app -p qingjian-windows-settings
+        cargo build --release --locked -p qingjian-windows-translator -p qingjian-windows-server -p qingjian-windows-tsf -p qingjian-settings -p qingjian-clipboard-app -p qingjian-windows-settings
         if ($LASTEXITCODE -ne 0) { throw "cargo build 失败（退出码 $LASTEXITCODE）" }
         cargo build --release --locked -p qingjian-windows-tsf --target i686-pc-windows-msvc
         if ($LASTEXITCODE -ne 0) { throw "32 位 DLL cargo build 失败（退出码 $LASTEXITCODE）" }
@@ -71,6 +71,7 @@ if (-not $SkipBuild) {
 $targets = @(
     'release\qingjian_tsf.dll',
     'i686-pc-windows-msvc\release\qingjian_tsf.dll',
+    'release\qingjian-translator.exe',
     'release\qingjian-server.exe',
     'release\qingjian-settings.exe',
     'release\qingjian-clipboard.exe',

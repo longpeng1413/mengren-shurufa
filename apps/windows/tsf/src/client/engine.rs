@@ -164,17 +164,20 @@ impl<S: Read + Write> EngineClient<S> {
     }
 
     /// 问 Server 有没有待处理的目标模式，顺路取回最新的按键行为设置（每一拍都带）。
-    pub fn sync_mode(&mut self) -> Result<ModeSyncReply, ClientError> {
+    pub fn sync_mode(&mut self, accepts_commit: bool) -> Result<ModeSyncReply, ClientError> {
         match self.call(&ClientMessage::SyncMode {
+            accepts_commit,
             session: self.session,
         })? {
             ServerMessage::ModeSync {
+                commit,
                 english,
                 vietnamese,
                 input,
                 indicator,
                 ..
             } => Ok(ModeSyncReply {
+                commit,
                 english,
                 vietnamese,
                 input,

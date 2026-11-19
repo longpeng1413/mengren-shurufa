@@ -51,6 +51,7 @@ impl Router {
     /// 状态条上的操作。
     pub fn handle_status_event(&mut self, event: StatusEvent) {
         match event {
+            StatusEvent::ToggleVoice => self.toggle_status_voice(),
             StatusEvent::ToggleMode => {
                 // 关掉内置英文模式后这一格不切模式：DLL 那边也会拦（配置改了没切走再切回时两边都挡住）
                 if !self.config.english_mode {
@@ -148,6 +149,7 @@ impl Router {
         match self.ime_active.then_some(self.english) {
             Some(english) if self.config.status_enabled => {
                 self.status.show_status(StatusView {
+                    voice_active: self.recording(),
                     english,
                     vietnamese: self.vietnamese_mode,
                     zhuyin: self.config.scheme == Scheme::Zhuyin,

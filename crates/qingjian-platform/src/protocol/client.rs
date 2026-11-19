@@ -120,6 +120,10 @@ pub enum ClientMessage {
     /// 取全局中英模式：激活、得到焦点时各一次，前台、没在组句时再定时问（别的应用或悬浮状态条可能切过）。
     /// 回 [`super::ServerMessage::ModeSync`]；有 DLL 来取也说明青简是当前输入法。
     SyncMode {
+        /// 新 DLL 可在模式轮询时直接上屏；旧 DLL 留到下一键或 Poll。
+        #[serde(default)]
+        accepts_commit: bool,
+
         /// 会话标识。
         session: SessionId,
     },

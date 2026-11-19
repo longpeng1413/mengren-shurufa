@@ -62,6 +62,7 @@ impl ClipboardApp {
                 let id = item.id.clone();
                 if let Err(error) = self.store.delete(&id, now_millis()) {
                     tracing::warn!(%error, "clipboard delete failed");
+                    return;
                 }
                 self.link.changed();
                 self.thumbnails.remove(&id);

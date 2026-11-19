@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 仓库现状
 
-本工作区为基于青简改版的猛人输入法，当前产品版本为 Android / Windows v0.4.8（两端新增局域网文件复制粘贴）。文件互传需要双方升级并选择对方，普通文字和图片沿用原设置。Core 平台无关，各平台只做壳；下面的 crate 地图及上游 macOS/Linux 资料继续作为架构参考，不表示本轮要扩展所有平台。
+本工作区为基于青简改版的猛人输入法，当前产品版本为 Windows v0.4.9（语音听写、独立翻译窗口、剪贴板删除修复）和 Android v0.4.8。文件互传需要双方升级并选择对方，普通文字和图片沿用原设置。Core 平台无关，各平台只做壳；下面的 crate 地图及上游 macOS/Linux 资料继续作为架构参考，不表示本轮要扩展所有平台。
 当前范围见 `docs/design/mengren-public.md`，猛人进度与剩余项见 `docs/plan/todo.md`；`docs/plan/roadmap.md` 主体为上游路线图。2026-11-07 v0.3.8 发布后，用户确认原有手机到另一手机及桌面设备的私密路线通过；新增 Windows 设备的普通/私密互传尚未联通，用户已确认仅看见附近/中转设备，尚未配对；先逐对完成六位码配对。0.4.0 修复 Windows 小键盘配对码输入顺序，并加入自定义短语同步及紧凑竖排剪贴板。源码没有三台设备上限，六台逻辑设备中转互传扩容测试已通过，不将逻辑测试当作新增真实设备已通过。此前 v0.3.7 故障历史见 `docs/notes/private-transfer-037-review.md`。
 
 ## 目录地图
@@ -33,7 +33,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `apps/clipboard`：青简剪贴板（独立进程，Windows 与 macOS）：监听复制、全局快捷键呼出卡片面板、粘贴回原窗口，画在 bamboo-slip 上；系统相关的在 `src/system/{windows,macos}/`，霓虹灯的节奏与像素在共用的 `src/system/neon/`。macOS 版是输入法包里的 `QingjianClipboard.app`，由输入法按配置拉起。
 - `apps/cli`：Core 的验证工具：查询、逐键计时、输入日志回放、整句评测、常数扫描。排序 / 整句 / 纠错的改动先跑它再合。
 - `apps/macos`：IMK 壳，按 `app / host / imk / candidates / menubar / preferences` 分目录（`preferences` 是旧版设置，新版 `apps/settings` 为主、旧版只作兜底）；`scripts/bundle.sh --install` 装到本机，`--pkg` 出分发包。
-- `apps/windows`：`server`（Server 进程：Engine + IPC + 自绘候选窗与状态条）+ `tsf`（TSF DLL）+ `settings`（旧版设置，WinUI 3，只作兜底，新版 `apps/settings` 为主）+ `installer`（Inno）。DLL 不能带 Engine 的依赖树，所以是两个 package。
+- `apps/windows`：`server`（Server 进程：Engine + IPC + 自绘候选窗与状态条）+ `tsf`（TSF DLL）+ `settings`（旧版设置，WinUI 3，只作兜底，新版 `apps/settings` 为主）+ `translator`（独立翻译窗口）+ `installer`（Inno）。DLL 不能带 Engine 的依赖树，所以是两个 package。
 - `apps/linux`：`server`（Engine + Unix socket）+ `fcitx5` / `fcitx4`（框架事件、默认面板）+ `ibus`（第二个前端：IBus，按键 / 焦点 / 面板已通，对着真 daemon 验过）+ `scripts`（用户级安装卸载、`package.sh` 打 Fcitx5 预编译包）+ `packaging`（`build.sh` 在容器里打 deb / rpm，见 `docs/notes/linux-packaging.md`）；Server 手动启动或装成 systemd 用户服务，见 `docs/notes/linux-fcitx5.md` 和 `docs/notes/linux-fcitx4.md`。
 - `apps/android`：`core`（Rust crate：Engine 装配 + `Session` + JNI，编成 `libqingjian_android.so`）+ `app`（Kotlin `InputMethodService` 壳，自绘键盘，候选条贴渲染器位图）；Gradle 构建时自动跑 `cargo ndk`，见 `apps/android/README.md`。
 - `tools/dict-convert`、`tools/gloss-gen`、`tools/corpus`：产品数据生成（词库 / 语言模型 / 释义表 / emoji / 英文词表），输出到 `data/generated/`（gitignore）。

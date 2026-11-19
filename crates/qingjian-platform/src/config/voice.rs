@@ -22,6 +22,8 @@ pub const DEFAULT_RESOURCE_ID: &str = "volc.seedasr.sauc.duration";
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct VoiceConfig {
+    /// 空串沿用既有组合键，否则缺省右 Alt。
+    pub hotkey: String,
     /// 识别服务：`none` 关闭 / `offline` 本机离线 / `volcengine` 豆包云端；写错按 `none`。
     pub provider: String,
 
@@ -49,6 +51,7 @@ pub struct VoiceConfig {
 impl Default for VoiceConfig {
     fn default() -> Self {
         Self {
+            hotkey: String::new(),
             provider: PROVIDER_NONE.to_owned(),
             resource_id: DEFAULT_RESOURCE_ID.to_owned(),
             api_key: None,
@@ -60,7 +63,27 @@ impl Default for VoiceConfig {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VoiceHotkey {
+    RightAlt,
+    RightCtrl,
+    Win,
+    Shortcut,
+    None,
+}
+
 impl VoiceConfig {
+    pub fn trigger(&self) -> VoiceHotkey {
+        match self.hotkey.as_str() {
+            "none" => VoiceHotkey::None,
+            "right_ctrl" => VoiceHotkey::RightCtrl,
+            "win" => VoiceHotkey::Win,
+            "shortcut" => VoiceHotkey::Shortcut,
+            "" if self.shortcut.is_some() => VoiceHotkey::Shortcut,
+            _ => VoiceHotkey::RightAlt,
+        }
+    }
+
     /// 服务开没开：`offline` / `volcengine` 之外的都当关。
     pub fn enabled(&self) -> bool {
         matches!(
@@ -135,5 +158,25 @@ mod tests {
             ..VoiceConfig::default()
         };
         assert_eq!(blank.resolve_api_key(), None);
+    }
+}
+
+#[cfg(test)]
+mod hotkey_tests {
+    use super::{VoiceConfig, VoiceHotkey};
+    #[test]
+    fn old_combo_and_explicit_off_round_trip() {
+        for (src, expected) in [
+            ("", VoiceHotkey::RightAlt),
+            ("shortcut='ctrl+alt+s'", VoiceHotkey::Shortcut),
+            ("hotkey='none'\nshortcut='ctrl+alt+s'", VoiceHotkey::None),
+        ] {
+            let cfg: VoiceConfig = toml::from_str(src).unwrap();
+            assert_eq!(cfg.trigger(), expected);
+            assert_eq!(
+                toml::from_str::<VoiceConfig>(&toml::to_string(&cfg).unwrap()).unwrap(),
+                cfg
+            );
+        }
     }
 }

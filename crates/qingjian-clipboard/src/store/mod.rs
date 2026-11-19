@@ -348,7 +348,7 @@ impl ClipStore {
     pub fn delete(&mut self, id: &str, now: i64) -> Result<(), ClipboardError> {
         let transaction = self.connection.transaction()?;
         transaction.execute(
-            "UPDATE items SET text = '', source = '', fingerprint = '', deleted = 1, updated_at = ?1
+            "UPDATE items SET text = '', source = '', fingerprint = '', deleted = 1, updated_at = MAX(?1, updated_at + 1)
              WHERE id = ?2",
             params![now, id],
         )?;

@@ -2,11 +2,11 @@
 
 ## 支持的版本
 
-猛人输入法基于青简，当前维护 Windows/Android，只修最新正式版（当前 v0.4.8）。部分功能已有用户确认；具体设备与目标应用的验收范围见[真机测试清单](docs/user/help/mengren-testing.md)。
+猛人输入法基于青简，当前维护 Windows/Android，只修最新正式版（Windows v0.4.9、Android v0.4.8）。部分功能已有用户确认；具体设备与目标应用的验收范围见[真机测试清单](docs/user/help/mengren-testing.md)。
 
 | 版本 | 支持 |
 |---|---|
-| 最新的猛人正式版（当前 0.4.8） | 接收报告，按影响评估处理 |
+| 最新的猛人正式版（Windows 0.4.9、Android 0.4.8） | 接收报告，按影响评估处理 |
 | 更早 | ❌，请升级 |
 
 ## 报告漏洞
@@ -26,4 +26,4 @@
 
 ---
 
-**English.** Mengren is based on Qingjian and currently maintains Windows and Android (latest stable release: v0.4.8). Please report vulnerabilities privately through GitHub's "Report a vulnerability" (Security tab), not in public issues. Reports are assessed by impact; no fixed response or release timeline is promised. An input method sees every keystroke, so we care most about keystroke leakage (logs, diagnostics, cloud requests, Secure Input), API key exposure, installer integrity, and crashes from malformed dictionaries, configuration, or cloud responses.
+**English.** Mengren is based on Qingjian and currently maintains Windows and Android (latest stable versions: Windows v0.4.9, Android v0.4.8). Please report vulnerabilities privately through GitHub's "Report a vulnerability" (Security tab), not in public issues. Reports are assessed by impact; no fixed response or release timeline is promised. An input method sees every keystroke, so we care most about keystroke leakage (logs, diagnostics, cloud requests, Secure Input), API key exposure, installer integrity, and crashes from malformed dictionaries, configuration, or cloud responses.

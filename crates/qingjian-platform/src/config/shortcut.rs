@@ -42,6 +42,9 @@ pub struct ShortcutConfig {
     pub translate_selection: KeyCombo,
 
     /// 组句中按需调用 AI（缺省 Ctrl+Alt+J，macOS 是 ⌃⌥J）。
+    #[serde(with = "super::optional_key_combo")]
+    pub translator: Option<KeyCombo>,
+
     pub predict: KeyCombo,
 
     /// 没在打字时打开符号面板的翻译组（缺省 Ctrl+Alt+Y，macOS 是 ⌃⌥Y；需要云服务开着）。
@@ -95,6 +98,7 @@ impl Default for ShortcutConfig {
             translation,
             translation_second,
             translate_selection,
+            translator: Some(KeyCombo::TRANSLATOR_DEFAULT),
             predict: KeyCombo::PREDICT_DEFAULT,
             translate_panel: KeyCombo::TRANSLATE_PANEL_DEFAULT,
             clipboard: KeyCombo::CLIPBOARD_DEFAULT,
