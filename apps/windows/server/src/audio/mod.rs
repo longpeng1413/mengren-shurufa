@@ -4,6 +4,8 @@
 //! 每段语音开一个线程，停时置 `stop` 标志，线程收尾（Stop + ReleaseBuffer + CoUninitialize）后退出。
 //! 用轮询而不是事件回调：省去 CreateEvent / SetEvent 的句柄管理，20 ms 一拍对语音足够，且停得快。
 
+mod gain;
+
 use std::ptr;
 use std::slice;
 use std::sync::Arc;
@@ -13,13 +15,15 @@ use std::thread;
 use std::time::Duration;
 
 use windows::Win32::Media::Audio::{
-    AUDCLNT_SHAREMODE_SHARED, IAudioCaptureClient, IAudioClient, IMMDevice, IMMDeviceEnumerator,
-    MMDeviceEnumerator, WAVE_FORMAT_PCM, WAVEFORMATEX, eCapture, eCommunications,
+    AUDCLNT_BUFFERFLAGS_SILENT, AUDCLNT_SHAREMODE_SHARED, IAudioCaptureClient, IAudioClient,
+    IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, WAVE_FORMAT_PCM, WAVEFORMATEX, eCapture,
+    eCommunications,
 };
 use windows::Win32::System::Com::{
     CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize,
 };
 
+use self::gain::VoiceGain;
 use crate::dispatch::{Capture, CaptureFactory, SAMPLE_RATE};
 
 /// 取包间隔：20 ms 约 320 个 16 kHz 采样，识别实时性足够。
@@ -97,35 +101,31 @@ fn capture_loop(
             .map_err(|e| format!("取录音客户端失败: {e}"))?;
         client.Start().map_err(|e| format!("开始录音失败: {e}"))?;
 
-        let mut max_level = 0.0f32;
-        while !stop.load(Ordering::Relaxed) {
+        let mut gain = VoiceGain::default();
+        loop {
+            let mut max_level = 0.0f32;
             let mut packet = || -> Result<(), String> {
                 let mut available = capture
                     .GetNextPacketSize()
                     .map_err(|e| format!("取包大小失败: {e}"))?;
-                while available > 0 && !stop.load(Ordering::Relaxed) {
+                while available > 0 {
                     let mut data = ptr::null_mut();
                     let mut frames = 0u32;
                     let mut flags = 0u32;
                     capture
                         .GetBuffer(&mut data, &mut frames, &mut flags, None, None)
                         .map_err(|e| format!("读取音频失败: {e}"))?;
-                    if frames > 0 {
-                        let silent = (flags & 0x1) != 0; // AUDCLNT_BUFFERFLAGS_SILENT
-                        let samples: Vec<i16> = if silent || data.is_null() {
+                    let mut samples =
+                        if flags & AUDCLNT_BUFFERFLAGS_SILENT.0 as u32 != 0 || data.is_null() {
                             vec![0; frames as usize]
                         } else {
-                            slice::from_raw_parts(data as *const i16, frames as usize).to_vec()
+                            slice::from_raw_parts(data.cast::<i16>(), frames as usize).to_vec()
                         };
-                        for &sample in &samples {
-                            let magnitude = (sample as f32 / i16::MAX as f32).abs();
-                            if magnitude > max_level {
-                                max_level = magnitude;
-                            }
-                        }
+                    let _ = capture.ReleaseBuffer(frames);
+                    if !samples.is_empty() {
+                        max_level = max_level.max(gain.process(&mut samples));
                         let _ = pcm.send(samples);
                     }
-                    let _ = capture.ReleaseBuffer(frames);
                     available = capture
                         .GetNextPacketSize()
                         .map_err(|e| format!("取下一包失败: {e}"))?;
@@ -138,7 +138,9 @@ fn capture_loop(
             }
             if max_level > 0.0 {
                 let _ = level.send(max_level);
-                max_level = 0.0;
+            }
+            if stop.load(Ordering::Relaxed) {
+                break;
             }
             thread::sleep(POLL_INTERVAL);
         }

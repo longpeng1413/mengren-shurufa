@@ -5,26 +5,39 @@ use qingjian_dictionary::Dictionary;
 use qingjian_platform::foreground::InputFocus;
 use qingjian_platform::protocol::{ClientMessage, PROTOCOL_VERSION, ServerMessage, SessionId};
 use std::sync::{Arc, mpsc};
-struct Final(Option<TranscriptEvent>);
+#[derive(Default)]
+struct Final {
+    event: Option<TranscriptEvent>,
+
+    samples: Vec<i16>,
+}
 impl Transcriber for Final {
     fn available(&self) -> bool {
         true
     }
     fn start(&mut self, _: u32) {}
-    fn feed(&mut self, _: &[i16]) {}
+    fn feed(&mut self, samples: &[i16]) {
+        self.samples.extend_from_slice(samples);
+    }
     fn finish(&mut self) {
-        self.0 = Some(TranscriptEvent::Final("语音文字".into()));
+        let text = if self.samples.is_empty() {
+            "语音文字".into()
+        } else {
+            format!("{:?}", self.samples)
+        };
+        self.event = Some(TranscriptEvent::Final(text));
     }
     fn cancel(&mut self) {
-        self.0 = None;
+        self.event = None;
+        self.samples.clear();
     }
     fn poll(&mut self) -> Option<TranscriptEvent> {
-        self.0.take()
+        self.event.take()
     }
 }
 fn router() -> Router {
     let mut r = Router::new(Engine::new(Dictionary::default()), Default::default());
-    r.voice.transcriber = Box::new(Final(None));
+    r.voice.transcriber = Box::<Final>::default();
     r.set_voice_capture(Some(Arc::new(|| {
         Ok(Capture {
             pcm: mpsc::channel().1,
@@ -176,4 +189,50 @@ fn unclaimed_final_retries_modifiers_once_and_never_follows_focus() {
     router.deliver_voice_fallback(due);
     assert!(router.voice.pending.is_none());
     assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn releasing_the_key_waits_for_the_last_capture_packet() {
+    use std::sync::Mutex;
+
+    let mut router = router();
+    let session = SessionId(1);
+    router.handle(ClientMessage::OpenSession {
+        session,
+        app: None,
+        protocol: PROTOCOL_VERSION,
+    });
+    router.handle(ClientMessage::SyncMode {
+        session,
+        accepts_commit: true,
+    });
+    let (sender, receiver) = mpsc::channel();
+    let receiver = Mutex::new(Some(receiver));
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let capture_stop = Arc::clone(&stop);
+    router.set_voice_capture(Some(Arc::new(move || {
+        Ok(Capture {
+            pcm: receiver.lock().unwrap().take().unwrap(),
+            level: None,
+            stop: Arc::clone(&capture_stop),
+        })
+    })));
+
+    router.toggle_status_voice();
+    sender.send(vec![11]).unwrap();
+    router.advance_voice();
+    router.toggle_status_voice();
+    assert!(stop.load(std::sync::atomic::Ordering::Relaxed));
+    router.advance_voice();
+    assert!(router.take_async_commit(session).is_none());
+
+    sender.send(vec![-23]).unwrap();
+    drop(sender);
+    router.advance_voice();
+    assert_eq!(
+        router.take_async_commit(session).as_deref(),
+        Some("[11, -23]")
+    );
+    router.advance_voice();
+    assert!(router.take_async_commit(session).is_none());
 }

@@ -906,4 +906,6 @@ Windows `cloud_usage` 本机 HTTP 回归服务在回复后先半关闭写方向�
 
 Windows Server 在 UI 线程安装一个低级键盘钩子，识别语音和翻译两套快捷键。修饰键按物理左右键分别跟踪，组合键通过当前布局映射，计时器只在到达长按阈值后发送遮罩键。Router 工人线程负责音频、取消、配置热加载及会话结果交付。
 
+Windows 麦克风采集在 `apps/windows/server/src/audio`。每包 16 kHz 单声道 PCM 先计算均方根电平和峰值，再按需增益。目标均方根为 −20 dBFS，增益上限为 +24 dB，放大后的峰值限制为 −1 dBFS。低于 −60 dBFS 的包保持原电平。增益上升采用 40 毫秒时间常数，峰值限制立即应用。波形显示原始峰值，离线和云端识别接收调整后的 PCM。松键后先让采集线程交出末尾音频，Router 最多等 150 毫秒再通知识别器结束。
+
 `apps/windows/translator` 生成 `qingjian-translator.exe`。窗口用 Win32 多行编辑控件支持 TSF，复用 CloudPredictor 后台翻译与 Windows SAPI。只有与当前输入代次匹配的响应才能刷新译文。互译语言代码单独保存在用户配置目录的 `translator-language` 文件；隐藏窗口在本进程内保留位置和内容，十分钟后退出。

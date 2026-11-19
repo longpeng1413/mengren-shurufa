@@ -12,7 +12,7 @@ mod transcriber;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::{Duration, Instant};
 
 use qingjian_core::{NoTranscriber, Transcriber, TranscriptEvent};
@@ -41,6 +41,9 @@ struct PendingCommit {
 
 /// 一段录音的采样率；豆包与 SenseVoice 都按 16 kHz 单声道。
 pub const SAMPLE_RATE: u32 = 16_000;
+
+/// 正常采集在下一次轮询就收尾。若驱动卡住，限制等尾包的时间。
+const CAPTURE_DRAIN_TIMEOUT: Duration = Duration::from_millis(150);
 
 /// 一次录音会话里，录音线程 -> Router 的东西。
 pub struct Capture {
@@ -88,6 +91,8 @@ struct Active {
     partial: String,
     /// 说完后还在等最终结果的起点，用于 UI 状态切换。
     finished_at: Option<Instant>,
+
+    finish_sent: bool,
 }
 
 /// 语音运行状态：识别方常驻，一段录音的进行态在其下。
@@ -264,6 +269,7 @@ impl Router {
             capture,
             partial: String::new(),
             finished_at: None,
+            finish_sent: false,
         });
         self.voice.last_level = 0.0;
         self.voice.notice_until = None;
@@ -297,15 +303,6 @@ impl Router {
             active.capture.stop.store(true, Ordering::Relaxed);
             active.finished_at = Some(Instant::now());
         }
-        while let Some(chunk) = self
-            .voice
-            .active
-            .as_ref()
-            .and_then(|a| a.capture.pcm.try_recv().ok())
-        {
-            self.voice.transcriber.feed(&chunk);
-        }
-        self.voice.transcriber.finish();
         self.reconcile_status();
         let partial = self
             .voice
@@ -438,9 +435,22 @@ impl Router {
         }
         self.voice.last_level = level * 0.8 + self.voice.last_level * 0.2;
 
-        // 喂音频：录音线程已经重采样到 16 kHz 单声道
-        while let Ok(chunk) = active.capture.pcm.try_recv() {
-            self.voice.transcriber.feed(&chunk);
+        // 收尾信号发给录音线程后，它仍可能交出最后一包。先喂完再结束识别。
+        if !active.finish_sent {
+            let disconnected = loop {
+                match active.capture.pcm.try_recv() {
+                    Ok(chunk) => self.voice.transcriber.feed(&chunk),
+                    Err(TryRecvError::Disconnected) => break true,
+                    Err(TryRecvError::Empty) => break false,
+                }
+            };
+            if active
+                .finished_at
+                .is_some_and(|at| disconnected || at.elapsed() >= CAPTURE_DRAIN_TIMEOUT)
+            {
+                active.finish_sent = true;
+                self.voice.transcriber.finish();
+            }
         }
 
         // 取事件（一次 tick 取完）
