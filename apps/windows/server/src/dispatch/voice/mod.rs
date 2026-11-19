@@ -13,7 +13,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use qingjian_core::{NoTranscriber, Transcriber, TranscriptEvent};
 use qingjian_platform::protocol::SessionId;
@@ -22,6 +22,22 @@ use qingjian_platform::{VoiceConfig, dirs, foreground::InputFocus};
 use super::Router;
 use qingjian_platform::{KeyCombo, windows_text::tr};
 type ConfigureKeys = fn(&VoiceConfig, Option<KeyCombo>);
+type InsertText = fn(InputFocus, &str) -> VoiceInsertResult;
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum VoiceInsertResult {
+    Sent,
+    Busy,
+    Failed,
+}
+
+struct PendingCommit {
+    session: SessionId,
+    focus: Option<InputFocus>,
+    fallback_at: Instant,
+    expires: Instant,
+    text: String,
+}
 
 /// 一段录音的采样率；豆包与 SenseVoice 都按 16 kHz 单声道。
 pub const SAMPLE_RATE: u32 = 16_000;
@@ -83,7 +99,8 @@ pub struct VoiceRuntime {
     sink: Box<dyn VoiceSink>,
     active: Option<Active>,
     foreground: Option<fn() -> Option<InputFocus>>,
-    pending: Option<(SessionId, Option<InputFocus>, Instant, String)>,
+    pending: Option<PendingCommit>,
+    insert_text: Option<InsertText>,
     /// 最近一次给面板的音量（平滑用）。
     last_level: f32,
     notice_until: Option<Instant>,
@@ -102,6 +119,7 @@ impl Default for VoiceRuntime {
             active: None,
             foreground: None,
             pending: None,
+            insert_text: None,
             last_level: 0.0,
             notice_until: None,
             from_status: false,
@@ -118,6 +136,10 @@ impl Router {
     }
     pub fn set_voice_foreground(&mut self, current: fn() -> Option<InputFocus>) {
         self.voice.foreground = Some(current);
+    }
+
+    pub fn set_voice_insertion(&mut self, insert: InsertText) {
+        self.voice.insert_text = Some(insert);
     }
 
     pub(super) fn reload_voice(&mut self, next: &super::RouterConfig) {
@@ -314,7 +336,7 @@ impl Router {
             .voice
             .pending
             .as_ref()
-            .is_some_and(|(owner, ..)| *owner == session)
+            .is_some_and(|pending| pending.session == session)
         {
             self.voice.pending = None;
         }
@@ -339,16 +361,45 @@ impl Router {
     /// 语音和鼠标点选分别排队，避免在切窗口时把听写写入其他编辑框。
     pub(super) fn take_async_commit(&mut self, session: SessionId) -> Option<String> {
         let clicked = self.take_clicked(session);
-        if let Some((owner, focus, until, _)) = &self.voice.pending {
-            if Instant::now() >= *until || !self.voice.focus_matches(*focus) {
+        if let Some(pending) = &self.voice.pending {
+            if Instant::now() >= pending.expires || !self.voice.focus_matches(pending.focus) {
                 self.voice.pending = None;
-            } else if *owner == session {
-                let (_, _, _, voice) = self.voice.pending.take()?;
+            } else if pending.session == session {
+                let voice = self.voice.pending.take()?.text;
                 tracing::debug!(?session, "voice final delivered to input thread");
                 return Some(clicked.unwrap_or_default() + &voice);
             }
         }
         clicked
+    }
+
+    fn deliver_voice_fallback(&mut self, now: Instant) {
+        let Some(pending) = self.voice.pending.take() else {
+            return;
+        };
+        if !self.voice.focus_matches(pending.focus) {
+            return;
+        }
+        if now >= pending.expires {
+            self.voice.notice(tr("voice_insert_failed"));
+            return;
+        }
+        if let (Some(insert), Some(focus)) = (self.voice.insert_text, pending.focus)
+            && now >= pending.fallback_at
+        {
+            match insert(focus, &pending.text) {
+                VoiceInsertResult::Sent => {
+                    tracing::debug!(session=?pending.session, "voice final sent as Unicode input");
+                    return;
+                }
+                VoiceInsertResult::Failed => {
+                    self.voice.notice(tr("voice_insert_failed"));
+                    return;
+                }
+                VoiceInsertResult::Busy => {}
+            }
+        }
+        self.voice.pending = Some(pending);
     }
 
     /// tick 里驱动一次语音（rescore 的 tick 调它）。
@@ -363,16 +414,7 @@ impl Router {
             self.voice.notice_until = None;
             self.voice.sink.hide();
         }
-        if self
-            .voice
-            .pending
-            .as_ref()
-            .is_some_and(|(_, focus, until, _)| {
-                Instant::now() >= *until || !self.voice.focus_matches(*focus)
-            })
-        {
-            self.voice.pending = None;
-        }
+        self.deliver_voice_fallback(Instant::now());
         if self
             .voice
             .active
@@ -435,12 +477,14 @@ impl Router {
                                 chars = commit.chars().count(),
                                 "voice final ready"
                             );
-                            self.voice.pending = Some((
+                            let now = Instant::now();
+                            self.voice.pending = Some(PendingCommit {
                                 session,
                                 focus,
-                                Instant::now() + std::time::Duration::from_secs(5),
-                                commit,
-                            ));
+                                fallback_at: now + Duration::from_millis(520),
+                                expires: now + Duration::from_secs(5),
+                                text: commit,
+                            });
                         }
                     }
                     done = true;

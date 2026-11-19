@@ -401,6 +401,7 @@ fn serve(
     // 语音热键钩子装在 UI 线程（它有消息循环）。把 work 发送端与配置带过去。
     let hotkey_work = work_tx.clone();
     router.set_voice_foreground(qingjian_platform::foreground::InputFocus::current);
+    router.set_voice_insertion(hotkey::insert_voice);
     router.set_voice_callbacks(hotkey::reconfigure, |on| {
         hotkey::LISTENING.store(on, std::sync::atomic::Ordering::Release)
     });

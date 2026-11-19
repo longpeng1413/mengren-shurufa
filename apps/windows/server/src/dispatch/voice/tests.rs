@@ -117,3 +117,63 @@ fn voice_uses_native_focus_and_drops_result_on_window_change() {
     WINDOW.store(10, Ordering::Relaxed);
     assert_eq!(sync(&mut r, foreground), None);
 }
+
+#[test]
+fn unclaimed_final_retries_modifiers_once_and_never_follows_focus() {
+    use super::{PendingCommit, VoiceInsertResult};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::{Duration, Instant};
+    static CALLS: AtomicUsize = AtomicUsize::new(0);
+    let mut router = router();
+    let focus = InputFocus {
+        session: SessionId(9),
+        window: 70,
+    };
+    router.set_voice_foreground(|| {
+        Some(InputFocus {
+            session: SessionId(9),
+            window: 70,
+        })
+    });
+    router.set_voice_insertion(|target, text| {
+        assert_eq!(target.window, 70);
+        assert_eq!(text, "测试");
+        if CALLS.fetch_add(1, Ordering::SeqCst) == 0 {
+            VoiceInsertResult::Busy
+        } else {
+            VoiceInsertResult::Sent
+        }
+    });
+    let now = Instant::now();
+    let due = now + Duration::from_millis(520);
+    let pending = || PendingCommit {
+        session: focus.session,
+        focus: Some(focus),
+        fallback_at: due,
+        expires: due + Duration::from_secs(4),
+        text: "测试".into(),
+    };
+    router.voice.pending = Some(pending());
+    router.deliver_voice_fallback(now);
+    assert_eq!(CALLS.load(Ordering::SeqCst), 0);
+    router.deliver_voice_fallback(due);
+    router.deliver_voice_fallback(due);
+    router.deliver_voice_fallback(due);
+    assert!(router.take_async_commit(focus.session).is_none());
+    router.voice.pending = Some(pending());
+    assert_eq!(
+        router.take_async_commit(focus.session).as_deref(),
+        Some("测试")
+    );
+    router.deliver_voice_fallback(due);
+    router.voice.pending = Some(pending());
+    router.set_voice_foreground(|| {
+        Some(InputFocus {
+            session: SessionId(9),
+            window: 71,
+        })
+    });
+    router.deliver_voice_fallback(due);
+    assert!(router.voice.pending.is_none());
+    assert_eq!(CALLS.load(Ordering::SeqCst), 2);
+}

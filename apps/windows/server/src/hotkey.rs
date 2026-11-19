@@ -1,5 +1,7 @@
 //! Windows 全局语音及翻译快捷键。物理修饰键始终成对放行。
+use crate::dispatch::VoiceInsertResult;
 use crate::ipc::Work;
+use qingjian_platform::foreground::InputFocus;
 use qingjian_platform::{KeyCombo, VoiceConfig, VoiceHotkey, global_hotkey};
 use std::sync::{
     Mutex,
@@ -9,7 +11,8 @@ use std::sync::{
 use std::time::{Duration, Instant};
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput, VIRTUAL_KEY,
+    GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
+    KEYEVENTF_UNICODE, SendInput, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, SetWindowsHookExW, WH_KEYBOARD_LL,
@@ -192,10 +195,109 @@ pub fn tick_hold() {
     }
 }
 
+/// 旧 DLL 未取走待上屏文本时，向仍持有焦点的窗口投递 Unicode。全段作为一批键消息，避免分段后焦点转移。
+pub fn insert_voice(target: InputFocus, text: &str) -> VoiceInsertResult {
+    if [VK_CONTROL, VK_SHIFT, VK_MENU, VK_LWIN, VK_RWIN]
+        .iter()
+        .any(|key| unsafe { GetAsyncKeyState(key.0.into()) } < 0)
+    {
+        return VoiceInsertResult::Busy;
+    }
+    let keys: Vec<_> = text
+        .encode_utf16()
+        .flat_map(|unit| {
+            [KEYEVENTF_UNICODE, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP].map(|flags| INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wScan: unit,
+                        dwFlags: flags,
+                        ..Default::default()
+                    },
+                },
+            })
+        })
+        .collect();
+    if InputFocus::current() != Some(target) {
+        return VoiceInsertResult::Failed;
+    }
+    let written = unsafe { SendInput(&keys, size_of::<INPUT>() as i32) };
+    if written as usize == keys.len() {
+        VoiceInsertResult::Sent
+    } else {
+        tracing::warn!(
+            written,
+            expected = keys.len(),
+            "Unicode input delivery failed"
+        );
+        VoiceInsertResult::Failed
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::mpsc::channel;
+    /// 需要交互桌面。只在本测试拥有前台焦点的 EDIT 内发送，退出即销毁。
+    #[test]
+    #[ignore = "requires an interactive Windows desktop"]
+    fn unicode_delivery_reaches_the_native_caret() {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::Input::KeyboardAndMouse::SetFocus;
+        use windows::Win32::UI::WindowsAndMessaging::*;
+        use windows::core::w;
+        struct TestWindow(HWND);
+        impl Drop for TestWindow {
+            fn drop(&mut self) {
+                let _ = unsafe { DestroyWindow(self.0) };
+            }
+        }
+        unsafe {
+            let edit = TestWindow(
+                CreateWindowExW(
+                    Default::default(),
+                    w!("EDIT"),
+                    w!("AB"),
+                    WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                    50,
+                    50,
+                    230,
+                    90,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+                .unwrap(),
+            );
+            let _ = SetForegroundWindow(edit.0);
+            let _ = SetFocus(Some(edit.0));
+            let target = InputFocus::current().expect("interactive keyboard focus");
+            assert_eq!(
+                target.window, edit.0.0 as isize,
+                "test window must own focus before sending"
+            );
+            SendMessageW(edit.0, 0xb1, Some(WPARAM(1)), Some(LPARAM(1)));
+            assert_eq!(insert_voice(target, "语音🙂"), VoiceInsertResult::Sent);
+            let until = Instant::now() + Duration::from_secs(2);
+            let mut msg = MSG::default();
+            let mut result = String::new();
+            while Instant::now() < until {
+                while PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE).as_bool() {
+                    let _ = TranslateMessage(&msg);
+                    DispatchMessageW(&msg);
+                }
+                let mut buf = [0; 32];
+                let len = GetWindowTextW(edit.0, &mut buf);
+                result = String::from_utf16_lossy(&buf[..len as usize]);
+                if result == "A语音🙂B" {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert_eq!(result, "A语音🙂B");
+        }
+    }
     #[test]
     fn voice_trigger_flow() {
         let (work, rx) = channel();

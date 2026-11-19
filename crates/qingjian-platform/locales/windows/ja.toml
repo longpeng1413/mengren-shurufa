@@ -25,3 +25,6 @@ failed = "訳文がありません。接続、キーと設定を確認してく�
 speech_failed = "Windows の音声パックを確認してください"
 background = "背景色…"
 voice_focus = "猛人入力法を使用する入力欄にフォーカスしてください"
+voice_insert_failed = "文字を入力できません。入力欄にフォーカスして再試行してください。"
+reset_background = "既定の黒に戻す"
+translate_now = "翻訳"

@@ -52,7 +52,9 @@ use self::session::SessionInfo;
 pub use self::status::{NoopStatusSink, StatusEvent, StatusSink, StatusView};
 use self::translate::Translation;
 use self::voice::VoiceRuntime;
-pub use self::voice::{Capture, CaptureFactory, NoopVoiceSink, SAMPLE_RATE, VoiceSink};
+pub use self::voice::{
+    Capture, CaptureFactory, NoopVoiceSink, SAMPLE_RATE, VoiceInsertResult, VoiceSink,
+};
 
 /// 学习数据落盘间隔（与 macOS 壳一致）；Server 没有定时器，借消息节拍看时间。
 const LEARNING_FLUSH_INTERVAL: Duration = Duration::from_secs(60);

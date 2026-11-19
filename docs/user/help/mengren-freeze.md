@@ -1,12 +1,14 @@
 ---
 title: 当前版本与验收范围
 order: 12
-description: Windows 0.4.9 与安卓 0.4.8的功能、已确认结果和待真机测试项目。
+description: Windows 0.4.10 与安卓 0.4.8的功能、已确认结果和待真机测试项目。
 ---
 
-用户已取消 0.4.1 的冻结，当前正式版为 Windows 0.4.9 与 Android 0.4.8。旧冻结记录保留为历史，现以本页和[测试清单](mengren-testing.md)为准。
+用户已取消 0.4.1 的冻结，当前正式版为 Windows 0.4.10 与 Android 0.4.8。旧冻结记录保留为历史，现以本页和[测试清单](mengren-testing.md)为准。
 
 ## 最近发布版本
+
+- Windows 0.4.10 支持向仍加载旧 DLL 的前台应用听写。翻译窗口的编辑框和按钮跟随主题配色，可恢复默认黑色。
 
 - Windows 0.4.9 新增语音听写和独立翻译窗口，并修复剪贴板历史删除。[配置与使用](../platforms/windows-voice-translate.md)
 

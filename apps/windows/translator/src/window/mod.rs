@@ -43,13 +43,23 @@ const COPY: usize = 8;
 const STATUS: usize = 9;
 const LABEL: usize = 10;
 const BACKGROUND: usize = 11;
-const CONTROL_COUNT: usize = BACKGROUND + 1;
+const TRANSLATE: usize = 12;
+const SOURCE_LABEL: usize = 13;
+const RESULT_LABEL: usize = 14;
+const CONTROL_COUNT: usize = RESULT_LABEL + 1;
 thread_local! {static EVENTS:RefCell<VecDeque<(u32,usize)>>=const{RefCell::new(VecDeque::new())};}
 unsafe extern "system" fn proc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) -> LRESULT {
     match msg {
+        WM_DRAWITEM if l.0 != 0 => {
+            colors::draw_button(unsafe {
+                &*(l.0 as *const windows::Win32::UI::Controls::DRAWITEMSTRUCT)
+            });
+            LRESULT(1)
+        }
         WM_ERASEBKGND if colors::erase(hwnd, HDC(w.0 as _)) => LRESULT(1),
         WM_CTLCOLOREDIT | WM_CTLCOLORSTATIC | WM_CTLCOLORLISTBOX => {
-            if let Some(brush) = colors::brush(HDC(w.0 as _)) {
+            let id = unsafe { GetDlgCtrlID(HWND(l.0 as _)) } as usize;
+            if let Some(brush) = colors::brush(HDC(w.0 as _), matches!(id, SOURCE | RESULT)) {
                 LRESULT(brush.0 as isize)
             } else {
                 unsafe { DefWindowProcW(hwnd, msg, w, l) }
@@ -59,7 +69,7 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) -> LR
             let size = unsafe { &mut *(l.0 as *mut MINMAXINFO) };
             let dpi = unsafe { GetDpiForWindow(hwnd) }.max(96) as i32;
             size.ptMinTrackSize.x = 640 * dpi / 96;
-            size.ptMinTrackSize.y = 352 * dpi / 96;
+            size.ptMinTrackSize.y = 455 * dpi / 96;
             LRESULT(0)
         }
         WM_CLOSE | WM_SIZE | WM_TIMER | WM_COMMAND | TOGGLE => {
@@ -125,48 +135,58 @@ impl Window {
                 Default::default(),
                 CLASS,
                 &HSTRING::from(tr("title")),
-                WS_OVERLAPPEDWINDOW,
+                WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                 r.left + (r.right - r.left) / 4,
                 r.top + (r.bottom - r.top) / 7,
                 660,
-                520,
+                615,
                 None,
                 None,
                 Some(inst.into()),
                 None,
             )?;
+            colors::caption(hwnd);
             let mut controls = [HWND::default(); CONTROL_COUNT];
             for (id, class, label, flags) in [
-                (
-                    LANG,
-                    w!("COMBOBOX"),
-                    "",
-                    CBS_DROPDOWNLIST as u32 | WS_VSCROLL.0,
-                ),
-                (SWAP, w!("BUTTON"), "swap", 0),
-                (BACKGROUND, w!("BUTTON"), "background", 0),
+                (LANG, w!("BUTTON"), "", BS_OWNERDRAW as u32),
+                (SWAP, w!("BUTTON"), "swap", BS_OWNERDRAW as u32),
+                (BACKGROUND, w!("BUTTON"), "background", BS_OWNERDRAW as u32),
                 (
                     SOURCE,
                     w!("EDIT"),
-                    "source",
-                    ES_MULTILINE as u32
-                        | ES_AUTOVSCROLL as u32
-                        | ES_WANTRETURN as u32
-                        | WS_VSCROLL.0
-                        | WS_BORDER.0,
+                    "",
+                    ES_MULTILINE as u32 | ES_AUTOVSCROLL as u32 | ES_WANTRETURN as u32,
                 ),
-                (READ_SOURCE, w!("BUTTON"), "read_source", 0),
-                (CLEAR, w!("BUTTON"), "clear", 0),
+                (
+                    READ_SOURCE,
+                    w!("BUTTON"),
+                    "read_source",
+                    BS_OWNERDRAW as u32,
+                ),
+                (CLEAR, w!("BUTTON"), "clear", BS_OWNERDRAW as u32),
+                (
+                    TRANSLATE,
+                    w!("BUTTON"),
+                    "translate_now",
+                    BS_OWNERDRAW as u32,
+                ),
                 (
                     RESULT,
                     w!("EDIT"),
-                    "result",
-                    ES_MULTILINE as u32 | ES_READONLY as u32 | WS_VSCROLL.0 | WS_BORDER.0,
+                    "",
+                    ES_MULTILINE as u32 | ES_READONLY as u32 | ES_AUTOVSCROLL as u32,
                 ),
-                (READ_RESULT, w!("BUTTON"), "read_result", 0),
-                (COPY, w!("BUTTON"), "copy", 0),
+                (
+                    READ_RESULT,
+                    w!("BUTTON"),
+                    "read_result",
+                    BS_OWNERDRAW as u32,
+                ),
+                (COPY, w!("BUTTON"), "copy", BS_OWNERDRAW as u32),
                 (STATUS, w!("STATIC"), "", 0),
                 (LABEL, w!("STATIC"), "language", 0),
+                (SOURCE_LABEL, w!("STATIC"), "source", 0),
+                (RESULT_LABEL, w!("STATIC"), "result", 0),
             ] {
                 let title = if (id == SOURCE || id == RESULT) || label.is_empty() {
                     ""
@@ -177,7 +197,14 @@ impl Window {
                     Default::default(),
                     class,
                     &HSTRING::from(title),
-                    WS_CHILD | WS_VISIBLE | WS_TABSTOP | WINDOW_STYLE(flags),
+                    WS_CHILD
+                        | WS_VISIBLE
+                        | (if matches!(id, STATUS | LABEL | SOURCE_LABEL | RESULT_LABEL) {
+                            WINDOW_STYLE(0)
+                        } else {
+                            WS_TABSTOP
+                        })
+                        | WINDOW_STYLE(flags),
                     0,
                     0,
                     0,
@@ -188,21 +215,7 @@ impl Window {
                     None,
                 )?;
             }
-            for (_, name, _) in LANGS {
-                SendMessageW(
-                    controls[LANG],
-                    CB_ADDSTRING,
-                    None,
-                    Some(LPARAM(HSTRING::from(name).as_ptr() as isize)),
-                );
-            }
             let model = Translation::new(config);
-            SendMessageW(
-                controls[LANG],
-                CB_SETCURSEL,
-                Some(WPARAM(model.language)),
-                None,
-            );
             let mut this = Self {
                 hwnd,
                 controls,
@@ -213,6 +226,7 @@ impl Window {
                 hidden: None,
             };
             this.layout();
+            this.render();
             let _ = ShowWindow(hwnd, SW_SHOW);
             let _ = SetFocus(Some(this.controls[SOURCE]));
             SetTimer(Some(hwnd), 1, 100, None);
@@ -226,7 +240,7 @@ impl Window {
             if self.dpi != dpi {
                 let old = self.font;
                 self.font = CreateFontW(
-                    -px(16),
+                    -px(14),
                     0,
                     0,
                     0,
@@ -258,22 +272,63 @@ impl Window {
             let _ = GetClientRect(self.hwnd, &mut r);
             let width = r.right * 96 / dpi as i32;
             let height = r.bottom * 96 / dpi as i32;
-            let area = ((height - 168) / 2).max(24);
+            let area = ((height - 250) / 2).max(40);
+            let left = 20;
+            let end = width - left;
+            let row = 96 + area;
+            let footer = row + area + 76;
             for (i, x, y, w, h) in [
-                (LABEL, 12, 16, 166, 26),
-                (LANG, 180, 10, 136, 230),
-                (SWAP, width - 130, 10, 118, 30),
-                (BACKGROUND, 327, 10, 155, 30),
-                (SOURCE, 12, 50, width - 24, area),
-                (READ_SOURCE, 12, 56 + area, 185, 32),
-                (CLEAR, 205, 56 + area, 110, 32),
-                (RESULT, 12, 96 + area, width - 24, area),
-                (READ_RESULT, 12, 102 + area * 2, 185, 32),
-                (COPY, 205, 102 + area * 2, 190, 32),
-                (STATUS, 12, 140 + area * 2, width - 24, 28),
+                (LABEL, left, 25, 136, 22),
+                (LANG, 154, 17, 150, 34),
+                (SWAP, 314, 17, 102, 34),
+                (BACKGROUND, end - 150, 17, 150, 34),
+                (SOURCE_LABEL, left, 63, end - left, 20),
+                (SOURCE, left + 10, 96, end - left - 20, area - 20),
+                (READ_SOURCE, left, row, 150, 34),
+                (CLEAR, left + 158, row, 111, 34),
+                (TRANSLATE, end - 132, row, 132, 34),
+                (RESULT_LABEL, left, row + 47, end - left, 20),
+                (RESULT, left + 10, row + 79, end - left - 20, area - 20),
+                (READ_RESULT, left, footer, 150, 34),
+                (COPY, end - 155, footer, 155, 34),
+                (STATUS, left, footer + 40, end - left, 24),
             ] {
                 let _ = MoveWindow(self.controls[i], px(x), px(y), px(w.max(1)), px(h), true);
             }
+            let _ = windows::Win32::Graphics::Gdi::InvalidateRect(Some(self.hwnd), None, true);
+        }
+    }
+
+    fn menu(&self, id: usize, labels: &[&str], checked: Option<usize>) -> Option<usize> {
+        unsafe {
+            let mut r = RECT::default();
+            GetWindowRect(self.controls[id], &mut r).ok()?;
+            let menu = CreatePopupMenu().ok()?;
+            let selection = (|| {
+                for (index, label) in labels.iter().enumerate() {
+                    let flags = if Some(index) == checked {
+                        MF_CHECKED
+                    } else {
+                        MF_STRING
+                    };
+                    AppendMenuW(menu, flags, index + 1, &HSTRING::from(*label)).ok()?;
+                }
+                let chosen = TrackPopupMenu(
+                    menu,
+                    TPM_RETURNCMD | TPM_NONOTIFY,
+                    r.left,
+                    r.bottom,
+                    None,
+                    self.hwnd,
+                    None,
+                )
+                .0;
+                (chosen > 0)
+                    .then_some(chosen as usize)
+                    .and_then(|n| n.checked_sub(1))
+            })();
+            let _ = DestroyMenu(menu);
+            selection
         }
     }
     fn text(&self, id: usize) -> String {
@@ -287,10 +342,8 @@ impl Window {
         let _ = unsafe { SetWindowTextW(self.controls[id], &HSTRING::from(text)) };
     }
     fn change(&mut self) {
-        let lang =
-            unsafe { SendMessageW(self.controls[LANG], CB_GETCURSEL, None, None) }.0 as usize;
         self.model
-            .change(self.text(SOURCE), lang.min(7), Instant::now());
+            .change(self.text(SOURCE), self.model.language, Instant::now());
         self.render();
     }
     fn render(&self) {
@@ -298,6 +351,22 @@ impl Window {
             self.set(RESULT, &self.model.output);
         }
         self.set(STATUS, self.model.status);
+        self.set(LANG, &format!("{}  ▾", LANGS[self.model.language].1));
+        for (id, enabled) in [
+            (READ_SOURCE, !self.model.source.is_empty()),
+            (CLEAR, !self.model.source.is_empty()),
+            (TRANSLATE, !self.model.source.trim().is_empty()),
+            (COPY, !self.model.output.is_empty()),
+            (SWAP, !self.model.output.is_empty()),
+            (READ_RESULT, !self.model.output.is_empty()),
+        ] {
+            unsafe {
+                let _ = windows::Win32::UI::Input::KeyboardAndMouse::EnableWindow(
+                    self.controls[id],
+                    enabled,
+                );
+            }
+        }
     }
     fn hide(&mut self) {
         self.hidden = Some(Instant::now());
@@ -309,14 +378,35 @@ impl Window {
         let event = (param >> 16) as u32;
         match id {
             SOURCE if event == EN_CHANGE => self.change(),
-            LANG if event == CBN_SELCHANGE => self.change(),
+            SOURCE | RESULT if matches!(event, EN_SETFOCUS | EN_KILLFOCUS) => unsafe {
+                let _ = windows::Win32::Graphics::Gdi::InvalidateRect(Some(self.hwnd), None, true);
+            },
+            LANG => {
+                if let Some(i) = self.menu(LANG, &LANGS.map(|l| l.1), Some(self.model.language)) {
+                    self.model.change(self.text(SOURCE), i, Instant::now());
+                    self.render();
+                }
+            }
+            TRANSLATE => {
+                self.change();
+                self.model.send();
+                self.render();
+            }
             SWAP if !self.model.output.is_empty() => {
                 self.set(SOURCE, &self.model.output);
                 self.change();
                 self.model.send();
                 self.render();
             }
-            BACKGROUND => colors::choose(self.hwnd),
+            BACKGROUND => match self.menu(
+                BACKGROUND,
+                &[tr("background"), tr("reset_background")],
+                None,
+            ) {
+                Some(0) => colors::choose(self.hwnd),
+                Some(1) => colors::apply(self.hwnd, windows::Win32::Foundation::COLORREF(0)),
+                _ => {}
+            },
             CLEAR => {
                 self.set(SOURCE, "");
                 self.change();

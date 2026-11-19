@@ -7,7 +7,9 @@
 use std::time::Instant;
 
 use windows::Win32::Foundation::{FALSE, LPARAM, WPARAM};
-use windows::Win32::UI::Input::KeyboardAndMouse::{VK_CAPITAL, VK_LSHIFT, VK_RSHIFT, VK_SHIFT};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    VK_CAPITAL, VK_LSHIFT, VK_PACKET, VK_RSHIFT, VK_SHIFT,
+};
 use windows::Win32::UI::TextServices::{ITfContext, ITfKeyEventSink_Impl};
 use windows::core::{BOOL, GUID, Ref, Result};
 
@@ -34,6 +36,9 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
     /// 所有键（含之后被吃掉的）都先经过这里，Shift 单击的判定放在这一层。
     fn OnTestKeyDown(&self, pic: Ref<ITfContext>, wparam: WPARAM, lparam: LPARAM) -> Result<BOOL> {
         let vk = wparam.0 as u32;
+        if vk == u32::from(VK_PACKET.0) {
+            return Ok(FALSE);
+        }
         self.note_key_down(vk, lparam);
         if self.keyboard_disabled(&pic) {
             return Ok(FALSE);
@@ -47,6 +52,9 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
 
     fn OnKeyDown(&self, pic: Ref<ITfContext>, wparam: WPARAM, lparam: LPARAM) -> Result<BOOL> {
         let vk = wparam.0 as u32;
+        if vk == u32::from(VK_PACKET.0) {
+            return Ok(FALSE);
+        }
         self.note_key_down(vk, lparam);
         if self.keyboard_disabled(&pic) {
             return Ok(FALSE);
@@ -126,7 +134,7 @@ impl TextService_Impl {
     }
 
     fn note_key_down(&self, vk: u32, lparam: LPARAM) {
-        let shift = [VK_SHIFT, VK_LSHIFT, VK_RSHIFT]
+        let shift = [VK_SHIFT, VK_LSHIFT, VK_PACKET, VK_RSHIFT]
             .iter()
             .any(|code| vk == u32::from(code.0));
         if !shift && self.key_tap.take_pending_shift() && self.mode_state.switch_keys().shift {
@@ -144,7 +152,7 @@ impl TextService_Impl {
             self.mode_state.notify();
         }
         if self.key_tap.key_up(vk, self.mode_state.tap_keys()) {
-            let shift = [VK_SHIFT, VK_LSHIFT, VK_RSHIFT]
+            let shift = [VK_SHIFT, VK_LSHIFT, VK_PACKET, VK_RSHIFT]
                 .iter()
                 .any(|code| vk == u32::from(code.0));
             if shift {
