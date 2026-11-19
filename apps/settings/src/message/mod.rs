@@ -83,6 +83,16 @@ pub enum Message {
     RemoveModel(qingjian_platform::LocalModel),
     /// 实验功能里开一个模型（`None` 是关掉，不用模型）。
     UseModel(Option<qingjian_platform::LocalModel>),
+    /// 语音设置页：测试豆包 / 离线识别连接。
+    VoiceTest,
+    /// 语音设置页：下载离线语音模型。
+    VoiceDownloadModel,
+    /// 语音设置页：取消离线模型下载。
+    VoiceCancelDownload,
+    /// 语音设置页：删除离线模型（第一下只是确认）。
+    VoiceRemoveModel,
+    /// 语音设置页：清除豆包密钥。
+    VoiceClearKey,
     /// 展开 / 收起「关于」页的数据来源。
     ToggleSources,
     /// 选一个程序，从它复制的内容不进剪贴板历史。

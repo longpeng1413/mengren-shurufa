@@ -22,7 +22,14 @@ pub(super) fn handle_incoming(stream: TcpStream, address: SocketAddr, shared: &S
         .and_then(|()| stream.set_write_timeout(Some(IO_TIMEOUT)))
         .is_ok()
     {
-        handle_stream(stream, Some(address), shared);
+        let mut stream = stream;
+        if let Ok(opening) = read_opening(&mut stream) {
+            if opening == Opening::LanFile {
+                super::files::incoming(stream, shared);
+            } else {
+                dispatch(opening, stream, Some(address), shared);
+            }
+        }
     }
 }
 
@@ -31,7 +38,19 @@ pub(crate) fn handle_stream<S: std::io::Read + std::io::Write>(
     address: Option<SocketAddr>,
     shared: &Shared,
 ) {
-    let result = (|| match read_opening(&mut stream)? {
+    if let Ok(opening) = read_opening(&mut stream) {
+        dispatch(opening, stream, address, shared);
+    }
+}
+
+fn dispatch<S: std::io::Read + std::io::Write>(
+    opening: Opening,
+    mut stream: S,
+    address: Option<SocketAddr>,
+    shared: &Shared,
+) {
+    let result = match opening {
+        Opening::LanFile => Err(SyncError::Handshake),
         Opening::Pair => host_pairing(stream, address, shared),
         Opening::Sync => respond(stream, address, shared),
         Opening::Capabilities => super::private::respond(stream, shared, false),
@@ -40,7 +59,7 @@ pub(crate) fn handle_stream<S: std::io::Read + std::io::Write>(
         Opening::Metadata => super::metadata::respond(stream, shared),
         Opening::Info if address.is_some() => scan::answer(&mut stream, shared),
         Opening::Info => Err(SyncError::Handshake),
-    })();
+    };
     if result.is_err() {
         tracing::debug!(relay = address.is_none(), "Incoming sync ended");
     }

@@ -5,6 +5,9 @@
 mod panic_log;
 mod update_migration;
 
+#[cfg(windows)]
+use qingjian_windows_server::audio;
+
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -305,6 +308,9 @@ fn main() -> ExitCode {
         &config.model,
     );
     router.configure_schemes(&config, dispatch::find_bundled_schemes(&root));
+    // 语音识别：按 [voice] 装配识别方，注入 WASAPI 录音源；面板输出端由 serve 里的 UI 线程注入。
+    router.configure_voice(&config.voice);
+    router.set_voice_capture(Some(audio::capture_factory()));
     if let Some(path) = config_path() {
         let user = user_dir();
         router.watch_config(
@@ -339,7 +345,7 @@ fn main() -> ExitCode {
         "青简 Windows Server 就绪"
     );
 
-    let code = serve(router);
+    let code = serve(router, config.voice.shortcut, config.voice.hold_ms);
     tracing::info!(pid = std::process::id(), ?code, "Server process stopped");
     code
 }
@@ -369,7 +375,12 @@ fn grant_appcontainer_log_access() {
 
 /// 起 UI 线程作为候选窗口 / 状态条的输出端（失败退化为不画），再在命名管道上服务到进程结束。
 #[cfg(windows)]
-fn serve(mut router: Router) -> ExitCode {
+fn serve(
+    mut router: Router,
+    voice_combo: Option<qingjian_platform::KeyCombo>,
+    hold_ms: u64,
+) -> ExitCode {
+    use qingjian_windows_server::hotkey;
     use qingjian_windows_server::ipc::{Work, pipe};
     use qingjian_windows_server::ui::UiHandle;
     grant_appcontainer_log_access();
@@ -387,12 +398,31 @@ fn serve(mut router: Router) -> ExitCode {
     let on_panel = Box::new(move |hit| {
         let _ = panel_events.send(Work::Panel(hit));
     });
-    match UiHandle::spawn(on_status, on_click, on_panel) {
+    // 语音热键钩子装在 UI 线程（它有消息循环）。把 work 发送端与配置带过去。
+    let hotkey_work = work_tx.clone();
+    let combo = hotkey::combo_from_config(voice_combo);
+    let hold = u32::try_from(hold_ms).unwrap_or(400);
+    let start_hook: Box<dyn FnOnce() + Send> = Box::new(move || {
+        hotkey::install(hotkey_work, hold, combo);
+    });
+    // 长按 Win 的计时线程：用户按住 Win 不动时没有别的按键事件，靠它到点推进。
+    let _ = std::thread::Builder::new()
+        .name("qingjian-voice-hold".to_owned())
+        .spawn(move || {
+            loop {
+                std::thread::sleep(std::time::Duration::from_millis(25));
+                hotkey::tick_hold();
+            }
+        });
+    match UiHandle::spawn(on_status, on_click, on_panel, start_hook) {
         Ok(ui) => {
             router.set_candidate_sink(Box::new(ui.clone()));
-            router.set_status_sink(Box::new(ui));
+            router.set_status_sink(Box::new(ui.clone()));
+            router.set_voice_sink(Box::new(ui));
         }
-        Err(error) => tracing::error!(%error, "UI 线程启动失败，将不显示候选框 / 状态条"),
+        Err(error) => {
+            tracing::error!(%error, "UI 线程启动失败，将不显示候选框 / 状态条 / 语音面板")
+        }
     }
     if let Err(error) = pipe::serve_pipe(pipe::DEFAULT_PIPE_NAME, &mut router, work_tx, work_rx) {
         tracing::error!(%error, "命名管道服务退出");

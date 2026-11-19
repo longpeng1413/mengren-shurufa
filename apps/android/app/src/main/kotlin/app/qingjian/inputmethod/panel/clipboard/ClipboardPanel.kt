@@ -51,6 +51,7 @@ class ClipboardPanel(
     private val showingPhrases get() = tabs.selected == PHRASES
 
     private var clips: List<ClipItem> = ClipboardStore.list(context, actions.clipboardLimit)
+    private val receivedFile = app.qingjian.inputmethod.clipboard.files.LanFiles.received(context).firstOrNull()
     private var page: PhrasePage = ClipboardStore.phrases(context)
 
     private val groups = Tabs(ink, scrollable(true) { x, y -> showingPhrases && y > groupTop() }, Tabs.Style.PILL).apply {
@@ -104,6 +105,8 @@ class ClipboardPanel(
         drawHeader(canvas, tabs, if (showingPhrases) Icon.PLUS else Icon.TRASH)
         val summary = if (showingPhrases) {
             context.getString(app.qingjian.inputmethod.R.string.custom_phrases_count, page.phrases.size)
+        } else if (receivedFile != null && !clearArmed) {
+            context.getString(app.qingjian.inputmethod.R.string.file_download) + " · " + receivedFile.name.take(20)
         } else if (clearArmed) {
             "再点一次右上角清空全部剪贴板"
         } else {
@@ -333,6 +336,7 @@ class ClipboardPanel(
                 lastGroup = page.groups[index]
                 collapse()
             }
+            !showingPhrases && receivedFile != null && y >= headerHeight && y < list.top -> app.qingjian.inputmethod.clipboard.files.LanFiles.save(context,receivedFile)
             list.contains(x, y) -> tapList(x, y - list.top + listScroll.offset)
         }
         if (!(y < headerHeight && isRightIcon(x, y))) clearArmed = false

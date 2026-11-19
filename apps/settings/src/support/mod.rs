@@ -64,12 +64,15 @@ pub enum Feature {
     TranslatePanel,
     InAppUpdate,
     ClipboardRelay,
+    ClipboardFiles,
     PrivateInput,
+    /// Windows 的语音识别设置页：本地离线 / 豆包云端。
+    Voice,
 }
 
 impl Feature {
     #[cfg(test)]
-    pub const ALL: [Self; 32] = [
+    pub const ALL: [Self; 34] = [
         Self::AuxCode,
         Self::Schemes,
         Self::SwitchKeys,
@@ -101,7 +104,9 @@ impl Feature {
         Self::TranslatePanel,
         Self::InAppUpdate,
         Self::ClipboardRelay,
+        Self::ClipboardFiles,
         Self::PrivateInput,
+        Self::Voice,
     ];
 
     /// 当前平台显示这一项。
@@ -153,7 +158,7 @@ impl Feature {
             // 符号面板只有 macOS 与 Windows 有
             Self::TranslatePanel => [Yes, Yes, No],
             Self::InAppUpdate => [No, Yes, No],
-            Self::ClipboardRelay => [No, Yes, No],
+            Self::ClipboardRelay | Self::ClipboardFiles => [No, Yes, No],
             Self::PrivateInput => [No, Yes, No],
             Self::KeyHint => [Yes, Yes, Todo],
             // Fcitx 面板与应用里的行内拼音共用一串，还没分开
@@ -164,6 +169,8 @@ impl Feature {
             Self::NumpadDigit => [Todo, Yes, Todo],
             // Fcitx 面板与应用里的行内拼音共用一串，还没分开
             Self::ShuangpinRawWindow => [Yes, Yes, Todo],
+            // 语音识别壳只做了 Windows（本地离线 SenseVoice + 豆包）
+            Self::Voice => [No, Yes, No],
         }
     }
 
@@ -202,7 +209,9 @@ impl Feature {
             Self::TranslatePanel => "打开符号面板的翻译组",
             Self::InAppUpdate => "应用内下载安装更新",
             Self::ClipboardRelay => "公网剪贴板中转",
+            Self::ClipboardFiles => "局域网文件复制粘贴",
             Self::PrivateInput => "私密输入",
+            Self::Voice => "语音识别（本地离线 / 豆包）",
         }
     }
 
@@ -255,7 +264,9 @@ impl Feature {
             | Self::Clipboard
             | Self::InAppUpdate
             | Self::ClipboardRelay
-            | Self::PrivateInput => &[],
+            | Self::ClipboardFiles
+            | Self::PrivateInput
+            | Self::Voice => &[],
         }
     }
 }

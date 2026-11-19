@@ -58,6 +58,12 @@ pub enum Message {
 
     PairCancel,
 
+    #[cfg(windows)]
+    FileSwitch,
+    #[cfg(windows)]
+    FilePeer(String),
+    #[cfg(windows)]
+    FileInbox,
     Unpair(String),
 
     Close,

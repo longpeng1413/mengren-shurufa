@@ -140,6 +140,26 @@ pub enum ClientMessage {
         command: IndicatorCommand,
     },
 
+    /// 语音：开始听（按住说话）。DLL 的键盘钩子判定长按 Win 键或自定义键按下后发来；
+    /// Server 收到就开麦克风、喂给识别方，中间结果在 Server 自绘的语音面板上显示。
+    /// 不等回话：上屏走 [`super::ServerMessage::Update`] 的 `commit`。
+    VoiceStart {
+        /// 会话标识。
+        session: SessionId,
+    },
+
+    /// 语音：说完（按键松开）。Server 停止录音、收尾，等最终结果上屏。不等回话。
+    VoiceStop {
+        /// 会话标识。
+        session: SessionId,
+    },
+
+    /// 语音：取消（Esc / 失焦 / 切了输入法）。Server 丢掉这段、撤掉中间结果、收起面板。不等回话。
+    VoiceCancel {
+        /// 会话标识。
+        session: SessionId,
+    },
+
     /// 关闭会话，释放 Server 侧状态。
     CloseSession {
         /// 会话标识。

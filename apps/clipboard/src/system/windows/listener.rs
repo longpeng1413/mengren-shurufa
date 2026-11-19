@@ -407,15 +407,30 @@ unsafe extern "system" fn procedure(
             LRESULT(0)
         }
         WM_CLIPBOARDUPDATE => {
+            use windows::Win32::System::DataExchange::GetClipboardSequenceNumber;
+            let sequence = unsafe { GetClipboardSequenceNumber() };
+            static LAST_SEQUENCE: AtomicU32 = AtomicU32::new(0);
+            if sequence != 0 && LAST_SEQUENCE.swap(sequence, Ordering::Relaxed) == sequence {
+                return LRESULT(0);
+            }
             send_private(false);
             let capture = WATCH.with_borrow(|state| {
-                read_capture(|source| {
-                    state
-                        .as_ref()
-                        .is_none_or(|(watch, _)| watch.settings.records(source))
-                })
+                read_capture(
+                    |source| {
+                        state
+                            .as_ref()
+                            .is_none_or(|(watch, _)| watch.settings.records(source))
+                    },
+                    |paths| {
+                        if unsafe { GetClipboardSequenceNumber() } == sequence {
+                            send(Signal::FileCopy(paths));
+                        }
+                    },
+                )
             });
-            if let Some(capture) = capture {
+            if let Some(capture) = capture
+                && unsafe { GetClipboardSequenceNumber() } == sequence
+            {
                 send(Signal::Copied(capture));
             }
             LRESULT(0)

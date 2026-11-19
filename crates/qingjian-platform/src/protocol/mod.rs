@@ -43,5 +43,5 @@ pub use frame::{Frame, PreeditKind, PreeditSegment};
 pub use indicator::{IndicatorCommand, IndicatorState};
 pub use key::{KeyEvent, KeyModifiers, KeyOutcome};
 pub use screen_rect::ScreenRect;
-pub use server::{InputSettings, ServerMessage};
+pub use server::{InputSettings, ServerMessage, VoiceInputSettings};
 pub use session::SessionId;

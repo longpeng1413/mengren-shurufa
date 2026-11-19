@@ -104,6 +104,9 @@ fn client_messages() -> Vec<ClientMessage> {
             session,
             command: IndicatorCommand::OpenSymbolPanel,
         },
+        ClientMessage::VoiceStart { session },
+        ClientMessage::VoiceStop { session },
+        ClientMessage::VoiceCancel { session },
         ClientMessage::CloseSession { session },
     ]
 }
@@ -115,6 +118,17 @@ fn server_messages() -> Vec<ServerMessage> {
         ServerMessage::SessionOpened {
             session,
             input: InputSettings::default(),
+        },
+        // 语音快捷键下发：新增的 voice 字段往返。
+        ServerMessage::SessionOpened {
+            session,
+            input: InputSettings {
+                voice: Some(qingjian_platform::protocol::VoiceInputSettings {
+                    combo: Some("ctrl+alt+v".parse().unwrap()),
+                    hold_ms: 400,
+                }),
+                ..InputSettings::default()
+            },
         },
         ServerMessage::KeyResult {
             session,

@@ -4,6 +4,8 @@ order: 1
 description: 青简在 macOS、Windows、Linux 与 Android 上各有哪些功能：现状、按键习惯与尚未支持的部分。
 ---
 
+Windows 和 Android 从猛人 0.4.8 起支持单文件局域网复制粘贴。一次性设备选择、系统粘贴和保存到下载的步骤见[局域网文件复制粘贴](../personalize/clipboard-sync.md)。
+
 macOS 与 Windows 版是测试版，功能基本相同，按键按各自系统的习惯设计。Linux 版使用 Fcitx 的候选面板，需手动启动。Android 版是预览版，功能比桌面版少，下载 APK 安装。
 
 「✓」为支持，「—」为暂不支持或不适用。

@@ -2,6 +2,7 @@
 
 mod device;
 mod expansion;
+mod files;
 mod large;
 mod memory;
 mod metadata;

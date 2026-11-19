@@ -18,8 +18,8 @@ use serde_json::json;
 
 use crate::HistoryReplica;
 
-struct Running {
-    service: SyncService,
+pub(super) struct Running {
+    pub(super) service: SyncService,
 
     /// 单独一份，事件和历史都从这里读：同步服务里的那份已交给服务。
     reader: HistoryReplica,
@@ -123,7 +123,7 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncPr
     }
 }
 
-fn running() -> MutexGuard<'static, Option<Running>> {
+pub(super) fn running() -> MutexGuard<'static, Option<Running>> {
     RUNNING.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
@@ -326,6 +326,11 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncCh
 fn event_json(event: SyncEvent, reader: Option<&HistoryReplica>) -> serde_json::Value {
     match event {
         SyncEvent::PhrasesReceived { count } => json!({"type":"phrases", "count":count}),
+        SyncEvent::FileReceived {
+            path,
+            clipboard_stamp,
+        } => json!({"type":"lan_file","path":path,"stamp":clipboard_stamp}),
+        SyncEvent::FileStatus(status) => json!({"type":"file_status","status":status}),
         SyncEvent::PrivateSendStarted => json!({"type":"private_started"}),
         SyncEvent::PrivateReceived => json!({"type":"private_received"}),
         SyncEvent::PrivateSent { count } => json!({"type":"private_sent", "count":count}),
@@ -412,6 +417,7 @@ pub extern "system" fn Java_app_qingjian_inputmethod_core_Native_clipboardSyncDe
                     "name": state.peer.name,
                     "status": status,
                     "relay": state.via_relay,
+                    "file_selected": service.file_peer_selected(&state.peer.device_id),
                     "last_seen": state.peer.last_seen,
                 })
             })

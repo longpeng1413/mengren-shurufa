@@ -4375,7 +4375,7 @@ checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
 name = "qingjian-android"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "bamboo-slip-i18n",
  "jiff",
@@ -4439,7 +4439,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian-clipboard-app"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "arboard",
  "bamboo-slip",
@@ -4476,11 +4476,14 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "snow",
+ "socket2",
  "spake2",
+ "tempfile",
  "thiserror 2.0.21",
  "tracing",
  "tungstenite",
  "webpki-roots",
+ "windows-sys 0.61.2",
  "zeroize",
 ]
 
@@ -4753,7 +4756,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian-settings"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "bamboo-slip",
  "bamboo-slip-i18n",
@@ -4770,6 +4773,8 @@ dependencies = [
  "qingjian-render",
  "qingjian-translate",
  "qingjian-update",
+ "qingjian-voice",
+ "qingjian-voice-offline",
  "reqwest",
  "rfd",
  "serde",
@@ -4853,7 +4858,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian-windows-server"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "bamboo-slip-i18n",
  "dotenvy",
@@ -4868,6 +4873,8 @@ dependencies = [
  "qingjian-render",
  "qingjian-translate",
  "qingjian-update",
+ "qingjian-voice",
+ "qingjian-voice-offline",
  "serde_json",
  "thiserror 2.0.21",
  "toml_edit",
@@ -4882,7 +4889,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian-windows-settings"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "jiff",
  "qingjian-core",
@@ -4903,7 +4910,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian-windows-tsf"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "qingjian-core",
  "qingjian-platform",

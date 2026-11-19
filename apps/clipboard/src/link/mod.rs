@@ -126,6 +126,7 @@ impl SyncLink {
         }
         #[cfg(windows)]
         {
+            service.set_files_enabled(settings.file_enabled)?;
             service.set_private_receiver(settings.private_receive);
             crate::system::windows::private::attach(
                 service.private_vault(),

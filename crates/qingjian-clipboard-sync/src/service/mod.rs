@@ -6,6 +6,7 @@ mod tests;
 
 pub(crate) mod command;
 mod event;
+pub mod files;
 mod hello;
 mod link;
 mod locked;
@@ -102,6 +103,7 @@ impl SyncService {
             LockedReplica::new(replica),
             events,
         ));
+        *lock(&shared.files) = files::Policy::load(options.directory);
         let stop = Arc::new(AtomicBool::new(false));
         if options.relay.enabled {
             if options.relay.validate().is_ok() {
@@ -228,6 +230,7 @@ impl SyncService {
 
     /// 解除配对。只影响本机名单，对方再连会被拒。
     pub fn unpair(&self, device_id: &str) -> Result<(), SyncError> {
+        self.select_file_peer(device_id, false)?;
         let result = lock(&self.shared.book).remove(device_id);
         self.shared.private_vault.clear();
         result
@@ -288,6 +291,7 @@ impl SyncService {
 
 impl Drop for SyncService {
     fn drop(&mut self) {
+        lock(&self.shared.files).stop();
         self.shared.private_running.store(false, Ordering::SeqCst);
         self.shared.private_receiver.store(false, Ordering::SeqCst);
         self.shared.private_vault.suspend();

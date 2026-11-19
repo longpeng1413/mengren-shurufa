@@ -36,4 +36,10 @@ pub(super) enum UiCommand {
 
     /// 收起右键菜单。
     MenuClose,
+
+    /// 显示 / 更新语音面板。
+    VoiceShow(Box<crate::ui::voice::VoiceView>),
+
+    /// 收起语音面板。
+    VoiceHide,
 }

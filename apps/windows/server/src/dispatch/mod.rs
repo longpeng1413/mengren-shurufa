@@ -18,6 +18,7 @@ mod session;
 mod status;
 mod trace;
 mod translate;
+mod voice;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -28,6 +29,7 @@ use qingjian_core::{Engine, Grid, TelexComposer};
 use qingjian_platform::logs::CompositionTrace;
 use qingjian_platform::protocol::{
     ClientMessage, Frame, IndicatorState, InputSettings, ScreenRect, ServerMessage, SessionId,
+    VoiceInputSettings,
 };
 use qingjian_platform::{LocalModelConfig, SchemeSlot};
 use qingjian_render::Mode;
@@ -49,6 +51,8 @@ pub use self::schemes::find_bundled_schemes;
 use self::session::SessionInfo;
 pub use self::status::{NoopStatusSink, StatusEvent, StatusSink, StatusView};
 use self::translate::Translation;
+use self::voice::VoiceRuntime;
+pub use self::voice::{Capture, CaptureFactory, NoopVoiceSink, SAMPLE_RATE, VoiceSink};
 
 /// 学习数据落盘间隔（与 macOS 壳一致）；Server 没有定时器，借消息节拍看时间。
 const LEARNING_FLUSH_INTERVAL: Duration = Duration::from_secs(60);
@@ -183,6 +187,9 @@ pub struct Router {
 
     /// 正在进行的这段组句的按键账；没在组句为 `None`。
     trace: Option<CompositionTrace>,
+
+    /// 语音识别：识别方、录音流、进行态。识别方常驻，配置变了重建。
+    voice: VoiceRuntime,
 }
 
 impl Router {
@@ -233,6 +240,7 @@ impl Router {
             surrounding_before: String::new(),
             rescore: RescoreState::default(),
             key_hint: KeyHintState::default(),
+            voice: VoiceRuntime::default(),
         }
     }
 
@@ -254,6 +262,10 @@ impl Router {
             english_candidates: self.config.english_candidates_in(app),
             predict: (self.config.cloud_enabled && self.engine.prediction_enabled())
                 .then_some(self.config.predict),
+            voice: self.config.voice.enabled().then(|| VoiceInputSettings {
+                combo: self.config.voice.shortcut,
+                hold_ms: u32::try_from(self.config.voice.hold_ms).unwrap_or(400),
+            }),
         }
     }
 

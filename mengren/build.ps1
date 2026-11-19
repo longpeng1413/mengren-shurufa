@@ -20,7 +20,8 @@ $ErrorActionPreference = 'Stop'
 if (-not $Android -and -not $Windows) { $Android = $true; $Windows = $true }
 
 $Repo = 'D:\mengren-dev\shurufa'
-$Out = Join-Path $Repo 'mengren\安装包'
+$ProductRoot = (Get-Item -LiteralPath $PSScriptRoot).Parent.FullName
+$Out = Join-Path $ProductRoot 'mengren\安装包'
 $Proxy = 'http://127.0.0.1:7897'
 New-Item -ItemType Directory -Force $Out | Out-Null
 $env:Path = "$env:USERPROFILE\.cargo\bin;$env:LOCALAPPDATA\Programs\Inno Setup 7;" + $env:Path
@@ -28,10 +29,18 @@ $env:HTTPS_PROXY = $Proxy
 $env:HTTP_PROXY = $Proxy
 
 # 新包校验通过后，每个平台只保留最新包，旧包送入垃圾箱。
-function Prune([string]$Pattern, [string]$Keep) {
+function Prune([string]$Pattern, [string]$Keep, [string]$Dir = $Out, [string]$Match = '') {
     Add-Type -AssemblyName Microsoft.VisualBasic
-    $outputPath = [IO.Path]::GetFullPath($Out).TrimEnd('\')
-    foreach ($package in Get-ChildItem -LiteralPath $Out -File -Filter $Pattern) {
+    $outputPath = [IO.Path]::GetFullPath($Dir).TrimEnd('\')
+    $currentDirectory = Get-Item -LiteralPath $outputPath -Force
+    while ($null -ne $currentDirectory) {
+        if ($currentDirectory.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw "不处理链接目录：$($currentDirectory.FullName)"
+        }
+        $currentDirectory = $currentDirectory.Parent
+    }
+    foreach ($package in Get-ChildItem -LiteralPath $Dir -File -Filter $Pattern) {
+        if ($Match -and $package.Name -notmatch $Match) { continue }
         if ([IO.Path]::GetFullPath($package.DirectoryName).TrimEnd('\') -ne $outputPath) {
             throw "安装包路径越界：$($package.FullName)"
         }
@@ -82,10 +91,12 @@ if ($Windows) {
         powershell -NoProfile -ExecutionPolicy Bypass -File apps\windows\installer\build.ps1
         if ($LASTEXITCODE -ne 0) { throw "Windows 打包失败（退出码 $LASTEXITCODE）" }
     } finally { Pop-Location }
-    $setup = Get-ChildItem (Join-Path $Repo 'target\installer') -Filter '*-setup.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $setup = Get-ChildItem (Join-Path $ProductRoot 'target\installer') -Filter '*-setup.exe' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     $dest = Join-Path $Out "猛人输入法-Windows-$stamp-setup.exe"
     Copy-Item $setup.FullName $dest
     Verify-Package $setup.FullName $dest
     Prune '猛人输入法-Windows-*-setup.exe' $dest
+    # 编译目录里的旧安装包也只留这一版（旧版 GitHub 上都有）；剪贴板的独立安装包不在此列
+    Prune 'qingjian-*-setup.exe' $setup.FullName (Join-Path $ProductRoot 'target\installer') '^qingjian-\d[^-]*(-dev-[0-9a-f+]+)?-windows-x86_64-setup\.exe$'
     Write-Host "Windows：$dest" -ForegroundColor Green
 }

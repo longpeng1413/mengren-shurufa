@@ -43,7 +43,7 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
 
     override fun onSyncEvent(type: String, event: JSONObject) {
         when (type) {
-            "nearby", "private_started", "private_delivery" -> rebuild()
+            "nearby", "lan_file", "private_started", "private_delivery" -> rebuild()
             "phrases" -> {
                 status = getString(R.string.phrases_sync_received, event.optInt("count"))
                 rebuild()
@@ -77,7 +77,16 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
                 },
             ),
         )
+        val files = app.qingjian.inputmethod.clipboard.files.LanFiles
+        val received = files.received(this)
+        for (file in received) {
+            views += ui.group(null,ui.action(R.string.file_download, file.name) { files.save(this,file) })
+        }
         if (!on) return views
+        views += ui.group(null,ui.toggle(R.string.file_title,R.string.file_limit,Native.lanFileEnabled()) {
+            if (!Native.lanFileConfigure("",it)) status=getString(R.string.file_failed)
+            rebuild()
+        })
         views += ui.group(null, ui.action(R.string.phrases_sync_now, getString(R.string.phrases_sync_note)) {
             ClipboardSync.changed()
         })
@@ -126,6 +135,7 @@ class ClipboardSyncActivity : PageActivity(), ClipboardSync.Listener {
                 val peer = peers.getJSONObject(i)
                 val id = peer.getString("id")
                 paired += id
+                if (Native.lanFileEnabled()) rows += ui.toggle(peer.getString("name"), getString(R.string.file_allow),peer.optBoolean("file_selected"),null) { Native.lanFileConfigure(id,it); rebuild() }
                 val delivery = ClipboardSync.privateDelivery(id)?.let {
                     getString(if (it) R.string.private_delivery_received else R.string.private_delivery_unconfirmed)
                 }

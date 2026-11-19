@@ -6,6 +6,7 @@
 /logs
 /data
 .playwright-mcp/
+.workbuddy-ai/
 __pycache__/
 
 # 本机凭据与签名文件不得进入公开源码

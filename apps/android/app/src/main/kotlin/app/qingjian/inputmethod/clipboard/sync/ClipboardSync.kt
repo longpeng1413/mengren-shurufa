@@ -96,6 +96,7 @@ object ClipboardSync {
         }.getOrDefault(false)
         if (!started) return
         running = true
+        app.qingjian.inputmethod.clipboard.files.LanNetwork.start(context)
         PrivateReceive.start(context)
         val info = runCatching { Native.clipboardSyncInfo() }.getOrNull()?.let(::JSONObject)
         if (info != null) {
@@ -107,6 +108,7 @@ object ClipboardSync {
     }
 
     private fun stop() {
+        app.qingjian.inputmethod.clipboard.files.LanNetwork.stop()
         PrivateReceive.stop()
         privateDeliveries.clear()
         running = false
@@ -145,6 +147,7 @@ object ClipboardSync {
                 }
                 listeners.toList().forEach { it.onSyncEvent(type, event) }
                 when (type) {
+                    "lan_file", "file_status" -> app.qingjian.inputmethod.clipboard.files.LanFiles.event(context,type,event)
                     "private_sent" -> PrivateNotice.show(context, context.getString(app.qingjian.inputmethod.R.string.private_sent, event.optInt("count")))
                     "private_failed" -> PrivateNotice.show(context, context.getString(app.qingjian.inputmethod.R.string.private_failed))
                     "private_received" -> if (PrivateReceive.pending()) PrivateNotice.show(context, context.getString(app.qingjian.inputmethod.R.string.private_received))

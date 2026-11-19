@@ -15,6 +15,9 @@ pub struct RelayServer {
     stop: Arc<AtomicBool>,
 
     thread: Option<JoinHandle<()>>,
+
+    #[cfg(test)]
+    pub(super) recorder: Arc<Broker>,
 }
 
 impl RelayServer {
@@ -28,6 +31,8 @@ impl RelayServer {
         let stop = Arc::new(AtomicBool::new(false));
         let cancelled = stop.clone();
         let broker = Arc::new(Broker::default());
+        #[cfg(test)]
+        let recorder = broker.clone();
         let thread = std::thread::spawn(move || {
             while !cancelled.load(Ordering::Relaxed) {
                 match listener.accept() {
@@ -55,6 +60,8 @@ impl RelayServer {
             address,
             stop,
             thread: Some(thread),
+            #[cfg(test)]
+            recorder,
         })
     }
     pub fn address(&self) -> SocketAddr {

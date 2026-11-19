@@ -4,6 +4,13 @@ use super::received_item::ReceivedItem;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SyncEvent {
+    FileReceived {
+        path: std::path::PathBuf,
+        clipboard_stamp: i64,
+    },
+
+    FileStatus(&'static str),
+
     /// 自定义短语入库；正文不进入事件或系统剪贴板。
     PhrasesReceived {
         count: usize,

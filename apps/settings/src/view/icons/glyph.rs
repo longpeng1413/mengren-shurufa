@@ -21,6 +21,8 @@ pub enum Glyph {
     About,
     Search,
     Translate,
+    /// 语音识别：麦克风。
+    Mic,
 }
 
 impl Icon for Glyph {
@@ -183,6 +185,13 @@ impl Icon for Glyph {
                 pen.line(&[(6.75, 3.75), (1.75, 9.0)]);
                 pen.line(&[(8.5, 14.5), (11.5, 7.0), (14.5, 14.5)]);
                 pen.line(&[(9.6, 11.75), (13.4, 11.75)]);
+            }
+            // 麦克风：圆头话筒 + 托架
+            Glyph::Mic => {
+                pen.round_rect(5.5, 1.5, 5.0, 8.0, 2.5, false);
+                pen.line(&[(3.5, 8.0), (3.5, 9.5), (12.5, 9.5), (12.5, 8.0)]);
+                pen.line(&[(8.0, 9.5), (8.0, 13.5)]);
+                pen.line(&[(5.5, 13.5), (10.5, 13.5)]);
             }
         }
         let width = 1.5 * pen.unit;

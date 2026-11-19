@@ -166,6 +166,38 @@ impl App for ClipboardApp {
             }
             Message::PairSubmit => self.submit_pairing(),
             Message::PairCancel => self.cancel_pairing(),
+            #[cfg(windows)]
+            Message::FileSwitch => {
+                if let Some(s) = self.link.service()
+                    && let Some(config) = self.config.as_ref()
+                {
+                    let enabled = !s.files_enabled();
+                    if qingjian_clipboard::ClipSettings::write_flag(config, "file_enabled", enabled)
+                        .is_ok()
+                        && s.set_files_enabled(enabled).is_ok()
+                    {
+                        return true;
+                    }
+                    self.pair_status = crate::i18n::tr("files.failed").into();
+                }
+            }
+            #[cfg(windows)]
+            Message::FilePeer(id) => {
+                if let Some(s) = self.link.service()
+                    && s.select_file_peer(&id, !s.file_peer_selected(&id)).is_err()
+                {
+                    self.pair_status = crate::i18n::tr("files.failed").into();
+                }
+            }
+            #[cfg(windows)]
+            Message::FileInbox => {
+                if let Some(s) = self.link.service() {
+                    let root = s.file_inbox();
+                    if std::fs::create_dir_all(&root).is_ok() {
+                        let _ = std::process::Command::new("explorer.exe").arg(root).spawn();
+                    }
+                }
+            }
             Message::Unpair(device_id) => {
                 if let Some(service) = self.link.service()
                     && let Err(error) = service.unpair(&device_id)

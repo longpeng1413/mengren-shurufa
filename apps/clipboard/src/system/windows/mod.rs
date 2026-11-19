@@ -1,7 +1,9 @@
 //! 和 Windows 打交道的部分：消息窗口线程收剪贴板变化与全局快捷键，读写系统剪贴板，粘贴回原窗口，托盘与霓虹灯的窗口。
 
 mod clipboard;
+mod files;
 pub(crate) mod listener;
+pub(crate) use files::send_files;
 mod neon_strip;
 mod neon_strips;
 mod paste;
@@ -9,6 +11,7 @@ pub(crate) mod private;
 mod source;
 mod tray;
 
+pub(crate) use clipboard::publish_file;
 pub use clipboard::write_payload;
 pub use listener::{Watch, spawn_listener};
 pub(crate) use neon_strips::{Strips, animations_on, should_hide};

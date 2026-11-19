@@ -1,7 +1,7 @@
 [package]
 name = "qingjian-windows-server"
 description = "Windows 输入法的 Server 进程：持有 Engine，跑在应用进程外，与 TSF DLL（../tsf）走 IPC 协议通信"
-version = "0.4.7"
+version = "0.4.8"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -25,6 +25,8 @@ qingjian-predict.workspace = true
 qingjian-render.workspace = true
 qingjian-translate.workspace = true
 qingjian-update.workspace = true
+qingjian-voice.workspace = true
+qingjian-voice-offline.workspace = true
 dotenvy.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
@@ -44,11 +46,16 @@ windows = { version = "0.62.2", features = [
     "Win32_Security",
     "Win32_Security_Authorization",
     "Win32_System_Console",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
     "Win32_Storage_FileSystem",
     "Win32_System_IO",
     "Win32_System_LibraryLoader",
     "Win32_System_Pipes",
     "Win32_System_Threading",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
     "Win32_UI_HiDpi",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",

@@ -93,6 +93,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     );
                 }
             }
+            "allow-file" => {
+                let id = parts.next().ok_or("allow-file <paired device id>")?;
+                service.select_file_peer(id, true)?;
+                service.set_files_enabled(true)?;
+                println!("allowed selected file peer");
+            }
+            "file" => {
+                let path = std::path::Path::new(line.trim_start_matches("file "));
+                let file = std::fs::File::open(path)?;
+                let name = path.file_name().and_then(|n| n.to_str()).ok_or("invalid name")?;
+                let size = file.metadata()?.len();
+                service.send_file(file, name.to_owned(), Some(size));
+            }
             "devices" => {
                 println!("peers {:?}", service.peers());
                 println!("nearby {:?}", service.nearby());

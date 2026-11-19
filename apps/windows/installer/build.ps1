@@ -103,8 +103,12 @@ foreach ($name in $wanted) {
 if ($missing.Count -gt 0) { throw "自包含 Windows App Runtime 缺 $($missing.Count) 项：$($missing -join ', ')" }
 Write-Host "自包含运行时 $($wanted.Count) 项 → target\installer\settings-runtime" -ForegroundColor Cyan
 
-# 1.3) 知意（ONNX）的运行库 ONNX Runtime，装到 Server 旁边。
+# 1.3) 知意（ONNX）的运行库 ONNX Runtime，装到 Server 旁边（开发时用）。
 & (Join-Path $PSScriptRoot 'fetch-onnxruntime.ps1')
+
+# 1.4) 离线语音识别引擎：sherpa-onnx C API Windows x64，自带与之配套的 ONNX Runtime。
+#      两者必须与 Server / 设置程序同目录；版本跟着 EXPECTED_VERSION 走（见 fetch-sherpa.ps1）。
+& (Join-Path $PSScriptRoot 'fetch-sherpa.ps1')
 
 # 1.5) 签名（必须在 iscc 打包前：Inno 把已签的文件原样拷进安装包）。
 if ($Sign) {

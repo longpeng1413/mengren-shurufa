@@ -28,6 +28,7 @@ impl Settings {
             FieldId::YoudaoAppKey => predict.youdao.app_key.clone(),
             FieldId::YoudaoSecret | FieldId::RelayToken => String::new(),
             FieldId::RelayUrl => self.config.clipboard.relay_url.clone(),
+            FieldId::VoiceApiKey => String::new(), // 密钥框总是空的，不显示已存的密钥
             FieldId::VocabularySearch => String::new(),
             FieldId::PhraseCode | FieldId::PhraseWeight | FieldId::PhraseText => return,
         };
@@ -98,6 +99,15 @@ impl Settings {
             | FieldId::PhraseWeight
             | FieldId::PhraseText
             | FieldId::VocabularySearch => return,
+            FieldId::VoiceApiKey if text.is_empty() => {}
+            // 密码框看不见内容，粘贴多了（带上了终端提示符、命令）用户发现不了
+            FieldId::VoiceApiKey if text.chars().any(|c| !c.is_ascii_graphic()) => {
+                self.notice = Some(("voice", tr("cloud.bad_key").to_owned()));
+            }
+            FieldId::VoiceApiKey => match self.save_voice_key(&text) {
+                Ok(()) => self.notice = Some(("voice", tr("voice.key_saved").to_owned())),
+                Err(error) => self.notice = Some(("voice", error)),
+            },
             FieldId::ApiKey if text.is_empty() => {}
             // 密码框看不见内容，粘贴多了（带上了终端提示符、命令）用户发现不了
             FieldId::ApiKey if text.chars().any(|c| !c.is_ascii_graphic()) => {

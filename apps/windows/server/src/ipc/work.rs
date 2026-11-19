@@ -20,4 +20,7 @@ pub enum Work {
 
     /// 本地模型的后台线程交了结果：马上推进一次重排，不等下一次轮询。
     Wake,
+
+    /// 全局语音热键（Server 的低级键盘钩子发出）：`down` 为真开始听，为假说完。
+    VoiceKey { down: bool },
 }

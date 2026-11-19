@@ -165,7 +165,13 @@ fn handle(
             if let Some(mut peer) = peer {
                 let _ = socket.send(Message::text("ready"));
                 let _ = peer.send(Message::text("ready"));
-                bridge(socket, peer, stop);
+                bridge(
+                    socket,
+                    peer,
+                    stop,
+                    #[cfg(test)]
+                    broker,
+                );
             }
         }
         ["accept", target, session] => {
@@ -262,6 +268,7 @@ fn bridge(
     mut a: WebSocket<TcpStream>,
     mut b: WebSocket<TcpStream>,
     stop: &std::sync::atomic::AtomicBool,
+    #[cfg(test)] broker: &Broker,
 ) {
     let _ = a.get_ref().set_nonblocking(true);
     let _ = b.get_ref().set_nonblocking(true);
@@ -273,7 +280,19 @@ fn bridge(
         && !stop.load(Ordering::Relaxed)
     {
         let before = bytes;
-        if !pump(&mut a, &mut b, &mut bytes) || !pump(&mut b, &mut a, &mut bytes) {
+        if !pump(
+            &mut a,
+            &mut b,
+            &mut bytes,
+            #[cfg(test)]
+            broker,
+        ) || !pump(
+            &mut b,
+            &mut a,
+            &mut bytes,
+            #[cfg(test)]
+            broker,
+        ) {
             break 'session;
         }
         if bytes != before {
@@ -315,7 +334,12 @@ fn finish(socket: &mut WebSocket<TcpStream>) {
     }
 }
 
-fn pump(from: &mut WebSocket<TcpStream>, to: &mut WebSocket<TcpStream>, bytes: &mut usize) -> bool {
+fn pump(
+    from: &mut WebSocket<TcpStream>,
+    to: &mut WebSocket<TcpStream>,
+    bytes: &mut usize,
+    #[cfg(test)] broker: &Broker,
+) -> bool {
     // 先排空目标的有界待写缓冲；慢接收端反压到源，不能把整张图片攒在服务器上。
     match to.flush() {
         Ok(()) => {}
@@ -324,6 +348,10 @@ fn pump(from: &mut WebSocket<TcpStream>, to: &mut WebSocket<TcpStream>, bytes: &
     }
     match from.read() {
         Ok(Message::Binary(data)) => {
+            #[cfg(test)]
+            if *bytes == 0 {
+                lock(&broker.openings).push(data.first().copied().unwrap_or(0));
+            }
             *bytes = bytes.saturating_add(data.len());
             *bytes <= 512 * 1024 * 1024
                 && match to.send(Message::Binary(data)) {

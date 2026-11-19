@@ -14,6 +14,7 @@ pub enum PageId {
     Phrases,
     Dictionaries,
     Cloud,
+    Voice,
     Stats,
     Vocabulary,
     Advanced,
@@ -22,7 +23,7 @@ pub enum PageId {
 }
 
 impl PageId {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::Input,
         Self::Candidates,
         Self::Language,
@@ -31,6 +32,7 @@ impl PageId {
         Self::Phrases,
         Self::Dictionaries,
         Self::Cloud,
+        Self::Voice,
         Self::Stats,
         Self::Vocabulary,
         Self::Advanced,
@@ -40,9 +42,11 @@ impl PageId {
 
     /// 这个平台的侧栏有这一页（实验功能只在做了的平台出现）。
     pub fn shown(self) -> bool {
-        self != Self::Experimental
-            || Feature::ExperimentalModels.here()
-            || Feature::Clipboard.here()
+        match self {
+            Self::Experimental => Feature::ExperimentalModels.here() || Feature::Clipboard.here(),
+            Self::Voice => Feature::Voice.here(),
+            _ => true,
+        }
     }
 
     pub fn label(self) -> &'static str {
@@ -55,6 +59,7 @@ impl PageId {
             Self::Phrases => tr("page.phrases"),
             Self::Dictionaries => tr("page.dictionaries"),
             Self::Cloud => tr("page.cloud"),
+            Self::Voice => tr("page.voice"),
             Self::Stats => tr("page.stats"),
             Self::Vocabulary => tr("page.vocabulary"),
             Self::Advanced => tr("page.advanced"),
@@ -73,6 +78,7 @@ impl PageId {
             Self::Phrases => Glyph::Phrases,
             Self::Dictionaries => Glyph::Dictionary,
             Self::Cloud => Glyph::Cloud,
+            Self::Voice => Glyph::Mic,
             Self::Stats => Glyph::Stats,
             Self::Vocabulary => Glyph::Vocabulary,
             Self::Advanced => Glyph::Advanced,

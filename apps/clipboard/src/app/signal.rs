@@ -11,11 +11,19 @@ use crate::system::{self, Payload, Signal};
 impl ClipboardApp {
     pub(super) fn handle(&mut self, signal: Signal) {
         match signal {
+            #[cfg(windows)]
+            Signal::FileCopy(paths) => {
+                if let Some(service) = self.link.service().filter(|s| s.files_enabled()) {
+                    crate::system::windows::send_files(service, paths);
+                }
+            }
             Signal::Copied(capture) => {
                 if let Err(error) = self.store.add(&capture, now_millis()) {
                     tracing::warn!(%error, "clipboard record failed");
                 }
-                self.link.changed();
+                if capture.kind != qingjian_clipboard::ClipKind::Files {
+                    self.link.changed();
+                }
                 if self.visible && self.editing.is_none() {
                     self.reload();
                 }
@@ -30,6 +38,11 @@ impl ClipboardApp {
                     || settings.device_name != self.settings.device_name
                     || settings.history_limit != self.settings.history_limit
                     || settings.language != self.settings.language;
+                if let Some(s) = self.link.service()
+                    && settings.file_enabled != self.settings.file_enabled
+                {
+                    let _ = s.set_files_enabled(settings.file_enabled);
+                }
                 self.neon_on = settings.sync_neon;
                 self.settings = settings.clone();
                 if sync_changed {
@@ -111,6 +124,30 @@ impl ClipboardApp {
             SyncEvent::PrivateFailed => {
                 #[cfg(windows)]
                 crate::system::windows::listener::notice("private.send_failed");
+            }
+            SyncEvent::FileStatus(status) => {
+                #[cfg(windows)]
+                crate::system::windows::listener::notice(match status {
+                    "sent" => "files.sent",
+                    "partial" => "files.partial",
+                    "invalid" => "files.invalid",
+                    "failed" => "files.failed",
+                    _ => "files.unavailable",
+                });
+                #[cfg(not(windows))]
+                let _ = status;
+            }
+            SyncEvent::FileReceived {
+                path,
+                clipboard_stamp,
+            } => {
+                #[cfg(windows)]
+                {
+                    crate::system::windows::publish_file(&path, clipboard_stamp);
+                    crate::system::windows::listener::notice("files.received");
+                }
+                #[cfg(not(windows))]
+                let _ = (path, clipboard_stamp);
             }
             SyncEvent::NearbyChanged => {}
             SyncEvent::Paired { name } => {

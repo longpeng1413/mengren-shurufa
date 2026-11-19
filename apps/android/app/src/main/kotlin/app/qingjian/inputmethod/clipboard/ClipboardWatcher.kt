@@ -22,7 +22,10 @@ class ClipboardWatcher(private val context: Context) {
     private val prefs = context.getSharedPreferences("clipboard", Context.MODE_PRIVATE)
     private val privateCopy = PrivateCopyState(prefs.getLong(LAST_PRIVATE, 0L))
     private val main = Handler(Looper.getMainLooper())
-    private val listener = ClipboardManager.OnPrimaryClipChangedListener { capture() }
+    private val listener = ClipboardManager.OnPrimaryClipChangedListener {
+        app.qingjian.inputmethod.clipboard.files.LanFiles.lastClipboardChange = System.currentTimeMillis()
+        capture(live = true)
+    }
 
     fun start() {
         manager?.addPrimaryClipChangedListener(listener)
@@ -33,10 +36,23 @@ class ClipboardWatcher(private val context: Context) {
     }
 
     /** 读一次当前剪贴板记下来；键盘弹出时也调（监听在输入法没起来时收不到）。 */
-    fun capture() {
+    fun capture(live: Boolean = false) {
         val settings = Settings.load(context)
         val clip = runCatching { manager?.primaryClip }.getOrNull() ?: return
         if (clip.itemCount == 0) return
+        if (clip.itemCount > 1 && (0 until clip.itemCount).any { clip.getItemAt(it).uri != null }) {
+            if (live && app.qingjian.inputmethod.core.Native.lanFileEnabled()) app.qingjian.inputmethod.clipboard.files.LanFiles.single(context)
+            return
+        }
+        val uri = clip.getItemAt(0).uri
+        if (uri != null) {
+            if (uri.authority in setOf("${context.packageName}.clipboard", "${context.packageName}.lanfiles")) return
+            if (app.qingjian.inputmethod.clipboard.files.LanFiles.isFile(context, uri)) {
+                if (live && !sensitive(clip.description) && firstSeen(clip.description.timestamp) && app.qingjian.inputmethod.core.Native.lanFileEnabled())
+                    app.qingjian.inputmethod.clipboard.files.LanFiles.send(context,uri)
+                return
+            }
+        }
         if (sensitive(clip.description)) {
             val timestamp = clip.description.timestamp
             if (privateCopy.shouldAttempt(timestamp, System.currentTimeMillis())) {
@@ -53,7 +69,6 @@ class ClipboardWatcher(private val context: Context) {
         if (!settings.recordClipboard) return
         if (!firstSeen(clip.description.timestamp)) return
         val item = clip.getItemAt(0)
-        val uri = item.uri
         if (uri?.authority == "${context.packageName}.clipboard") return
         val mime = uri?.let { runCatching { context.contentResolver.getType(it) }.getOrNull() }
         if (uri != null && mime?.startsWith("image/") == true) {

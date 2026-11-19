@@ -50,6 +50,20 @@ pub struct InputSettings {
     /// 组句中的按需 AI 快捷键；旧 Server 没有这项。
     #[serde(default)]
     pub predict: Option<KeyCombo>,
+
+    /// 语音识别的触发设置；旧 Server 没有时为 `None`，DLL 不登记语音触发（按钮呈不可用）。
+    #[serde(default)]
+    pub voice: Option<VoiceInputSettings>,
+}
+
+/// 下发给 DLL 的语音触发设置：语音服务开着才带 `Some`，DLL 据此登记长按 Win / 自定义键。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VoiceInputSettings {
+    /// 自定义快捷键（修饰键 + 字母/数字/句号）；`None` 表示用长按 Win 键。
+    pub combo: Option<KeyCombo>,
+
+    /// 长按 Win 键触发的时长（毫秒）。
+    pub hold_ms: u32,
 }
 
 fn english_candidates_default() -> bool {
@@ -68,6 +82,7 @@ impl Default for InputSettings {
             toggle_traditional: None,
             english_candidates: true,
             predict: None,
+            voice: None,
         }
     }
 }

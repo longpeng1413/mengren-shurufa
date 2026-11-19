@@ -120,7 +120,20 @@ impl Router {
                 self.handle_indicator(command);
                 None
             }
+            ClientMessage::VoiceStart { session } => {
+                self.handle_voice_start(session);
+                None
+            }
+            ClientMessage::VoiceStop { session } => {
+                self.handle_voice_stop(session);
+                None
+            }
+            ClientMessage::VoiceCancel { session } => {
+                self.handle_voice_cancel(session);
+                None
+            }
             ClientMessage::CloseSession { session } => {
+                self.voice_abort_session(session);
                 self.sessions.remove(&session);
                 if self.mode_session == Some(session) {
                     self.mode_session = None;

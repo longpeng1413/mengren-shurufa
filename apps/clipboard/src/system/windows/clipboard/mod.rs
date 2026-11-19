@@ -172,7 +172,9 @@ pub(crate) fn read_private(
         return None;
     }
     let opened = Opened::new()?;
-    if only_sensitive && !marked_sensitive(&opened) {
+    if unsafe { IsClipboardFormatAvailable(CF_HDROP) }.is_ok()
+        || (only_sensitive && !marked_sensitive(&opened))
+    {
         return None;
     }
     let bytes = zeroize::Zeroizing::new(opened.read(
@@ -194,7 +196,10 @@ pub(crate) fn read_private(
 
 /// 读这次复制的内容。文件优先，其次文字（网页、Office 同时给文字和图片时用户多半要文字），最后才是图片。
 /// `records` 按来源程序判断要不要记，不记的内容根本不读。
-pub fn read_capture(records: impl Fn(&str) -> bool) -> Option<Capture> {
+pub fn read_capture(
+    records: impl Fn(&str) -> bool,
+    copied_files: impl FnOnce(Vec<String>),
+) -> Option<Capture> {
     if SELF_WRITE.load(Ordering::Relaxed) || sensitive() {
         return None;
     }
@@ -202,7 +207,6 @@ pub fn read_capture(records: impl Fn(&str) -> bool) -> Option<Capture> {
     if !records(&source) {
         return None;
     }
-    let image_with_files;
     let (files, text, html, rtf) = {
         let opened = Opened::new()?;
         // 文件列表、文字超限时整条不记，不能往下落到别的格式上，记成另一样东西
@@ -216,7 +220,9 @@ pub fn read_capture(records: impl Fn(&str) -> bool) -> Option<Capture> {
             tracing::info!("clipboard content too large to record");
             return None;
         }
-        image_with_files = has_files && image_size > 0 && image_size <= MAX_RAW_IMAGE_BYTES;
+        if has_files && marked_sensitive(&opened) {
+            return None;
+        }
         (
             opened.read(CF_HDROP, MAX_FILE_LIST_BYTES),
             opened.read(CF_UNICODETEXT, MAX_TEXT_BYTES),
@@ -224,29 +230,11 @@ pub fn read_capture(records: impl Fn(&str) -> bool) -> Option<Capture> {
             opened.read(rtf_format(), MAX_FORMAT_BYTES),
         )
     };
-    if let Some(raw) = files
-        && let Some(paths) = parse_file_list(&raw)
-    {
-        if image_with_files && let Some((png, thumbnail)) = read_image() {
-            return Some(Capture::image_with_files(png, thumbnail, raw, source));
-        }
-        if paths.len() == 1 {
-            let path = Path::new(&paths[0]);
-            let extension = path
-                .extension()
-                .and_then(|value| value.to_str())
-                .unwrap_or_default()
-                .to_ascii_lowercase();
-            if matches!(
-                extension.as_str(),
-                "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp"
-            ) && path.metadata().is_ok_and(|meta| {
-                meta.is_file() && meta.len() <= qingjian_clipboard::MAX_IMAGE_BYTES as u64
-            }) && let Ok(bytes) = std::fs::read(path)
-                && let Some((png, thumbnail)) = picture::from_file(&bytes)
-            {
-                return Some(Capture::image_with_files(png, thumbnail, raw, source));
-            }
+    if let Some(raw) = files {
+        let paths = parse_file_list(&raw).unwrap_or_default();
+        copied_files(paths.clone());
+        if paths.is_empty() {
+            return None;
         }
         let size = total_size(&paths);
         return Some(Capture::files(&paths, raw, source, size));
@@ -265,6 +253,32 @@ pub fn read_capture(records: impl Fn(&str) -> bool) -> Option<Capture> {
     }
     let (png, thumbnail) = read_image()?;
     Some(Capture::image(png, thumbnail, source))
+}
+
+pub(crate) fn publish_file(path: &Path, stamp: i64) {
+    let Some(opened) = Opened::new() else { return };
+    if i64::from(unsafe { windows::Win32::System::DataExchange::GetClipboardSequenceNumber() })
+        != stamp
+    {
+        return;
+    }
+    let Some(path) = path.to_str() else { return };
+    let mut raw = vec![0u8; 20];
+    raw[0] = 20;
+    raw[16] = 1;
+    raw.extend(encode_text(path));
+    raw.extend([0, 0]);
+    if unsafe { EmptyClipboard() }.is_ok() {
+        opened.write(
+            unsafe { RegisterClipboardFormatW(w!("CanUploadToCloudClipboard")) },
+            &0u32.to_le_bytes(),
+        );
+        opened.write(
+            unsafe { RegisterClipboardFormatW(w!("CanIncludeInClipboardHistory")) },
+            &0u32.to_le_bytes(),
+        );
+        opened.write(CF_HDROP, &raw);
+    }
 }
 
 fn read_image() -> Option<(Vec<u8>, Vec<u8>)> {

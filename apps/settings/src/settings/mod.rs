@@ -11,6 +11,7 @@ mod search;
 mod shortcuts;
 mod transfer;
 mod vocabulary;
+mod voice;
 
 #[cfg(test)]
 mod tests;
@@ -28,6 +29,7 @@ use crate::jobs::cloud_test::CloudTest;
 use crate::jobs::import::ImportJob;
 use crate::jobs::model_download::ModelDownload;
 use crate::jobs::update::check::UpdateCheck;
+use crate::jobs::voice::{VoiceDownload, VoiceTest};
 use crate::library::Library;
 use crate::message::{FieldId, Popup, SizeKind};
 use crate::page_id::PageId;
@@ -101,6 +103,15 @@ pub struct Settings {
 
     /// 点过一次「删除」、等再点一次确认的模型；点了别的就作废。
     pub remove_armed: Option<qingjian_platform::LocalModel>,
+
+    /// 语音设置页：豆包 / 离线测试连接。
+    pub voice_test: VoiceTest,
+
+    /// 语音设置页：离线语音模型下载。
+    pub voice_download: VoiceDownload,
+
+    /// 语音设置页：点过一次「删除模型」等确认。
+    pub voice_remove_armed: bool,
 
     /// 开着的短语编辑卡片。
     pub phrase: Option<PhraseEditor>,
@@ -198,6 +209,9 @@ impl Settings {
             import: ImportJob::default(),
             download: ModelDownload::default(),
             remove_armed: None,
+            voice_test: VoiceTest::default(),
+            voice_download: VoiceDownload::default(),
+            voice_remove_armed: false,
             phrase: None,
             stats: None,
             stats_cloud: false,

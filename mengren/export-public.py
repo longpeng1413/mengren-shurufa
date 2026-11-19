@@ -23,7 +23,7 @@ def main():
     paths = subprocess.check_output(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=ROOT).decode("utf-8").split("\0")
     manifest = {}
     for name in sorted(set(paths)):
-        if not name or name in PRIVATE or name.startswith(("mengren/private/", "mengren/design/", "mengren/安装包/")):
+        if not name or name in PRIVATE or name.startswith((".workbuddy-ai/", "mengren/private/", "mengren/design/", "mengren/安装包/")):
             continue
         leaf = Path(name).name.lower()
         if (leaf.startswith(".env") and leaf != ".env.example") or Path(name).suffix.lower() in {".dpapi", ".keystore", ".jks", ".p12", ".pfx"}:

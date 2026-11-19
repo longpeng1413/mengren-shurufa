@@ -1,6 +1,8 @@
 //! 剪贴板与常用语面板的出口：请求是 JSON（`op` 区分），回的是操作之后的整份列表 JSON；出错返回 null，壳当作没变。
 //! 拆词与重挂常用语要用引擎，带句柄。
 
+#[cfg(target_os = "android")]
+mod files;
 mod sync;
 mod verification;
 

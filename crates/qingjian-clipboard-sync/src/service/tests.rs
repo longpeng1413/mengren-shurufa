@@ -1,3 +1,5 @@
+mod file_failures;
+
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, channel};

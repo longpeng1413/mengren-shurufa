@@ -39,6 +39,22 @@ copy = "Copy"
 edit = "Edit"
 delete = "Delete"
 
+[files]
+title = "LAN file copy and paste"
+limit = "One file smaller than 300 MB"
+on = "Enabled"
+off = "Disabled"
+inbox = "Open received files"
+selected = "Allowed"
+select = "Allow files"
+sent = "File delivered"
+partial = "Some devices did not receive the file"
+invalid = "Unsupported name or file reaches 300 MB"
+failed = "Receive or save failed"
+received = "File received. Available in Devices."
+unavailable = "Undelivered. Check LAN and both device selections."
+single = "Copy one file at a time. Zip folders first."
+
 [devices]
 relay = "Internet relay"
 relay_connected = "Relay connected"

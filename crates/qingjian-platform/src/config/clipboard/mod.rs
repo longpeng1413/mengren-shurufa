@@ -36,6 +36,8 @@ pub struct ClipboardConfig {
 
     pub relay_enabled: bool,
 
+    pub file_enabled: bool,
+
     pub private_receive: bool,
 
     pub private_auto_fill: bool,
@@ -63,6 +65,7 @@ impl Default for ClipboardConfig {
             paused: false,
             sync_enabled: false,
             relay_enabled: false,
+            file_enabled: false,
             private_receive: true,
             private_auto_fill: false,
             private_send_mode: "auto".into(),

@@ -30,6 +30,8 @@ pub struct ClipSettings {
 
     pub private_hotkey: Hotkey,
 
+    pub file_enabled: bool,
+
     pub private_receive: bool,
 
     pub private_auto_fill: bool,
@@ -89,6 +91,7 @@ impl Default for ClipSettings {
             edge: Edge::Bottom,
             hotkey: Hotkey::DEFAULT,
             private_hotkey: Hotkey::DEFAULT,
+            file_enabled: false,
             private_receive: true,
             private_auto_fill: false,
             private_send_mode: "auto".into(),
@@ -185,6 +188,12 @@ impl ClipSettings {
             private_hotkey: text_of(&file.shortcut.private_input)
                 .and_then(|value| Hotkey::parse(&value))
                 .unwrap_or(defaults.private_hotkey),
+            file_enabled: file
+                .clipboard
+                .file_enabled
+                .as_ref()
+                .and_then(toml::Value::as_bool)
+                .unwrap_or(false),
             private_receive: file
                 .clipboard
                 .private_receive

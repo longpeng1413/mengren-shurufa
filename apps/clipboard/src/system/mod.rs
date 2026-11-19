@@ -35,6 +35,9 @@ pub enum Signal {
     /// 复制了内容（已排除密码管理器标记为敏感的）。
     Copied(Capture),
 
+    #[cfg(windows)]
+    FileCopy(Vec<String>),
+
     /// 配置改了。
     Settings(ClipSettings),
 

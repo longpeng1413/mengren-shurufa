@@ -145,12 +145,17 @@ impl Router {
         }
     }
 
-    /// 工人循环下次该多久后来一次 [`Self::tick`]：在等重排、键位提示在等停顿就按它们的节拍，否则按配置热加载的一秒。
+    /// 工人循环下次该多久后来一次 [`Self::tick`]：在等重排、键位提示在等停顿就按它们的节拍，
+    /// 语音识别进行中要 30 ms 一拍尽快取异步结果，否则按配置热加载的一秒。
     pub fn next_tick(&self) -> Duration {
-        [self.rescore.next_deadline(), self.key_hint.next_deadline()]
+        let mut due = [self.rescore.next_deadline(), self.key_hint.next_deadline()]
             .into_iter()
             .flatten()
-            .fold(super::reload::CONFIG_POLL_INTERVAL, Duration::min)
+            .fold(super::reload::CONFIG_POLL_INTERVAL, Duration::min);
+        if self.voice_active() {
+            due = due.min(Duration::from_millis(30));
+        }
+        due
     }
 
     /// 到点了：接上加载好的模型、推进重排、键位提示停顿到点就弹出、看一眼配置文件。工人循环超时与 DLL 的 `Poll` 都会调。
@@ -158,6 +163,7 @@ impl Router {
         self.attach_loaded_model();
         self.advance_rescoring();
         self.advance_key_hint();
+        self.voice_advance();
         self.poll_config_reload();
     }
 

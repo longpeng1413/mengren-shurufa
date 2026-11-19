@@ -150,6 +150,17 @@ fn clipboard(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, RenderErr
             .control(add)
             .build(ui, theme)?,
     ];
+    if Feature::ClipboardFiles.here() {
+        rows.push(toggle_info(
+            ui,
+            page,
+            tr("experimental.clipboard_files"),
+            Some(tr("experimental.clipboard_files_info")),
+            ("clipboard", "file_enabled"),
+            config.file_enabled,
+            !on || !config.sync_enabled,
+        )?);
+    }
     if Feature::ClipboardRelay.here() {
         use super::cloud::field;
         use crate::message::FieldId;

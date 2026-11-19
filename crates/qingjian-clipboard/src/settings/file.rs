@@ -35,6 +35,8 @@ pub(super) struct ClipboardSection {
 
     pub(super) relay_enabled: Option<toml::Value>,
 
+    pub(super) file_enabled: Option<toml::Value>,
+
     pub(super) private_receive: Option<toml::Value>,
 
     pub(super) private_auto_fill: Option<toml::Value>,

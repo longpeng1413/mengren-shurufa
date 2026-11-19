@@ -1,7 +1,7 @@
 [package]
 name = "qingjian-settings"
 description = "三平台共用的设置程序：画在 bamboo-slip 上，读写输入法同一份 config.toml"
-version = "0.4.7"
+version = "0.4.8"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -27,6 +27,9 @@ qingjian-dictionary.workspace = true
 # 统计页：读输入量与词汇记录、词汇等级表
 qingjian-learning.workspace = true
 qingjian-translate.workspace = true
+# 语音设置页：豆包测试连接、离线模型状态/下载/测试识别
+qingjian-voice.workspace = true
+qingjian-voice-offline.workspace = true
 # 导入时的文件选择窗口（与 Windows 旧设置程序同一个）
 rfd = "0.17"
 dotenvy.workspace = true

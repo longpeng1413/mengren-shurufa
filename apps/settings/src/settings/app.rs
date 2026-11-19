@@ -33,12 +33,15 @@ impl App for Settings {
     fn update(&mut self, message: Message) -> bool {
         let armed = self.armed.take();
         let remove_armed = self.remove_armed.take();
+        let voice_remove_armed = std::mem::take(&mut self.voice_remove_armed);
         if !matches!(
             message,
             Message::Run(_)
                 | Message::ImportConfig
                 | Message::ExportConfig
                 | Message::TestCloud
+                | Message::VoiceTest
+                | Message::VoiceDownloadModel
                 | Message::CheckUpdate
                 | Message::InstallUpdate
                 | Message::DownloadModel(_)
@@ -58,6 +61,8 @@ impl App for Settings {
                 self.page = page;
                 self.recording = None;
                 self.close_phrase();
+                self.remove_armed = None;
+                self.voice_remove_armed = false;
                 self.reload();
                 if page == PageId::Dictionaries {
                     self.library = Library::scan();
@@ -253,6 +258,41 @@ impl App for Settings {
                     self.notice = Some(("cloud", text));
                 }
             }
+            Message::VoiceTest => self.voice_test(),
+            Message::VoiceDownloadModel => {
+                let root = self.voice_model_root();
+                let proxy = self.config.predict.proxy.clone();
+                match self.voice_download.start(&root, &proxy, self.waker.clone()) {
+                    Ok(()) => {
+                        self.notice = Some(("voice", tr("voice.downloading").to_owned()));
+                    }
+                    Err(error) => self.notice = Some(("voice", error)),
+                }
+            }
+            Message::VoiceCancelDownload => {
+                self.voice_download.cancel();
+                self.notice = Some(("voice", tr("voice.download_cancelled").to_owned()));
+            }
+            Message::VoiceRemoveModel => {
+                if !voice_remove_armed {
+                    self.voice_remove_armed = true;
+                } else {
+                    let root = self.voice_model_root();
+                    match crate::jobs::voice::remove_model(&root) {
+                        Ok(()) => {
+                            self.notice = Some(("voice", tr("voice.model_removed").to_owned()))
+                        }
+                        Err(error) => self.notice = Some(("voice", error)),
+                    }
+                }
+            }
+            Message::VoiceClearKey => match self.clear_voice_key() {
+                Ok(()) => {
+                    self.reset_field(FieldId::VoiceApiKey);
+                    self.notice = Some(("voice", tr("voice.key_cleared").to_owned()));
+                }
+                Err(error) => self.notice = Some(("voice", error)),
+            },
             Message::Set(section, key, value) => {
                 self.menu = None;
                 self.write(section, key, value);
@@ -359,6 +399,20 @@ impl App for Settings {
         }
         if let Some(text) = self.cloud_test.finish() {
             self.notice = Some(("cloud", text));
+            changed = true;
+        }
+        if let Some(outcome) = self.voice_test.finish() {
+            let text = match outcome {
+                Ok(message) => message,
+                Err(message) => message,
+            };
+            self.notice = Some(("voice", text));
+            changed = true;
+        }
+        // 离线模型下载：周期性推进进度、结束后收起任务
+        changed |= self.voice_download.tick();
+        if self.voice_download.finished() {
+            self.notice = Some(("voice", tr("voice.model_ready").to_owned()));
             changed = true;
         }
         if let Some(report) = self.import.finish() {

@@ -21,6 +21,8 @@ pub(super) use pending_code::PendingCode;
 
 pub(crate) struct Shared {
     pub(in crate::service) phrases: Mutex<Option<super::phrases::PhraseState>>,
+    pub(in crate::service) files: Mutex<super::files::Policy>,
+
     pub identity: Identity,
 
     pub name: String,
@@ -87,6 +89,7 @@ impl Shared {
     ) -> Self {
         Self {
             phrases: Mutex::new(None),
+            files: Mutex::default(),
             identity,
             name,
             model,

@@ -145,6 +145,7 @@ fn page_children(
         PageId::Phrases => pages::phrases::phrases(ui, page)?,
         PageId::Dictionaries => pages::dictionaries::dictionaries(ui, page)?,
         PageId::Cloud => pages::cloud::cloud(ui, page)?,
+        PageId::Voice => pages::voice::voice(ui, page)?,
         PageId::Stats => pages::stats::stats(ui, page)?,
         PageId::Vocabulary => pages::vocabulary::vocabulary(ui, page)?,
         PageId::Advanced => pages::advanced::advanced(ui, page)?,

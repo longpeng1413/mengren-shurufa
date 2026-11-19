@@ -31,6 +31,7 @@ mod switch_key;
 mod third_input_method;
 mod transfer;
 mod update;
+mod voice;
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -82,6 +83,9 @@ pub use switch_key::{SwitchKey, SwitchKeys};
 pub use third_input_method::ThirdInputMethod;
 pub use transfer::{export_settings, import_settings};
 pub use update::{UpdateChannel, UpdateConfig};
+pub use voice::{
+    DEFAULT_RESOURCE_ID, PROVIDER_NONE, PROVIDER_OFFLINE, PROVIDER_VOLCENGINE, VoiceConfig,
+};
 
 /// 用户配置文件（TOML）。所有平台同一份格式，缺省值全部在各分节的 `Default` 里。
 ///
@@ -128,6 +132,10 @@ pub struct Config {
 
     /// 各形码方案的按键规则（`[code.<id>]`），按方案 id；没写的方案按它自己的 `scheme.toml`。
     pub code: BTreeMap<String, CodeRules>,
+
+    /// 语音识别：本机离线 / 豆包云端，与云联想的密钥分开。
+    #[serde(default)]
+    pub voice: VoiceConfig,
 }
 
 /// 模板的 `[apps]` 一节（Linux）：应用按 fcitx5 认到的名字（X11 是 WM_CLASS，Wayland 是 app_id）。
@@ -465,6 +473,27 @@ slots = 2
 sentence = true
 # 上屏的整句（含分几次打完的一句）翻成学习语言，记进生词本的时间线；只发那一句，不发光标前后的文字
 vocabulary_translation = true
+
+# 有道智云文本翻译：给「翻译选中文字 / 快捷翻译」用，与上面的云联想是两套服务。
+# 密钥用设置程序「云服务」页填写，Windows 存在本机凭据里（DPAPI），不写进这个配置文件、不进日志。
+[predict.youdao]
+enabled = false
+# 有道应用 ID（应用密钥在设置程序里填）
+# app_key = ""
+
+[voice]
+# 语音识别：默认关闭。offline 用本机离线模型（不联网、不收费，首次要从 GitHub 下载约 229 MB 模型），
+# volcengine 用豆包流式识别（要 API Key、按用量计费，嘈杂环境与长句更稳）；none 不启用。
+provider = "none"
+# 豆包计费方式：volc.seedasr.sauc.duration 按时长 / volc.seedasr.sauc.concurrent 按并发 / volc.seedasr.auc 文件版
+resource_id = "volc.seedasr.sauc.duration"
+# 豆包 API Key：可留空并设 QINGJIAN_VOICE_API_KEY 环境变量；设置页填的写进配置同目录的 .env
+# api_key = ""
+api_key_env = "QINGJIAN_VOICE_API_KEY"
+# 长按 Win 键多久（毫秒）开始语音；设了下面 shortcut 时以 shortcut 为准
+hold_ms = 400
+# 自定义语音快捷键（修饰键 + 字母/数字/句号），设了就替代长按 Win，按下开始、松开结束；留空用长按 Win
+# shortcut = "ctrl+alt+v"
 
 [status_bar]
 # 桌面上常驻、可拖动的悬浮状态条（Windows）：「中 / 英」格点一下切换模式（开着双拼时还显示方案名）、「，。」格切全角 / 半角标点、齿轮打开设置。

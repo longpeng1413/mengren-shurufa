@@ -3,6 +3,10 @@ package app.qingjian.inputmethod.core
 /** Rust 侧（apps/android/core）的 JNI 入口。句柄只在主线程用。 */
 internal object Native {
     external fun clipboardVerificationCode(text: String, label: String, classified: Boolean): String?
+    external fun lanFileEnabled(): Boolean
+    external fun lanFileConfigure(id: String, value: Boolean): Boolean
+    external fun lanFileNetwork(network: String)
+    external fun lanFileSend(fd: Int, name: String, size: Long): Boolean
     external fun clipboardSyncPrivateSend(text: String): Boolean
     external fun clipboardSyncPrivateState(enabled: Boolean, available: Boolean)
     external fun clipboardSyncPrivateTake(): String?

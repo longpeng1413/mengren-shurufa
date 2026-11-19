@@ -14,6 +14,7 @@ mod painter;
 mod panel;
 mod status;
 mod taskbar_icon;
+mod voice;
 mod window_class;
 
 use std::cell::RefCell;
@@ -43,13 +44,18 @@ use self::painter::{Painter, SharedPainter};
 pub use self::panel::PanelEvents;
 use self::panel::PanelWindow;
 use self::status::StatusBar;
+use self::voice::VoiceView;
+use self::voice::VoiceWindow;
 use crate::dispatch::{
     CandidateMenu, CandidateSink, KeyHintView, PanelFrame, RenderSettings, StatusEvent, StatusSink,
-    StatusView,
+    StatusView, VoiceSink,
 };
 
 /// 状态条上的操作（点格子 / 拖动结束）回给 Router 的回调，UI 线程上调。
 pub type StatusEvents = Box<dyn Fn(StatusEvent) + Send>;
+
+/// UI 线程起来后、进消息循环前跑的一次性初始化（如安装低级键盘钩子，必须在有消息循环的线程上装）。
+pub type UiStartHook = Box<dyn FnOnce() + Send>;
 
 /// 唤醒 UI 线程去排空命令队列的线程消息。
 const WM_WAKE: u32 = WM_APP;
@@ -70,13 +76,18 @@ impl UiHandle {
         on_status: StatusEvents,
         on_click: CandidateClicks,
         on_panel: PanelEvents,
+        start_hook: UiStartHook,
     ) -> Result<Self> {
         // 用 Option<u32> 而非 Result 回报，免得 windows Error 跨线程。
         let (ready_tx, ready_rx) = mpsc::channel::<Option<u32>>();
         let (command_tx, command_rx) = mpsc::channel::<UiCommand>();
         thread::Builder::new()
             .name("qingjian-candidates".to_owned())
-            .spawn(move || run(command_rx, &ready_tx, on_status, on_click, on_panel))
+            .spawn(move || {
+                run(
+                    command_rx, &ready_tx, on_status, on_click, on_panel, start_hook,
+                )
+            })
             .map_err(|_| Error::from(E_FAIL))?;
         match ready_rx.recv() {
             Ok(Some(thread_id)) => Ok(Self {
@@ -126,6 +137,39 @@ impl CandidateSink for UiHandle {
 
     fn close_menu(&self) {
         self.post(UiCommand::MenuClose);
+    }
+}
+
+impl VoiceSink for UiHandle {
+    fn listening(&self, text: &str, level: f32) {
+        self.post(UiCommand::VoiceShow(Box::new(VoiceView {
+            state: "正在听…".to_owned(),
+            text: text.to_owned(),
+            level,
+            history: Vec::new(),
+        })));
+    }
+
+    fn recognizing(&self, text: &str) {
+        self.post(UiCommand::VoiceShow(Box::new(VoiceView {
+            state: "识别中…".to_owned(),
+            text: text.to_owned(),
+            level: 0.0,
+            history: Vec::new(),
+        })));
+    }
+
+    fn error(&self, message: &str) {
+        self.post(UiCommand::VoiceShow(Box::new(VoiceView {
+            state: "语音识别出错".to_owned(),
+            text: message.to_owned(),
+            level: 0.0,
+            history: Vec::new(),
+        })));
+    }
+
+    fn hide(&self) {
+        self.post(UiCommand::VoiceHide);
     }
 }
 
@@ -185,10 +229,13 @@ fn run(
     on_status: StatusEvents,
     on_click: CandidateClicks,
     on_panel: PanelEvents,
+    start_hook: UiStartHook,
 ) {
     // 按物理像素定位，与应用报来的组句屏幕矩形对齐；已设过会失败，忽略。
     let _ = unsafe { SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
     let thread_id = unsafe { GetCurrentThreadId() };
+    // 低级键盘钩子必须装在带消息循环的线程上；这里循环还没起，但线程消息队列已随建窗口建立。
+    start_hook();
     // 装上时随 Configure 命令建。
     let painter: SharedPainter = Rc::new(RefCell::new(None));
     // 先建窗口再报 id：建窗口顺带建起本线程的消息队列，之后 PostThreadMessageW 才有处可投。
@@ -214,6 +261,13 @@ fn run(
             None
         }
     };
+    let voice = match VoiceWindow::new() {
+        Ok(voice) => Some(voice),
+        Err(error) => {
+            tracing::error!(%error, "建语音面板失败，将不显示语音面板");
+            None
+        }
+    };
     taskbar_icon::sync();
     if ready.send(Some(thread_id)).is_err() {
         return;
@@ -236,7 +290,14 @@ fn run(
         if msg.message == WM_WAKE {
             // 一次唤醒排空整个队列，保住 Hide→Show 的先后。
             while let Ok(command) = commands.try_recv() {
-                apply(&window, panel.as_ref(), status.as_ref(), &painter, command);
+                apply(
+                    &window,
+                    panel.as_ref(),
+                    status.as_ref(),
+                    voice.as_ref(),
+                    &painter,
+                    command,
+                );
             }
             continue;
         }
@@ -251,6 +312,7 @@ fn apply(
     window: &CandidateWindow,
     panel: Option<&PanelWindow>,
     status: Option<&StatusBar>,
+    voice: Option<&VoiceWindow>,
     painter: &SharedPainter,
     command: UiCommand,
 ) {
@@ -287,11 +349,24 @@ fn apply(
                 status.hide();
             }
         }
+        UiCommand::VoiceShow(view) => {
+            if let Some(voice) = voice {
+                voice.show(*view);
+            }
+        }
+        UiCommand::VoiceHide => {
+            if let Some(voice) = voice {
+                voice.hide();
+            }
+        }
         UiCommand::Configure(settings) => {
             Painter::configure(painter, &settings);
             window.theme_changed();
             if let Some(panel) = panel {
                 panel.theme_changed();
+            }
+            if let Some(voice) = voice {
+                voice.theme_changed();
             }
         }
     }

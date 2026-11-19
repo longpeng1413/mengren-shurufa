@@ -11,6 +11,8 @@ pub enum FieldId {
     YoudaoSecret,
     RelayUrl,
     RelayToken,
+    /// 语音设置页：豆包 API Key（写进配置同目录的 .env）。
+    VoiceApiKey,
     PhraseCode,
     PhraseWeight,
     PhraseText,
@@ -19,8 +21,8 @@ pub enum FieldId {
 }
 
 impl FieldId {
-    /// 存进配置的那几个（短语的几个随卡片一起存）。
-    pub const ALL: [Self; 8] = [
+    /// 存进配置的那几个（短语的几个随卡片一起存）。密钥框（ApiKey / VoiceApiKey）存进 .env，也在这里。
+    pub const ALL: [Self; 9] = [
         Self::BaseUrl,
         Self::Model,
         Self::ApiKey,
@@ -29,6 +31,7 @@ impl FieldId {
         Self::YoudaoSecret,
         Self::RelayUrl,
         Self::RelayToken,
+        Self::VoiceApiKey,
     ];
 
     /// 配置文件 `[predict]` 里的键。
@@ -42,6 +45,7 @@ impl FieldId {
             Self::YoudaoSecret => "secret",
             Self::RelayUrl => "relay_url",
             Self::RelayToken => "relay_token",
+            Self::VoiceApiKey => "api_key",
             Self::PhraseCode => "code",
             Self::PhraseWeight => "weight",
             Self::PhraseText => "text",

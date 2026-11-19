@@ -81,6 +81,19 @@
             android:taskAffinity=""
             android:theme="@style/Theme.Qingjian.Transparent" />
 
+        <activity android:name=".clipboard.files.ShareActivity" android:exported="true" android:excludeFromRecents="true"
+            android:label="@string/file_share" android:theme="@style/Theme.Qingjian.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".clipboard.files.SaveActivity" android:exported="false" android:excludeFromRecents="true" />
+        <provider android:name=".clipboard.files.ReceivedProvider" android:authorities="${applicationId}.lanfiles"
+            android:exported="false" android:grantUriPermissions="true" />
+
         <!-- 剪贴板图片交给别的应用读（发图片、放回系统剪贴板），见 clipboard/ClipboardImageProvider.kt -->
         <provider
             android:name=".clipboard.ClipboardImageProvider"

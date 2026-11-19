@@ -13,3 +13,4 @@ pub mod phrases;
 pub mod shortcuts;
 pub mod stats;
 pub mod vocabulary;
+pub mod voice;

@@ -34,6 +34,13 @@ fn id_of(kind: ClipKind, text: &str, png: Option<&[u8]>) -> Option<String> {
 }
 
 pub(super) fn capture_id(capture: &Capture) -> Option<String> {
+    if capture
+        .formats
+        .iter()
+        .any(|f| f.name == crate::FORMAT_FILES)
+    {
+        return None;
+    }
     let png = capture
         .formats
         .iter()
@@ -221,7 +228,7 @@ impl StoreReplica {
             .connection
             .query_row(
                 "SELECT id, kind, text, updated_at, deleted FROM items
-                 WHERE sync_id = ?1 ORDER BY updated_at DESC LIMIT 1",
+                 WHERE sync_id = ?1 AND NOT EXISTS (SELECT 1 FROM formats f WHERE f.item_id = items.id AND f.name = 'files') ORDER BY updated_at DESC LIMIT 1",
                 [id],
                 |row| {
                     Ok((
@@ -275,7 +282,7 @@ impl Replica for StoreReplica {
         let mut statement = connection
             .prepare(
                 "SELECT sync_id, updated_at, deleted, forgotten FROM items
-                 WHERE sync_id IS NOT NULL ORDER BY updated_at DESC LIMIT ?1",
+                 WHERE sync_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM formats f WHERE f.item_id = items.id AND f.name = 'files') ORDER BY updated_at DESC LIMIT ?1",
             )
             .map_err(storage)?;
         let rows = statement

@@ -13,5 +13,8 @@ pub(super) struct Broker {
 
     pub pending: Mutex<HashMap<String, PendingConnection>>,
 
+    #[cfg(test)]
+    pub openings: Mutex<Vec<u8>>,
+
     pub active: AtomicUsize,
 }

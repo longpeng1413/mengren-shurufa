@@ -112,10 +112,16 @@ Source: "{#Repo}\assets\levels\levels-ja.tsv";   DestDir: "{app}\assets\levels";
 Source: "{#Repo}\assets\schemes\wubi86\scheme.toml";  DestDir: "{app}\assets\schemes\wubi86"; Flags: ignoreversion
 Source: "{#Repo}\assets\schemes\wubi86\table.tsv";    DestDir: "{app}\assets\schemes\wubi86"; Flags: ignoreversion
 Source: "{#Repo}\assets\sample\dict.tsv";        DestDir: "{app}\assets\sample"; Flags: ignoreversion
-; —— 知意（ONNX）的运行库：Server 按路径加载 exe 旁边的 onnxruntime.dll；
-;    由 build.ps1 调 fetch-onnxruntime.ps1 取到 target\installer\onnxruntime（含许可）——
-Source: "{#Repo}\target\installer\onnxruntime\onnxruntime.dll"; DestDir: "{app}"; Flags: ignoreversion uninsrestartdelete
-Source: "{#Repo}\target\installer\onnxruntime\*.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
+; —— 知意（ONNX）的运行库：开发时 Server 从 target\installer\onnxruntime 加载；
+;    由 build.ps1 调 fetch-onnxruntime.ps1 取到 target\installer\onnxruntime（含许可）。
+;    装机时改由下面 sherpa 那份同版本成套的 ONNX Runtime 提供，不重复安装 ——
+; —— 本机离线语音识别引擎：sherpa-onnx C API 与配套 ONNX Runtime，Server / 设置程序按 exe 目录找；
+;    由 build.ps1 调 fetch-sherpa.ps1 取到 target\installer\sherpa（含许可），版本见 EXPECTED_VERSION ——
+Source: "{#Repo}\target\installer\sherpa\sherpa-onnx-c-api.dll";           DestDir: "{app}"; Flags: ignoreversion uninsrestartdelete
+Source: "{#Repo}\target\installer\sherpa\onnxruntime.dll";                 DestDir: "{app}"; Flags: ignoreversion uninsrestartdelete
+Source: "{#Repo}\target\installer\sherpa\onnxruntime_providers_shared.dll"; DestDir: "{app}"; Flags: ignoreversion uninsrestartdelete
+Source: "{#Repo}\target\installer\sherpa\sherpa-onnx-LICENSE.txt";         DestDir: "{app}\licenses"; Flags: ignoreversion
+Source: "{#Repo}\target\installer\onnxruntime\*.txt";                      DestDir: "{app}\licenses"; Flags: ignoreversion
 ; —— Server 放最后：它一落地，旧版 DLL 就能把它拉起来并占住数据文件（见文件头）——
 Source: "{#Repo}\target\release\qingjian-server.exe";   DestDir: "{app}"; Flags: ignoreversion
 

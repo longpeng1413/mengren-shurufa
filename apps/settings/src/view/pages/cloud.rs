@@ -288,8 +288,10 @@ pub(super) fn field(
     let input = TextField::new(edit)
         .placeholder(placeholder)
         .secret(
-            matches!(id, FieldId::ApiKey | FieldId::YoudaoSecret)
-                || id == FieldId::RelayToken && !page.settings.relay_token_visible,
+            matches!(
+                id,
+                FieldId::ApiKey | FieldId::YoudaoSecret | FieldId::VoiceApiKey
+            ) || id == FieldId::RelayToken && !page.settings.relay_token_visible,
         )
         .width(FIELD_WIDTH)
         .build(

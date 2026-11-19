@@ -95,4 +95,17 @@
     <string name="flick_symbol_invalid">Use up to 8 characters without whitespace or control characters</string>
     <string name="flick_symbols_reset">Reset all swipe-up symbols</string>
     <string name="flick_symbols_reset_note">Remove custom symbols and restore the original hints for each language.</string>
+    <string name="file_title">LAN file copy and paste</string>
+    <string name="file_limit">One file smaller than 300 MB</string>
+    <string name="file_allow">Allow file transfers with this device</string>
+    <string name="file_download">Save to Downloads</string>
+    <string name="file_share">Mengren IME · Send over LAN</string>
+    <string name="file_failed">Transfer incomplete. Check access, storage and LAN.</string>
+    <string name="file_unavailable">Undelivered. Check LAN and both device selections.</string>
+    <string name="file_invalid">Unsupported name or file reaches 300 MB</string>
+    <string name="file_sent">File delivered</string>
+    <string name="file_partial">Some devices did not receive the file</string>
+    <string name="file_received">File received. Tap Save to Downloads on the keyboard clipboard.</string>
+    <string name="file_saved">Saved to Downloads</string>
+    <string name="file_single">Copy one file at a time. Zip folders first.</string>
 </resources>

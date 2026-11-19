@@ -258,6 +258,7 @@ fn clipboard_process_reads_the_same_keys() {
     config.clipboard.enabled = true;
     config.clipboard.paused = true;
     config.clipboard.sync_enabled = true;
+    config.clipboard.file_enabled = true;
     config.clipboard.sync_neon = false;
     config.clipboard.device_name = "坚强的高松灯".to_owned();
     config.clipboard.history_limit = 500;
@@ -284,6 +285,7 @@ fn clipboard_process_reads_the_same_keys() {
             relay_url: String::new(),
             relay_revision: String::new(),
             private_hotkey: Hotkey::DEFAULT,
+            file_enabled: true,
             private_receive: true,
             private_auto_fill: false,
             private_send_mode: "auto".into(),

@@ -21,9 +21,14 @@ serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
 snow = "0.10"
+socket2 = "0.6.5"
 spake2 = "0.4"
+tempfile = "3.27.0"
 thiserror.workspace = true
 tracing.workspace = true
 tungstenite.workspace = true
 webpki-roots.workspace = true
 zeroize.workspace = true
+
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_NetworkManagement_IpHelper", "Win32_NetworkManagement_Ndis", "Win32_Networking_WinSock", "Win32_System_DataExchange"] }

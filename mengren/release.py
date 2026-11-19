@@ -1,4 +1,4 @@
-"""发布经检查的猛人源码和本次有改动平台的安装包；原开发仓库历史始终留在私有库。
+"""发布经审查的猛人源码和本次有改动平台的安装包；保留公开仓库已有提交。
 
 按平台独立发版：`--platform android` / `--platform windows`（两端都改了就写两次）。只检查、只上传所选平台的新包；
 签名索引在上一版已验签索引的基础上把本版加在最前，未发版平台原有的版本、下载地址和摘要原样保留。
@@ -99,6 +99,26 @@ def remove_tree(path):
         shutil.rmtree(path, onexc=retry)
     except OSError as error:
         print(f"临时目录没删掉，请手动删除：{path}（{error}）", flush=True)
+
+
+def prune_old_releases(keep):
+    """发布成功后本机只留这一版的发布留档；旧版在 GitHub 上都有。顺带清掉中途出错留下的临时导出。"""
+    target = ROOT / "target"
+    if target.is_symlink() or target.is_junction():
+        print(f"Skip linked release cache directory: {target}", flush=True)
+        return
+    for folder, spare in ((ROOT / "target/release-dist", keep), (ROOT / "target/release-work", None)):
+        if folder.is_symlink() or folder.is_junction():
+            print(f"Skip linked release cache directory: {folder}", flush=True)
+            continue
+        if not folder.is_dir():
+            continue
+        for old in folder.iterdir():
+            if old.is_symlink() or old.is_junction():
+                print(f"Skip linked release artifact: {old}", flush=True)
+                continue
+            if old.is_dir() and old.name != spare:
+                remove_tree(old)
 
 
 def save(path, value):
@@ -275,6 +295,7 @@ def main():
     save(dist / "published.json", {"version": version, "platforms": platforms, "commit": commit, "url": f"https://github.com/{REPO}/releases/tag/v{version}", "verified_uploads": len(uploads)})
     # 本次源码导出与上一版索引只在发布过程中用；收据在 release-dist 里，公开后删掉这份临时导出（每次约 90 MB）。
     remove_tree(work)
+    prune_old_releases(version)
     print(f"Published https://github.com/{REPO}/releases/tag/v{version}", flush=True)
 
 

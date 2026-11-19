@@ -205,6 +205,20 @@ pub(super) fn devices(ui: &mut Ui<Message>, context: &Context) -> Result<Vec<Nod
     body.push(row(ui, context, &[name, save], false)?);
 
     let service = app.link.service();
+    #[cfg(windows)]
+    if let Some(s) = service {
+        body.push(heading(ui, context, tr("files.title"))?);
+        body.push(note(ui, context, tr("files.limit"))?);
+        let switch = Button::new(tr(if s.files_enabled() {
+            "files.on"
+        } else {
+            "files.off"
+        }))
+        .build(ui, theme, "files-switch", Message::FileSwitch)?;
+        let inbox =
+            Button::new(tr("files.inbox")).build(ui, theme, "files-inbox", Message::FileInbox)?;
+        body.push(row(ui, context, &[switch, inbox], false)?);
+    }
     let peers = service
         .map(|service| service.peer_states())
         .unwrap_or_default();
@@ -239,6 +253,23 @@ pub(super) fn devices(ui: &mut Ui<Message>, context: &Context) -> Result<Vec<Nod
             ("unpair", peer.device_id.as_str()),
             Message::Unpair(peer.device_id.clone()),
         )?;
+        #[cfg(windows)]
+        let button = if let Some(s) = service.filter(|s| s.files_enabled()) {
+            let select = Button::new(tr(if s.file_peer_selected(&peer.device_id) {
+                "files.selected"
+            } else {
+                "files.select"
+            }))
+            .build(
+                ui,
+                theme,
+                ("files-peer", peer.device_id.as_str()),
+                Message::FilePeer(peer.device_id.clone()),
+            )?;
+            row(ui, context, &[select, button], false)?
+        } else {
+            button
+        };
         body.push(device_row(
             ui,
             context,
