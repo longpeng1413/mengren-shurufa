@@ -211,6 +211,20 @@ pub enum ServerMessage {
         /// 右键菜单打勾用的开关状态（v7 起）。
         #[serde(default)]
         indicator: IndicatorState,
+
+        /// 请 DLL 读当前选区并用 [`super::ClientMessage::Selection`] 回（带这个请求号），供翻译窗口带入选中文字。
+        /// 只发给声明了 `reads_selection` 的 DLL；旧 DLL 读到多余字段会忽略。
+        #[serde(default)]
+        read_selection: Option<u64>,
+
+        /// `read_selection` 是给原地翻译（双击右 Shift）读的：DLL 按「翻译选中文字」读，读到就进评审并记下选区。
+        #[serde(default)]
+        review_selection: bool,
+
+        /// Server 已用别的办法取到选中文字并发出翻译：DLL 进入评审态（所有键交给 Server、轮询取译文）。
+        /// 用于输入法读不到选区的程序（微信、WPS 等经兼容层的程序）。
+        #[serde(default)]
+        start_review: bool,
     },
 
     /// 收到「翻译选中文字」快捷键：请 DLL 在读编辑会话里取当前选区，用

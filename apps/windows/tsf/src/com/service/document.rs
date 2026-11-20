@@ -5,7 +5,7 @@ use windows::Win32::UI::TextServices::ITfContext;
 use windows::core::Ref;
 
 use super::TextService_Impl;
-use crate::com::edit::{request_selection, request_update};
+use crate::com::edit::{SelectionUse, request_selection, request_update};
 use crate::com::log::log;
 
 impl TextService_Impl {
@@ -20,6 +20,7 @@ impl TextService_Impl {
             self.engine.clone(),
             self.shared.clone(),
             request,
+            SelectionUse::Review,
         ) {
             log(&format!("请求读选区会话失败: {error}"));
         }
@@ -29,6 +30,7 @@ impl TextService_Impl {
     /// 组句已被应用终止的（拼音已是普通文本）只清 Server 不再插。
     pub(super) fn commit_pending(&self) {
         if self.shared.translating() {
+            log("翻译评审：失焦 / 切模式 / 停用，结束评审");
             self.shared.set_translating(false);
             self.shared.hide_candidates();
         }

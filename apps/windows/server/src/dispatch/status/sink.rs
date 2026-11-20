@@ -2,7 +2,8 @@ use super::StatusView;
 
 /// 状态条输出端。Router 在工人线程上调，窗口在 UI 线程上，故要 `Send`。
 pub trait StatusSink: Send {
-    fn open_translator(&self) {}
+    /// 打开 / 收起翻译窗口，按 [`TranslatorOpen`] 带入或去取选中文字。
+    fn open_translator(&self, _open: super::super::TranslatorOpen) {}
     fn show_status(&self, view: StatusView);
 
     fn hide_status(&self);

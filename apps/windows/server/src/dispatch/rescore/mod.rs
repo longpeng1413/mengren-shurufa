@@ -155,6 +155,9 @@ impl Router {
         if self.voice_active() {
             due = due.min(Duration::from_millis(30));
         }
+        if self.translator_window_waiting() || self.in_place_waiting() {
+            due = due.min(Duration::from_millis(50));
+        }
         due
     }
 
@@ -164,6 +167,8 @@ impl Router {
         self.advance_rescoring();
         self.advance_key_hint();
         self.voice_advance();
+        self.advance_translator_window();
+        self.advance_in_place();
         self.poll_config_reload();
     }
 

@@ -176,6 +176,84 @@ pub fn brush(dc: HDC, card: bool) -> Option<HBRUSH> {
     })
 }
 
+/// 窗口底色画刷（由配色持有，别删）；下拉菜单拿它铺底。
+pub fn background_brush() -> Option<HBRUSH> {
+    PALETTE.with_borrow(|slot| slot.as_ref().map(|p| p.brush))
+}
+
+/// 下拉菜单窗口的边框色。
+pub fn menu_border() -> Option<COLORREF> {
+    PALETTE.with_borrow(|slot| {
+        let p = slot.as_ref()?;
+        Some(mix(p.background, foreground(p.background), 22))
+    })
+}
+
+/// 底色深不深（深色时提示框用深色主题）。
+pub fn dark() -> bool {
+    PALETTE.with_borrow(|slot| {
+        slot.as_ref()
+            .is_some_and(|p| foreground(p.background).0 != 0)
+    })
+}
+
+/// 画一个下拉菜单项：悬停时加一层高亮，选中的项左边打勾。
+pub fn draw_menu_item(
+    dc: HDC,
+    rect: RECT,
+    label: &str,
+    checked: bool,
+    selected: bool,
+    font: gdi::HFONT,
+    dpi: i32,
+) {
+    PALETTE.with_borrow(|slot| {
+        let Some(p) = slot else { return };
+        let ink = foreground(p.background);
+        let fill = if selected {
+            mix(p.background, ink, 18)
+        } else {
+            p.background
+        };
+        unsafe {
+            gdi::SetDCBrushColor(dc, fill);
+            FillRect(dc, &rect, HBRUSH(gdi::GetStockObject(gdi::DC_BRUSH).0));
+            gdi::SetBkMode(dc, gdi::TRANSPARENT);
+            SetTextColor(dc, ink);
+            let old = gdi::SelectObject(dc, font.into());
+            let gutter = 32 * dpi / 96;
+            let flags = gdi::DT_VCENTER | gdi::DT_SINGLELINE | gdi::DT_NOPREFIX;
+            if checked {
+                let mut mark: Vec<u16> = "✓".encode_utf16().collect();
+                let mut bounds = RECT {
+                    right: rect.left + gutter,
+                    ..rect
+                };
+                let _ = gdi::DrawTextW(dc, &mut mark, &mut bounds, flags | gdi::DT_CENTER);
+            }
+            let mut text: Vec<u16> = label.encode_utf16().collect();
+            let mut bounds = RECT {
+                left: rect.left + gutter,
+                right: rect.right - 12 * dpi / 96,
+                ..rect
+            };
+            let _ = gdi::DrawTextW(dc, &mut text, &mut bounds, flags | gdi::DT_LEFT);
+            gdi::SelectObject(dc, old);
+        }
+    });
+}
+
+/// 说明小字：在 [`brush`] 设好的底色上把文字调淡。
+pub fn mute(dc: HDC) {
+    PALETTE.with_borrow(|slot| {
+        if let Some(p) = slot {
+            unsafe {
+                SetTextColor(dc, mix(foreground(p.background), p.background, 45));
+            }
+        }
+    });
+}
+
 fn rounded(dc: HDC, r: RECT, fill: COLORREF, edge: COLORREF, radius: i32) {
     unsafe {
         let pen = gdi::SelectObject(dc, gdi::GetStockObject(gdi::DC_PEN));

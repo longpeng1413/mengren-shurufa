@@ -20,8 +20,8 @@ use qingjian_platform::protocol::SessionId;
 use qingjian_platform::{VoiceConfig, dirs, foreground::InputFocus};
 
 use super::Router;
-use qingjian_platform::{KeyCombo, windows_text::tr};
-type ConfigureKeys = fn(&VoiceConfig, Option<KeyCombo>);
+use qingjian_platform::windows_text::tr;
+type ConfigureKeys = fn(&VoiceConfig, super::TranslatorKeys);
 type InsertText = fn(InputFocus, &str) -> VoiceInsertResult;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -47,6 +47,10 @@ const CAPTURE_DRAIN_TIMEOUT: Duration = Duration::from_millis(150);
 
 /// 整段原始峰值低于它（约 -50 dBFS）又没识别出字：麦克风多半被静音或被隐私设置挡住。
 const SILENT_PEAK: f32 = 0.003;
+
+/// 整段原始峰值低于它（约 -66 dBFS，呼吸声都比它大）：麦克风交出的是数字静音，识别出什么都丢掉。
+/// 2026-11-20 笔记本日志：英特尔智音数字麦克风被挡住时整段峰值只有 1 个最小刻度，模型猜出「ㄱ.」。
+const DEAD_PEAK: f32 = 0.0005;
 
 /// 一次录音会话里，录音线程 -> Router 的东西。
 pub struct Capture {
@@ -102,6 +106,9 @@ struct Active {
 
     /// 这段录音的原始峰值（0..1），判断是不是整段没声音。
     peak: f32,
+
+    /// 收到过电平：录音线程收到包就报，纯静音也报 0。测试里的假录音源没有电平通道。
+    level_seen: bool,
 
     finish_sent: bool,
 }
@@ -179,14 +186,23 @@ impl Router {
             self.configure_voice(new);
         }
     }
+    /// 借语音面板显示一句短提示（约 2.5 秒后收起），原地翻译没取到文字等情况用。
+    pub(in crate::dispatch) fn flash_notice(&mut self, message: &str) {
+        self.voice.notice(message);
+    }
+
     pub(super) fn recording(&self) -> bool {
         self.voice
             .active
             .as_ref()
             .is_some_and(|a| a.finished_at.is_none())
     }
-    pub fn open_translator(&self) {
-        self.status.open_translator();
+    /// 现在有键盘焦点的会话：有前台查询（Windows）就当场问系统，否则用最近来取模式 / 聚焦的会话。
+    pub(super) fn foreground_session(&self) -> Option<SessionId> {
+        match self.voice.foreground {
+            Some(current) => current().map(|focus| focus.session),
+            None => self.mode_session.or(self.focused),
+        }
     }
     pub fn cancel_hotkey_voice(&mut self) {
         if let Some(a) = &self.voice.active {
@@ -219,10 +235,7 @@ impl Router {
             self.voice.notice(&reason);
             return;
         }
-        let session = match self.voice.foreground {
-            Some(current) => current().map(|focus| focus.session),
-            None => self.mode_session.or(self.focused),
-        };
+        let session = self.foreground_session();
         if let Some(session) = session.filter(|id| self.sessions.contains_key(id)) {
             self.handle_voice_start(session);
         } else {
@@ -302,6 +315,7 @@ impl Router {
             finished_at: None,
             started: Instant::now(),
             peak: 0.0,
+            level_seen: false,
             finish_sent: false,
         });
         self.voice.last_level = 0.0;
@@ -481,6 +495,7 @@ impl Router {
             while let Ok(value) = receiver.try_recv() {
                 level = value.clamp(0.0, 1.0);
                 active.peak = active.peak.max(level);
+                active.level_seen = true;
             }
         }
         self.voice.last_level = level * 0.8 + self.voice.last_level * 0.2;
@@ -520,6 +535,8 @@ impl Router {
         let session = active.session;
         let focus = active.focus;
         let peak = active.peak;
+        // 整段几乎是数字静音（隐私设置挡住、静音键、输入音量为 0）：模型给出的任何文字都是瞎猜
+        let dead_silence = active.level_seen && peak < DEAD_PEAK;
         let spoken = active
             .finished_at
             .unwrap_or_else(Instant::now)
@@ -541,7 +558,14 @@ impl Router {
                         seconds = format!("{:.2}", spoken.as_secs_f32()),
                         "voice final"
                     );
-                    if text.is_empty() {
+                    if dead_silence || !meaningful(&text) {
+                        if !text.is_empty() {
+                            tracing::info!(
+                                chars = text.chars().count(),
+                                dead_silence,
+                                "voice final discarded as noise"
+                            );
+                        }
                         self.voice.notice(tr(if peak < SILENT_PEAK {
                             "mic_silent"
                         } else {
@@ -595,6 +619,25 @@ impl Router {
         }
         true
     }
+}
+
+/// 识别结果里有没有真正的文字：汉字、假名、完整的韩文音节、字母或数字。
+/// 模型自动判断语言时，噪音常被认成「ㄱ.」这类单独的韩文字母加标点，不能写进输入框。
+fn meaningful(text: &str) -> bool {
+    text.chars().any(|c| {
+        c.is_ascii_alphanumeric()
+            || matches!(c as u32,
+                0x3040..=0x30FF            // 平假名、片假名
+                | 0x3400..=0x4DBF          // 汉字扩展 A
+                | 0x4E00..=0x9FFF          // 汉字
+                | 0xAC00..=0xD7A3          // 韩文音节
+                | 0xF900..=0xFAFF          // 兼容汉字
+                | 0xFF10..=0xFF19          // 全角数字
+                | 0xFF21..=0xFF3A
+                | 0xFF41..=0xFF5A          // 全角字母
+                | 0x20000..=0x323AF)       // 汉字扩展 B 以后
+            || (c.is_alphabetic() && !matches!(c as u32, 0x1100..=0x11FF | 0x3130..=0x318F))
+    })
 }
 
 fn exe_dir() -> Option<std::path::PathBuf> {

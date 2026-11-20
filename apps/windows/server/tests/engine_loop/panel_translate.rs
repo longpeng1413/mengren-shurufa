@@ -153,3 +153,39 @@ fn shift_arrows_and_ctrl_a_select_in_the_box() {
         .map(|panel| panel.translate_source().to_owned());
     assert_eq!(source.as_deref(), Some(""));
 }
+
+#[test]
+fn selection_translation_works_with_only_the_translation_channel() {
+    // 只开有道、不开 AI 云联想：云联想是空实现，译文走翻译通道，也必须取得回来（曾一直停在「翻译中…」）
+    let submitted = Arc::new(Mutex::new(Vec::new()));
+    let mut router = router();
+    router
+        .engine_mut()
+        .set_translation_predictor(Some(Box::new(EchoTranslator {
+            replies: Vec::new(),
+            submitted: submitted.clone(),
+        })));
+    let combo = KeyCombo::TRANSLATE_DEFAULT;
+    let event = KeyEvent::new(
+        combo.key.to_ascii_uppercase() as u32,
+        Some(combo.key),
+        combo.modifiers.into(),
+    );
+    let request = match router.handle(ClientMessage::Key {
+        session: SESSION,
+        event,
+    }) {
+        Some(ServerMessage::RequestSelection { request, .. }) => request,
+        other => panic!("expected RequestSelection, got {other:?}"),
+    };
+    router.handle(ClientMessage::Selection {
+        session: SESSION,
+        request,
+        text: "你好".to_owned(),
+        rect: rect(),
+        unreadable: false,
+    });
+    assert_eq!(translations(&submitted), ["你好"]);
+    let frame = poll(&mut router);
+    assert_eq!(candidate_texts(&frame), ["Hello"]);
+}

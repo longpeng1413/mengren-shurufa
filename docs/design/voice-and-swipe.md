@@ -109,6 +109,12 @@ Android 上怎么接的见 [notes/android.md](../notes/android.md)「语音输�
 
 Windows 用右 Alt 长按作为默认语音入口。设置还提供右 Ctrl、任一 Win、自定义组合键和关闭快捷键。旧配置已经指定组合键时沿用原键。短按修饰键或用它组成普通快捷键时照常放行，达到阈值后才发送一次遮罩键，物理抬键始终交回系统。录音时按 Esc 丢弃当前段。「说」按钮另支持点击开始、再点结束。按住期间又按下别的修饰键、点鼠标或滚滚轮，这次按住作废。自定义组合键含 Win 或 Alt 时，吞掉主键后同样补发遮罩键。低级键盘 / 鼠标钩子装在专用的高优先级线程上：钩子回调超过 LowLevelHooksTimeout 会被系统静默卸载，不能与要画候选窗的 UI 线程共用。
 
+翻译窗口快捷键（组合键或双击右 Ctrl）：Server 先看前台焦点会话的 DLL 是否在 `SyncMode` 里声明 `reads_selection`；是且不是私密输入，就在下一次 `ModeSync` 带 `read_selection` 请求号，DLL 用只读编辑会话读选区（翻译窗口用途最多 4000 字、超出截断，不进原地评审），以 `Selection` 回；Server 收到后经管道（`--stdin`，不放命令行）交给 `qingjian-translator`，窗口已开时新实例用 `WM_COPYDATA` 转交。DLL 要不到编辑会话（网页正文这类非可编辑内容会被拒）时立即回 `Selection.unreadable = true`。输入法读不到（unreadable、0.7 秒内没回、旧 DLL、不是猛人会话）时，Server 在后台线程依次试系统辅助接口（UI Automation TextPattern，限时 0.8 秒；Win32 原生 EDIT 不提供 TextPattern，靠前一步 TSF 覆盖）和模拟 Ctrl+Insert（不用 Ctrl+C：终端里是中断）：先等修饰键松开，存下剪贴板原内容（太大或 0.3 秒内打不开就整步跳过），复制后读文字，再限时 3 秒放回原内容，只标 `CanIncludeInClipboardHistory` / `CanUploadToCloudClipboard` 为 0。**不能**标 `ExcludeClipboardContentFromMonitorProcessing`：猛人剪贴板把它当密码管理器的密码，会私密发给已配对设备。输入框读到了但没选中时只试辅助接口不复制（有的编辑器没选中时复制整行）；私密输入什么都不读；翻译窗口自己在前台时只收起。
+
+原地翻译（双击右 Shift，`dispatch/translate/in_place/`）：前台是能读选区的猛人会话时，下一次 `ModeSync` 带 `read_selection` 加 `review_selection`，DLL 按「翻译选中文字」读，读到就走原有评审并记下选区范围（接受时直接 `SetText` 替换它，不信回车时的当前选区——ChatGPT 桌面版会把选区收成光标）；读到空选区（微信、WPS、原生 EDIT 这类经兼容层的程序总报空）、读不了或超时，就调注入的 `SelectionProbe`（辅助接口加模拟 Ctrl+Insert）取文字，取到后发翻译、画「翻译中…」，下一次 `ModeSync.start_review` 让 DLL 进评审态（2 秒没接上就收起）。Ctrl+Alt+T 读到空选区时同样走这条兜底。私密输入不兜底；前台不是猛人会话或取的时候换了窗口，改开翻译窗口。注意 `ensure_focus` 换焦点时会清在等的读选区请求，认领选区后要记回去。
+
+交给 DLL 的读选区请求与 `start_review` 只放进声明了 `reads_selection` 的那次同步（空闲轮询）；DLL 获焦时补的同步不处理这两项，交给它就丢了。`start_review` 一直带到 DLL 来轮询（确认收到）或 2 秒超时。DLL 在 `SyncMode.in_place_review` 声明自己认得原地评审，0.4.14 之前的 DLL 不声明，Server 改开翻译窗口显示译文。能力记录只记不清，会话关闭才忘。DLL 判断「前台」时键盘焦点在本线程也算（WPS 外框与编辑区分属两个进程）。DLL 吃掉带 Alt / Win 的保留键后补发遮罩键 0xE8：否则应用把单独松开的 Alt 当成进菜单访问键模式，短暂夺焦让刚开始的评审被落定结束（记事本、WPS 实测）。兜底取文字时 Ctrl+Insert 没复制到再试 Ctrl+C（Flutter 不认 Ctrl+Insert），前台是终端或带终端的编辑器（按进程名、窗口类）时不发 Ctrl+C。两个协议字段都带 `serde(default)`，新旧端互读不出错，不升 `PROTOCOL_VERSION`。双击判定：右 Ctrl 单独按下且 0.3 秒内松开算一次轻点，上次松开到这次按下不超过 0.4 秒算双击；中间有其他按键、修饰键、鼠标或触发了语音都作废；右 Ctrl 本身不拦。
+
 Server 把识别终稿留在发起会话的待上屏队列。处于前台的 DLL 在空闲模式轮询中先取得当前 TSF 焦点文档，然后声明可以接收文字。Server 原子取走队列，DLL 在异步编辑会话中写入当前光标。协议沿用原版本号，两字段均有反序列化默认值。旧 DLL 在按键或 Poll 时取回终稿，重开宿主应用加载新 DLL 后即可空闲上屏。
 
 ### Windows 听写目标

@@ -79,6 +79,7 @@ fn client_messages() -> Vec<ClientMessage> {
             private: true,
         },
         ClientMessage::Selection {
+            unreadable: true,
             session,
             request: 7,
             text: "选中的文字".to_owned(),
@@ -96,6 +97,8 @@ fn client_messages() -> Vec<ClientMessage> {
         },
         ClientMessage::SyncMode {
             accepts_commit: true,
+            reads_selection: true,
+            in_place_review: true,
             session,
         },
         ClientMessage::ImeSwitched { session },
@@ -168,6 +171,9 @@ fn server_messages() -> Vec<ServerMessage> {
             vietnamese: Some(false),
             input: InputSettings::default(),
             indicator: IndicatorState::default(),
+            read_selection: None,
+            review_selection: false,
+            start_review: false,
         },
         ServerMessage::ModeSync {
             commit: None,
@@ -176,6 +182,9 @@ fn server_messages() -> Vec<ServerMessage> {
             vietnamese: Some(true),
             input: InputSettings::default(),
             indicator: IndicatorState::default(),
+            read_selection: Some(7),
+            review_selection: true,
+            start_review: true,
         },
         ServerMessage::RequestSelection {
             session,
@@ -265,6 +274,38 @@ fn a_frame_without_the_translation_pos_field_still_parses() {
         let frame: Frame = serde_json::from_value(json).expect("带字段的帧也该读得出来");
         assert_eq!(frame.translation_pos, value);
     }
+}
+
+#[test]
+fn selection_reads_are_optional_in_both_directions() {
+    // 旧 DLL 的 SyncMode 不带 reads_selection：读成 false，Server 就不发读选区请求。
+    let body = br#"{"SyncMode":{"accepts_commit":true,"session":9}}"#;
+    let mut bytes = (body.len() as u32).to_le_bytes().to_vec();
+    bytes.extend_from_slice(body);
+    let got: Option<ClientMessage> =
+        read_message(&mut Cursor::new(bytes)).expect("旧 DLL 的同步请求");
+    assert_eq!(
+        got,
+        Some(ClientMessage::SyncMode {
+            accepts_commit: true,
+            reads_selection: false,
+            in_place_review: false,
+            session: SessionId(9),
+        })
+    );
+    // 旧 Server 的 ModeSync 不带 read_selection：新 DLL 读成 None，不读选区。
+    let body = br#"{"ModeSync":{"session":9,"english":null}}"#;
+    let mut bytes = (body.len() as u32).to_le_bytes().to_vec();
+    bytes.extend_from_slice(body);
+    let got: Option<ServerMessage> =
+        read_message(&mut Cursor::new(bytes)).expect("旧 Server 的回包");
+    assert!(matches!(
+        got,
+        Some(ServerMessage::ModeSync {
+            read_selection: None,
+            ..
+        })
+    ));
 }
 
 #[test]

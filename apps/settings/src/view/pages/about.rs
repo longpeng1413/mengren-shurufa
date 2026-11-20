@@ -1,4 +1,4 @@
-//! 「关于」页：版本与链接，更新，许可，数据来源，隐私。
+//! 「关于」页：版本与链接，更新，日志，许可，数据来源，隐私。
 
 use std::sync::Arc;
 
@@ -131,6 +131,26 @@ pub fn about(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, RenderErr
     }
     out.push(section_title(ui, theme, tr("about.section_update"))?);
     out.push(group(ui, theme, &rows)?);
+
+    // 与「高级」页同一组按钮：反馈问题时用户多半先来「关于」页找
+    let buttons = actions(
+        ui,
+        page,
+        &[
+            (tr("advanced.open_log_dir"), Action::OpenLogDir),
+            (tr("advanced.export_logs"), Action::ExportLogs),
+        ],
+    )?;
+    let logs = with_notice(
+        ui,
+        page,
+        SettingRow::new(tr("advanced.log_files"))
+            .info(tr("about.logs_info"))
+            .control(buttons),
+        "logs",
+    )?;
+    out.push(section_title(ui, theme, tr("advanced.section_logs"))?);
+    out.push(group(ui, theme, &[logs])?);
 
     out.push(section_title(ui, theme, tr("about.section_license"))?);
     let license = note(ui, page, None, tr("about.license"))?;

@@ -18,6 +18,7 @@ mod session;
 mod status;
 mod trace;
 mod translate;
+mod translator_window;
 mod voice;
 
 use std::collections::HashMap;
@@ -50,7 +51,10 @@ use self::rescore::{ModelLoader, RescoreState};
 pub use self::schemes::find_bundled_schemes;
 use self::session::SessionInfo;
 pub use self::status::{NoopStatusSink, StatusEvent, StatusSink, StatusView};
-use self::translate::Translation;
+pub use self::translate::SelectionProbe;
+use self::translate::{InPlace, Translation};
+use self::translator_window::TranslatorWindowState;
+pub use self::translator_window::{TranslatorKeys, TranslatorOpen};
 use self::voice::VoiceRuntime;
 pub use self::voice::{
     Capture, CaptureFactory, NoopVoiceSink, SAMPLE_RATE, VoiceInsertResult, VoiceSink,
@@ -192,6 +196,15 @@ pub struct Router {
 
     /// 语音识别：识别方、录音流、进行态。识别方常驻，配置变了重建。
     voice: VoiceRuntime,
+
+    /// 翻译窗口快捷键在等选区。
+    translator_window: TranslatorWindowState,
+
+    /// 原地翻译在取选中文字。
+    in_place: Option<InPlace>,
+
+    /// 输入法读不到选区时的取法（Windows 上是辅助接口 + 模拟复制）；没注入就不取。
+    selection_probe: Option<SelectionProbe>,
 }
 
 impl Router {
@@ -243,6 +256,9 @@ impl Router {
             rescore: RescoreState::default(),
             key_hint: KeyHintState::default(),
             voice: VoiceRuntime::default(),
+            translator_window: TranslatorWindowState::default(),
+            in_place: None,
+            selection_probe: None,
         }
     }
 

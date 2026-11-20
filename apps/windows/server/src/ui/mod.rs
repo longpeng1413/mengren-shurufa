@@ -48,7 +48,7 @@ use self::voice::VoiceView;
 use self::voice::VoiceWindow;
 use crate::dispatch::{
     CandidateMenu, CandidateSink, KeyHintView, PanelFrame, RenderSettings, StatusEvent, StatusSink,
-    StatusView, VoiceSink,
+    StatusView, TranslatorOpen, VoiceSink,
 };
 
 /// 状态条上的操作（点格子 / 拖动结束）回给 Router 的回调，UI 线程上调。
@@ -177,8 +177,28 @@ impl VoiceSink for UiHandle {
 }
 
 impl StatusSink for UiHandle {
-    fn open_translator(&self) {
-        launch_sibling("qingjian-translator.exe");
+    fn open_translator(&self, open: TranslatorOpen) {
+        match open {
+            TranslatorOpen::Text(text) => launch_translator_with(text),
+            TranslatorOpen::Plain => launch_sibling("qingjian-translator.exe"),
+            // 辅助接口与模拟复制会等应用回话、等用户松开修饰键，放后台线程，不卡 UI 与工人循环
+            TranslatorOpen::Probe => {
+                let spawned = std::thread::Builder::new()
+                    .name("qingjian-translator-probe".to_owned())
+                    .spawn(move || {
+                        let text = (!crate::selection::translator_in_front())
+                            .then(crate::selection::read)
+                            .flatten();
+                        match text {
+                            Some(text) => launch_translator_with(text),
+                            None => launch_sibling("qingjian-translator.exe"),
+                        }
+                    });
+                if spawned.is_err() {
+                    launch_sibling("qingjian-translator.exe");
+                }
+            }
+        }
     }
     fn show_status(&self, view: StatusView) {
         self.post(UiCommand::StatusShow(Box::new(view)));
@@ -219,6 +239,34 @@ fn launch_sibling(name: &str) {
     let spawned = exe.and_then(|exe| std::process::Command::new(exe).spawn());
     if let Err(error) = spawned {
         tracing::warn!(%error, name, "打开设置程序失败");
+    }
+}
+
+/// 起翻译窗口并把选中的文字交给它（`--stdin`，经管道传，不放命令行：命令行别的进程看得见）。
+/// 窗口已开时新实例把文字转给它后退出。写管道放后台线程，不卡 UI 线程。
+fn launch_translator_with(text: String) {
+    use std::io::Write;
+    let _ = unsafe { AllowSetForegroundWindow(ASFW_ANY) };
+    let exe = std::env::current_exe().map(|exe| exe.with_file_name("qingjian-translator.exe"));
+    let spawned = exe.and_then(|exe| {
+        std::process::Command::new(exe)
+            .arg("--stdin")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+    });
+    match spawned {
+        Ok(mut child) => {
+            if let Some(mut stdin) = child.stdin.take() {
+                let _ = std::thread::Builder::new()
+                    .name("qingjian-translator-text".to_owned())
+                    .spawn(move || {
+                        if let Err(error) = stdin.write_all(text.as_bytes()) {
+                            tracing::warn!(%error, "cannot pass the selection to the translator");
+                        }
+                    });
+            }
+        }
+        Err(error) => tracing::warn!(%error, "cannot start the translator"),
     }
 }
 

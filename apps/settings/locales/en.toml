@@ -234,6 +234,7 @@ aux_scheme = "Auxiliary code scheme"
 aux_scheme_info = "Choose an auxiliary code set"
 
 [about]
+logs_info = "To report a problem, click Bundle to desktop and send the zip on your desktop. Logs contain no recordings, and keys in the config are removed"
 install_update = "Update now"
 upstream_github = "Qingjian GitHub"
 mengren_github = "Mengren GitHub"
@@ -358,6 +359,11 @@ commit_candidate_info = "Press while typing pinyin to commit the highlighted can
 commit_raw_info = "Press while typing pinyin to commit the typed letters as is"
 
 [shortcut]
+translate_double_shift = "Double-press right Shift to translate in place"
+translate_double_shift_info = "Select text and press right Shift twice quickly; the translation appears as a candidate. Enter replaces the text, Esc keeps it. If Shift switches Chinese/English, a double press switches twice"
+translator_info = "With text selected, it is brought into the window and translated"
+translator_double_ctrl = "Double-press right Ctrl to open the translator"
+translator_double_ctrl_info = "Press right Ctrl twice quickly; selected text is translated right away. A single right Ctrl press still works as usual; if Ctrl switches Chinese/English, a double press switches twice"
 translator = "Open translator"
 prompt_global = "Press modifiers + a letter, digit or symbol"
 need_global = "Needs modifiers plus a letter, digit or symbol"

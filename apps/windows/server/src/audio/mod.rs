@@ -129,8 +129,10 @@ unsafe fn capture(
     let mut stats = Stats::default();
     let result = loop {
         let mut max_level = 0.0f32;
+        let mut got_audio = false;
         let drained = unsafe {
             drain(&capture, block, &mut |data, frames, silent| {
+                got_audio = true;
                 stats.packets += 1;
                 stats.frames += u64::from(frames);
                 if silent {
@@ -148,7 +150,8 @@ unsafe fn capture(
             break Err(error);
         }
         stats.peak = stats.peak.max(max_level);
-        if max_level > 0.0 {
+        // 收到包就报电平，0 也报：Router 据此区分「麦克风交出纯静音」和「没有电平通道」
+        if got_audio {
             let _ = level.send(max_level);
         }
         if stop.load(Ordering::Relaxed) {

@@ -75,12 +75,16 @@ impl Router {
                 request,
                 text,
                 rect,
-            } => Some(self.handle_selection(session, request, text, rect)),
+                unreadable,
+            } => Some(self.handle_selection(session, request, text, rect, unreadable)),
             ClientMessage::PositionCandidates { session, rect } => {
                 self.position_candidates(session, rect);
                 None
             }
             ClientMessage::HideCandidates { session } => {
+                if self.translation.is_some() {
+                    tracing::info!(?session, "DLL ended the translation review");
+                }
                 // 组句在 DLL 侧结束（应用终止组句 / 翻译评审失焦）：只收窗口；缓冲留给下一键的 Commit 清。
                 if self.focused == Some(session) {
                     self.end_translation();
@@ -100,10 +104,26 @@ impl Router {
             }
             ClientMessage::SyncMode {
                 accepts_commit,
+                reads_selection,
+                in_place_review,
                 session,
             } => {
                 self.activate_mode(session);
                 self.handle_ime_active();
+                self.note_selection_reader(session, reads_selection, in_place_review);
+                // 读选区请求与进评审只交给空闲轮询那次同步（它声明能读选区并会处理）：
+                // 失焦时补的同步不处理这两项，交给它就丢了
+                let (window_read, review_read, start_review) = if reads_selection {
+                    let window_read = self.translator_read_request(session);
+                    let review_read = if window_read.is_none() {
+                        self.in_place_read_request(session)
+                    } else {
+                        None
+                    };
+                    (window_read, review_read, self.in_place_start(session))
+                } else {
+                    (None, None, false)
+                };
                 Some(ServerMessage::ModeSync {
                     commit: if accepts_commit {
                         self.take_async_commit(session)
@@ -115,6 +135,9 @@ impl Router {
                     vietnamese: Some(self.vietnamese_mode),
                     input: self.input_settings(session),
                     indicator: self.indicator_state(),
+                    read_selection: window_read.or(review_read),
+                    review_selection: review_read.is_some(),
+                    start_review,
                 })
             }
             ClientMessage::ImeSwitched { session } => {
@@ -142,6 +165,7 @@ impl Router {
             }
             ClientMessage::CloseSession { session } => {
                 self.voice_abort_session(session);
+                self.forget_selection_reader(session);
                 self.sessions.remove(&session);
                 if self.mode_session == Some(session) {
                     self.mode_session = None;
@@ -180,10 +204,10 @@ impl Router {
                 english: None,
             };
         }
-        if self.config.cloud_enabled
-            && self.engine.composition().is_empty()
+        // 只开有道、不开 AI 云联想时也能翻译选中文字：看翻译通道，不看云联想开关
+        if self.engine.composition().is_empty()
             && !self.panel_open()
-            && self.engine.prediction_enabled()
+            && self.engine.translation_enabled()
             && self.matches_translate_combo(&event)
         {
             self.selection_seq += 1;
@@ -237,6 +261,8 @@ impl Router {
             tracing::info!(learned, "释义兜底写入个人释义表");
         }
         let frame = if self.focused == Some(session) {
+            // DLL 来轮询说明它已进评审：原地翻译的「进评审」送到了
+            self.ack_in_place(session);
             self.poll_prediction();
             self.engine.tick_panel_translation(Instant::now());
             let shown = self.self_drawn_frame();

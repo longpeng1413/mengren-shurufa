@@ -11,6 +11,9 @@ pub mod error;
 #[cfg(windows)]
 pub mod hotkey;
 pub mod ipc;
+/// 翻译窗口快捷键在输入法读不到选区时取选中文字（辅助接口 / 模拟复制）；仅 Windows。
+#[cfg(windows)]
+pub mod selection;
 /// 候选窗口 / 状态条的自绘线程；仅 Windows。
 #[cfg(windows)]
 pub mod ui;

@@ -7,6 +7,6 @@ mod surrounding;
 mod update;
 
 pub(crate) use self::anchor::{caret_rect, measured_rect, mouse_screen_rect};
-pub(crate) use self::selection::request_selection;
+pub(crate) use self::selection::{SelectionUse, report_unreadable, request_selection};
 pub(crate) use self::surrounding::{InputContext, input_context};
 pub(crate) use self::update::{request_focused_update, request_update};

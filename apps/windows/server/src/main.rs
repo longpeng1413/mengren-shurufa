@@ -345,7 +345,11 @@ fn main() -> ExitCode {
         "青简 Windows Server 就绪"
     );
 
-    let code = serve(router, config.voice.clone(), config.shortcut.translator);
+    let code = serve(
+        router,
+        config.voice.clone(),
+        dispatch::TranslatorKeys::from_config(&config),
+    );
     tracing::info!(pid = std::process::id(), ?code, "Server process stopped");
     code
 }
@@ -378,7 +382,7 @@ fn grant_appcontainer_log_access() {
 fn serve(
     mut router: Router,
     voice: qingjian_platform::VoiceConfig,
-    translator: Option<qingjian_platform::KeyCombo>,
+    translator: dispatch::TranslatorKeys,
 ) -> ExitCode {
     use qingjian_windows_server::hotkey;
     use qingjian_windows_server::ipc::{Work, pipe};
@@ -402,6 +406,25 @@ fn serve(
     let hotkey_work = work_tx.clone();
     router.set_voice_foreground(qingjian_platform::foreground::InputFocus::current);
     router.set_voice_insertion(hotkey::insert_voice);
+    // 原地翻译读不到选区时：后台线程用辅助接口 / 模拟复制取，取完交回工人循环
+    let probe_work = work_tx.clone();
+    router.set_selection_probe(Box::new(move |request| {
+        let work = probe_work.clone();
+        let spawned = std::thread::Builder::new()
+            .name("qingjian-selection-probe".to_owned())
+            .spawn(move || {
+                let rect = qingjian_windows_server::selection::caret_rect();
+                let text = qingjian_windows_server::selection::read();
+                let _ = work.send(Work::SelectionProbed {
+                    request,
+                    text,
+                    rect,
+                });
+            });
+        if let Err(error) = spawned {
+            tracing::warn!(%error, "cannot spawn selection probe");
+        }
+    }));
     router.set_voice_callbacks(hotkey::reconfigure, |on| {
         hotkey::LISTENING.store(on, std::sync::atomic::Ordering::Release)
     });
@@ -438,7 +461,7 @@ fn serve(
 fn serve(
     _router: Router,
     _voice: qingjian_platform::VoiceConfig,
-    _translator: Option<qingjian_platform::KeyCombo>,
+    _translator: dispatch::TranslatorKeys,
 ) -> ExitCode {
     tracing::warn!("命名管道传输仅 Windows 提供；本平台只装配 Engine 供测试");
     ExitCode::SUCCESS

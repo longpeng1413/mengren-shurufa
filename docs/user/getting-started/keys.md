@@ -132,4 +132,4 @@ Windows 私密输入与私密发送可在实验功能分别自定义，支持 Ct
 
 ### Windows 语音和翻译窗口
 
-按住右 Alt 说话，松开后文字写入光标。Esc 取消。Ctrl+Alt+F 呼出或收起独立翻译窗口，Ctrl+Alt+T 继续翻译选中的文字。更改快捷键及朗读操作见 [Windows 语音和翻译](../platforms/windows-voice-translate.md)。
+按住右 Alt 说话，松开后文字写入光标。Esc 取消。Ctrl+Alt+F 或快速双击右 Ctrl 呼出或收起独立翻译窗口；先选中文字再按，文字会带进窗口直接翻译。选中文字后快速双击右 Shift 或按 Ctrl+Alt+T，在原地出译文候选，回车替换原文、Esc 保留（开着有道翻译或 AI 服务即可）。更改快捷键及朗读操作见 [Windows 语音和翻译](../platforms/windows-voice-translate.md)。

@@ -152,6 +152,7 @@ fn poll_once(context: &PollContext) {
             }
             // 翻译评审时回空帧 = 翻译已在 Server 侧结束（云端没给译文）。
             if translating && frame.is_empty() {
+                log("翻译评审：Server 回空帧，结束评审");
                 drop(guard);
                 context.shared.set_translating(false);
                 context.shared.hide_candidates();
@@ -225,7 +226,11 @@ fn commit_clicked(context: &PollContext, frame: &Frame, commit: String) {
 
 /// 本进程是不是在前台：当场看前台窗口属于谁，不只信线程焦点标记（后台进程的标记可能一直不清，
 /// 它来取模式会让 Server 以为青简仍是当前输入法）。UWP 应用的前台窗口在 ApplicationFrameHost 进程，那时退回看标记。
+/// 键盘焦点就在本线程也算前台：WPS 这类多进程程序的外框窗口在另一个进程，编辑区在本进程。
 fn in_foreground(context: &PollContext) -> bool {
+    if InputFocus::current().is_some_and(|focus| focus.session == crate::com::session_id()) {
+        return true;
+    }
     let window = unsafe { GetForegroundWindow() };
     if window.is_invalid() {
         return false;
@@ -268,9 +273,9 @@ fn sync_mode(context: &PollContext) {
     drop(guard);
     // 按键行为设置每一拍都带（DLL 不读配置文件），切换键与内置英文模式开关改完靠它生效。
     if let Some(commit) = reply.commit {
-        if let Some(document) = document {
+        if let Some(document) = &document {
             if let Err(error) = crate::com::edit::request_focused_update(
-                &document,
+                document,
                 context.client_id,
                 context.engine.clone(),
                 context.shared.clone(),
@@ -281,6 +286,37 @@ fn sync_mode(context: &PollContext) {
             }
         } else {
             log("语音结果没有焦点文档");
+        }
+    }
+    // 翻译窗口 / 原地翻译快捷键：读当前选区交给 Server；读不到 Server 改用别的办法取
+    if reply.start_review {
+        log("原地翻译：Server 已取到选中文字，进入评审");
+        context.shared.set_translating(true);
+    }
+    if let Some(request) = reply.read_selection {
+        let purpose = if reply.review_selection {
+            crate::com::edit::SelectionUse::Review
+        } else {
+            crate::com::edit::SelectionUse::Window
+        };
+        match &document {
+            Some(document) => {
+                if let Err(error) = crate::com::edit::request_selection(
+                    document,
+                    context.client_id,
+                    context.engine.clone(),
+                    context.shared.clone(),
+                    request,
+                    purpose,
+                ) {
+                    log(&format!("翻译窗口读选区会话未受理: {error}"));
+                    crate::com::edit::report_unreadable(&context.engine, request);
+                }
+            }
+            None => {
+                log("翻译窗口读选区：没有焦点文档");
+                crate::com::edit::report_unreadable(&context.engine, request);
+            }
         }
     }
     super::service::on_input_settings(reply.input);

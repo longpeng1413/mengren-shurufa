@@ -86,17 +86,20 @@ impl<S: Read + Write> EngineClient<S> {
     }
 
     /// 把读到的选区发给 Server，等它回翻译候选帧。空选区时 Server 不进入翻译、回空帧。
+    /// `unreadable` 是文档拒绝读取（不是没选中），Server 据此改用别的办法取。
     pub fn selection(
         &mut self,
         request: u64,
         text: String,
         rect: ScreenRect,
+        unreadable: bool,
     ) -> Result<KeyResponse, ClientError> {
         let message = ClientMessage::Selection {
             session: self.session,
             request,
             text,
             rect,
+            unreadable,
         };
         match self.call(&message)? {
             ServerMessage::KeyResult {
@@ -164,9 +167,12 @@ impl<S: Read + Write> EngineClient<S> {
     }
 
     /// 问 Server 有没有待处理的目标模式，顺路取回最新的按键行为设置（每一拍都带）。
-    pub fn sync_mode(&mut self, accepts_commit: bool) -> Result<ModeSyncReply, ClientError> {
+    /// 有焦点文档时才声明能上屏、能读选区：那时才写得进、读得到。
+    pub fn sync_mode(&mut self, has_document: bool) -> Result<ModeSyncReply, ClientError> {
         match self.call(&ClientMessage::SyncMode {
-            accepts_commit,
+            accepts_commit: has_document,
+            reads_selection: has_document,
+            in_place_review: true,
             session: self.session,
         })? {
             ServerMessage::ModeSync {
@@ -175,6 +181,9 @@ impl<S: Read + Write> EngineClient<S> {
                 vietnamese,
                 input,
                 indicator,
+                read_selection,
+                review_selection,
+                start_review,
                 ..
             } => Ok(ModeSyncReply {
                 commit,
@@ -182,6 +191,9 @@ impl<S: Read + Write> EngineClient<S> {
                 vietnamese,
                 input,
                 indicator,
+                read_selection,
+                review_selection,
+                start_review,
             }),
             _ => Err(ClientError::Unexpected("expected mode sync")),
         }

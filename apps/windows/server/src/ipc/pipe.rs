@@ -83,6 +83,12 @@ pub fn serve_pipe(
             Ok(Work::Wake) => router.tick(),
             Ok(Work::VoiceCancel) => router.cancel_hotkey_voice(),
             Ok(Work::OpenTranslator) => router.open_translator(),
+            Ok(Work::TranslateInPlace) => router.translate_in_place(),
+            Ok(Work::SelectionProbed {
+                request,
+                text,
+                rect,
+            }) => router.selection_probed(request, text, rect),
             Ok(Work::VoiceKey { down }) => router.handle_hotkey_voice(down),
             Err(RecvTimeoutError::Timeout) => continue,
             Err(RecvTimeoutError::Disconnected) => {

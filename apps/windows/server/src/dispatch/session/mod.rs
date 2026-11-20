@@ -35,7 +35,7 @@ impl Router {
         self.engine.is_private()
     }
 
-    fn focused_private(&self) -> bool {
+    pub(super) fn focused_private(&self) -> bool {
         self.focused
             .and_then(|session| self.sessions.get(&session))
             .is_some_and(|info| info.private)

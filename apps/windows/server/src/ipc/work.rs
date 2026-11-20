@@ -24,6 +24,16 @@ pub enum Work {
     /// 全局语音热键（Server 的低级键盘钩子发出）：`down` 为真开始听，为假说完。
     VoiceCancel,
     OpenTranslator,
+
+    /// 双击右 Shift：原地翻译选中的文字。
+    TranslateInPlace,
+
+    /// 界面层取完选中文字（原地翻译的兜底取法）。
+    SelectionProbed {
+        request: u64,
+        text: Option<String>,
+        rect: Option<qingjian_platform::protocol::ScreenRect>,
+    },
     VoiceKey {
         down: bool,
     },

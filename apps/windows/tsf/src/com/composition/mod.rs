@@ -144,6 +144,15 @@ fn commit_text(shared: &Shared, context: &ITfContext, ec: u32, text: &str) -> Re
             shared.set_composition(None);
         }
         None => {
+            // 「翻译选中文字」接受译文：替换评审开始时记下的选区，不信回车时的当前选区（可能已收成光标）
+            if let Some(range) = shared.take_review_range() {
+                match unsafe { range.SetText(ec, 0, &utf16) } {
+                    Ok(()) => return move_selection_to_end(context, ec, &range),
+                    Err(error) => super::log::log(&format!(
+                        "翻译评审：替换记下的选区失败，改在当前选区插入: {error}"
+                    )),
+                }
+            }
             let insert: ITfInsertAtSelection = context.cast()?;
             // 标志不能用 NOQUERY：它不回传 range，windows-rs 会把 NULL 当失败。
             let range = unsafe {

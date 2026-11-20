@@ -8,7 +8,8 @@ use crate::dispatch::Router;
 impl Router {
     /// 拉一次云联想结果：云端词并进候选布局，整句补全记下；翻译评审时结果是译文。
     pub(in crate::dispatch) fn poll_prediction(&mut self) {
-        if !self.engine.prediction_enabled() {
+        // 只开有道时云联想是空实现，但选区翻译的结果走翻译通道，也要来取
+        if !self.engine.prediction_enabled() && !self.engine.translation_enabled() {
             return;
         }
         let Some(prediction) = self.engine.poll_prediction() else {

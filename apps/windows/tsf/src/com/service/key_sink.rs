@@ -108,7 +108,12 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             return Ok(FALSE);
         };
         let event = preserved::key_event(combo, self.mode_state.english());
-        Ok(self.forward_key(pic, event).into())
+        let eaten = self.forward_key(pic, event);
+        if eaten {
+            // 主键被吃，Alt 单独松开会让应用进菜单访问键模式、夺走焦点，刚开始的翻译评审随即被结束
+            crate::com::key::mask::mask_menu_activation();
+        }
+        Ok(eaten.into())
     }
 }
 

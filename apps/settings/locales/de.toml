@@ -206,6 +206,7 @@ aux_scheme = "Hilfscode-Schema"
 aux_scheme_info = "Einen Hilfscode-Satz wählen"
 
 [about]
+logs_info = "Für Fehlerberichte „Auf dem Schreibtisch bündeln“ wählen und die ZIP-Datei senden. Protokolle enthalten keine Aufnahmen, Schlüssel in der Konfiguration werden entfernt"
 license = "Freie Software unter der Lizenz GPL-3.0-or-later: Sie darf frei genutzt, verändert und weitergegeben werden; veränderte Versionen müssen ebenfalls quelloffen weitergegeben werden. Über die offiziellen Kanäle kostenlos."
 source_dictionary = "Wörterbuch"
 source_dictionary_text = "Tabelle der allgemein gebräuchlichen Standardschriftzeichen; Lexikon gebräuchlicher Wörter des modernen Chinesisch (Korrekturfassung von liuxilu); THUOCL (NLP-Labor der Tsinghua-Universität, MIT); Lesungen aus Unihan (Unicode License v3)."
@@ -312,6 +313,11 @@ commit_candidate_info = "Beim Pinyin-Tippen drücken, um den markierten Kandidat
 commit_raw_info = "Beim Pinyin-Tippen drücken, um die getippten Buchstaben unverändert zu übernehmen"
 
 [shortcut]
+translate_double_shift = "Rechte Umschalttaste zweimal drücken übersetzt direkt"
+translate_double_shift_info = "Text markieren und rechte Umschalttaste zweimal schnell drücken; die Übersetzung erscheint als Kandidat. Eingabe ersetzt den Text, Esc behält ihn. Schaltet Umschalt Chinesisch/Englisch um, schaltet ein Doppeldruck zweimal"
+translator_info = "Markierter Text wird ins Fenster übernommen und sofort übersetzt"
+translator_double_ctrl = "Rechte Strg-Taste zweimal drücken öffnet den Übersetzer"
+translator_double_ctrl_info = "Rechte Strg-Taste zweimal schnell drücken; markierter Text wird sofort übersetzt. Einfaches Drücken funktioniert wie gewohnt; schaltet Strg Chinesisch/Englisch um, schaltet ein Doppeldruck zweimal"
 translator = "Übersetzungsfenster öffnen"
 translation = "Erste Übersetzung übernehmen"
 translation_second = "Zweite Übersetzung übernehmen"

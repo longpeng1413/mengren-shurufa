@@ -61,6 +61,8 @@ fn final_is_delivered_once_with_legacy_poll_fallback() {
     let sync = |r: &mut Router, accepts_commit| match r.handle(ClientMessage::SyncMode {
         session,
         accepts_commit,
+        reads_selection: false,
+        in_place_review: false,
     }) {
         Some(ServerMessage::ModeSync { commit, .. }) => commit,
         _ => panic!("mode sync"),
@@ -112,6 +114,8 @@ fn voice_uses_native_focus_and_drops_result_on_window_change() {
     let sync = |r: &mut Router, session| match r.handle(ClientMessage::SyncMode {
         session,
         accepts_commit: true,
+        reads_selection: false,
+        in_place_review: false,
     }) {
         Some(ServerMessage::ModeSync { commit, .. }) => commit,
         _ => panic!("mode sync"),
@@ -206,6 +210,8 @@ fn releasing_the_key_waits_for_the_last_capture_packet() {
     router.handle(ClientMessage::SyncMode {
         session,
         accepts_commit: true,
+        reads_selection: false,
+        in_place_review: false,
     });
     let (sender, receiver) = mpsc::channel();
     let receiver = Mutex::new(Some(receiver));
@@ -265,6 +271,8 @@ fn open(router: &mut Router) -> Notes {
     router.handle(ClientMessage::SyncMode {
         session: SessionId(1),
         accepts_commit: true,
+        reads_selection: false,
+        in_place_review: false,
     });
     let notes = Notes::default();
     router.set_voice_sink(Box::new(notes.clone()));
@@ -366,5 +374,48 @@ fn empty_results_explain_silence_or_ask_to_repeat() {
         assert!(router.voice.active.is_none());
         assert_eq!(notes.last().as_deref(), Some(tr(expected)));
         assert!(router.take_async_commit(SessionId(1)).is_none());
+    }
+}
+
+#[test]
+fn noise_like_results_are_not_typed() {
+    use super::meaningful;
+    for noise in ["ㄱ.", "ㄱ.ㄱ.", "。", "…", " ? ", "ᄀ"] {
+        assert!(!meaningful(noise), "{noise}");
+    }
+    for text in ["你好", "ok", "3", "こんにちは", "안녕", "Ünïcode", "１"] {
+        assert!(meaningful(text), "{text}");
+    }
+}
+
+#[test]
+fn text_from_dead_silence_is_discarded_with_a_mic_hint() {
+    use qingjian_platform::windows_text::tr;
+    use std::sync::Mutex;
+
+    for (level, typed) in [(0.00003, false), (0.2, true)] {
+        let mut router = router();
+        let notes = open(&mut router);
+        let (level_tx, level_rx) = mpsc::channel();
+        let slot = Mutex::new(Some(level_rx));
+        router.set_voice_capture(Some(Arc::new(move || {
+            Ok(Capture {
+                pcm: mpsc::channel().1,
+                level: slot.lock().unwrap().take(),
+                stop: Arc::default(),
+                failure: None,
+            })
+        })));
+        router.toggle_status_voice();
+        level_tx.send(level).unwrap();
+        router.advance_voice();
+        router.toggle_status_voice();
+        router.advance_voice();
+        router.advance_voice();
+        let delivered = router.take_async_commit(SessionId(1));
+        assert_eq!(delivered.is_some(), typed, "level {level}");
+        if !typed {
+            assert_eq!(notes.last().as_deref(), Some(tr("mic_silent")));
+        }
     }
 }

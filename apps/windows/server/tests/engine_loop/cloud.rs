@@ -262,6 +262,8 @@ fn manual_shortcut_is_configurable_and_private_and_english_input_stay_local() {
     router.engine_mut().set_predictor(Box::new(cloud.clone()));
     match router.handle(ClientMessage::SyncMode {
         accepts_commit: true,
+        reads_selection: false,
+        in_place_review: false,
         session: SESSION,
     }) {
         Some(ServerMessage::ModeSync { input, .. }) => {

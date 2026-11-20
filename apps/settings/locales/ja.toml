@@ -206,6 +206,7 @@ aux_scheme = "補助コード方式"
 aux_scheme_info = "補助コードのセットを選びます"
 
 [about]
+logs_info = "問題を報告するときは「デスクトップにまとめる」を押し、作成された zip を送ってください。録音内容は含まれず、設定内のキーは消去されます"
 license = "フリーソフトウェア（GPL-3.0-or-later ライセンス）：自由に使用・改変・再配布でき、改変版を配布する場合は同じくオープンソースにする必要があります。公式の入手先からは無料です。"
 source_dictionary = "辞書"
 source_dictionary_text = "通用規範漢字表、現代漢語常用詞表（liuxilu 校訂版）、THUOCL（清華大学自然言語処理研究室、MIT）。読みは Unihan（Unicode License v3）によります。"
@@ -312,6 +313,11 @@ commit_candidate_info = "ピンイン入力中に押すとハイライトした�
 commit_raw_info = "ピンイン入力中に押すと打った英字をそのまま確定します"
 
 [shortcut]
+translate_double_shift = "右 Shift を 2 回押してその場で翻訳"
+translate_double_shift_info = "文字を選択して右 Shift を素早く 2 回押すと、訳文が候補に出ます。Enter で置き換え、Esc で元のまま。Shift を中英切り替えキーにしている場合は 2 回切り替わります"
+translator_info = "文字を選択してから押すと、その文字をウィンドウに取り込んで翻訳します"
+translator_double_ctrl = "右 Ctrl を 2 回押して翻訳ウィンドウを開く"
+translator_double_ctrl_info = "右 Ctrl を素早く 2 回押します。選択した文字はそのまま翻訳されます。右 Ctrl の 1 回押しは通常どおり使えます。Ctrl を中英切り替えキーにしている場合は 2 回切り替わります"
 translator = "翻訳ウィンドウを開く"
 translation = "1 つ目の訳語を確定"
 translation_second = "2 つ目の訳語を確定"

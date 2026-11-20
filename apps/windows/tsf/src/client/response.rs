@@ -15,6 +15,15 @@ pub struct ModeSyncReply {
 
     /// 右键菜单打勾用的开关状态，同样每一拍都带。
     pub indicator: IndicatorState,
+
+    /// Server 请读选区（翻译窗口带入选中文字）；读完用这个请求号回 `Selection`。
+    pub read_selection: Option<u64>,
+
+    /// 上面的读选区是给原地翻译的（按「翻译选中文字」读）。
+    pub review_selection: bool,
+
+    /// Server 已取到选中文字：进入评审态。
+    pub start_review: bool,
 }
 
 /// Server 对一次按键的处理结果。

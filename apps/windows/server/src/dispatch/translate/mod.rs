@@ -2,6 +2,7 @@
 //! 与 macOS 壳对齐；引擎调用在 Core。替换选区靠回给 DLL 的 `commit`：无组句时 `InsertTextAtSelection` 正好替换选区。
 //! 进行态在 [`Translation`]。
 
+mod in_place;
 mod job;
 
 use qingjian_core::{Candidate, CandidateKind, CandidateList};
@@ -9,6 +10,8 @@ use qingjian_platform::protocol::{
     Frame, KeyEvent, KeyModifiers, KeyOutcome, ScreenRect, ServerMessage, SessionId,
 };
 
+pub(super) use self::in_place::InPlace;
+pub use self::in_place::SelectionProbe;
 pub(super) use self::job::Translation;
 use super::Router;
 use super::key::{ESCAPE, RETURN};
@@ -36,6 +39,7 @@ impl Router {
         request: u64,
         text: String,
         rect: ScreenRect,
+        unreadable: bool,
     ) -> ServerMessage {
         let empty = ServerMessage::KeyResult {
             session,
@@ -44,13 +48,30 @@ impl Router {
             frame: Frame::default(),
             english: None,
         };
+        // 翻译窗口快捷键要的选区：交给窗口，不进原地评审
+        if self.translator_selection(session, request, &text, unreadable) {
+            return empty;
+        }
+        // 双击右 Shift 借空闲同步读的选区：焦点对齐到这个会话，后面与 Ctrl+Alt+T 同一套评审
+        self.claim_in_place_selection(session, request);
         if self.focused != Some(session) || self.pending_selection != Some(request) {
             return empty;
         }
         self.pending_selection = None;
         let text = text.trim();
-        if text.is_empty() || !self.engine.prediction_enabled() {
-            tracing::info!("翻译选中文字：没有可读的选区（或云服务已关）");
+        if !self.engine.translation_enabled() {
+            tracing::info!("翻译选中文字：翻译服务没开");
+            return empty;
+        }
+        if text.is_empty() && self.focused_private() {
+            tracing::info!("翻译选中文字：私密输入不改用别的办法取");
+            return empty;
+        }
+        if text.is_empty() {
+            // 微信、WPS、原生 EDIT 这类经兼容层的程序报的选区总是空的：改用辅助接口 / 模拟复制取
+            tracing::info!(unreadable, "翻译选中文字：输入法读不到选区，改用别的办法取");
+            self.last_rect = Some(rect);
+            self.start_probe(session, request);
             return empty;
         }
         self.last_rect = Some(rect);
@@ -94,6 +115,7 @@ impl Router {
 
     /// 结束评审：丢进行态、取消在飞的请求、收起候选窗。没在评审时是空操作。
     pub(super) fn end_translation(&mut self) {
+        self.drop_in_place_start();
         if self.translation.take().is_some() {
             self.cancel_prediction();
             self.hide_candidate_window();

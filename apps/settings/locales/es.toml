@@ -206,6 +206,7 @@ aux_scheme = "Esquema de código auxiliar"
 aux_scheme_info = "Elige un conjunto de códigos auxiliares"
 
 [about]
+logs_info = "Para informar de un problema, pulsa Empaquetar en el escritorio y envía el zip. Los registros no incluyen grabaciones y se borran las claves de la configuración"
 license = "Software libre con licencia GPL-3.0-or-later: puedes usarlo, modificarlo y redistribuirlo libremente, y las versiones modificadas también deben distribuirse como código abierto. Gratuito en los canales oficiales."
 source_dictionary = "Diccionario"
 source_dictionary_text = "Tabla de caracteres chinos estándar de uso general; Léxico de palabras comunes del chino moderno (revisión de liuxilu); THUOCL (Laboratorio de PLN de la Universidad Tsinghua, MIT); lecturas de Unihan (Unicode License v3)."
@@ -312,6 +313,11 @@ commit_candidate_info = "Púlsala al escribir pinyin para confirmar el candidato
 commit_raw_info = "Púlsala al escribir pinyin para confirmar las letras tecleadas tal cual"
 
 [shortcut]
+translate_double_shift = "Pulsa dos veces Shift derecho para traducir en el sitio"
+translate_double_shift_info = "Selecciona texto y pulsa Shift derecho dos veces; la traducción aparece como candidata. Intro reemplaza el texto y Esc lo conserva. Si Shift cambia chino/inglés, la doble pulsación cambia dos veces"
+translator_info = "Con texto seleccionado, se lleva a la ventana y se traduce"
+translator_double_ctrl = "Pulsa dos veces Ctrl derecho para abrir el traductor"
+translator_double_ctrl_info = "Pulsa Ctrl derecho dos veces seguidas; el texto seleccionado se traduce al momento. Una sola pulsación de Ctrl derecho sigue funcionando; si Ctrl cambia chino/inglés, la doble pulsación cambia dos veces"
 translator = "Abrir traductor"
 translation = "Confirmar la primera traducción"
 translation_second = "Confirmar la segunda traducción"

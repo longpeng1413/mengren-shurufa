@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput,
-    VIRTUAL_KEY, VK_CONTROL, VK_V,
+    INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT, KEYEVENTF_KEYUP,
+    MAPVK_VK_TO_VSC, MapVirtualKeyW, SendInput, VIRTUAL_KEY, VK_CONTROL, VK_V,
 };
 use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, SetForegroundWindow};
 
@@ -78,12 +78,14 @@ pub fn refocus(target: isize) {
     });
 }
 
+/// 带扫描码：Flutter 按扫描码认键，扫描码为 0 的模拟 Ctrl+V 它不当粘贴（猛人快传实测同类的 Ctrl+C）。
 fn key(code: VIRTUAL_KEY, up: bool) -> INPUT {
     INPUT {
         r#type: INPUT_KEYBOARD,
         Anonymous: INPUT_0 {
             ki: KEYBDINPUT {
                 wVk: code,
+                wScan: unsafe { MapVirtualKeyW(u32::from(code.0), MAPVK_VK_TO_VSC) } as u16,
                 dwFlags: if up {
                     KEYEVENTF_KEYUP
                 } else {

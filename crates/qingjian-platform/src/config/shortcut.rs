@@ -38,13 +38,20 @@ pub struct ShortcutConfig {
     /// 数字键配这些修饰键：上屏候选的第二个译词（候选右侧有两个译词时）。
     pub translation_second: Modifiers,
 
-    /// 把应用里选中的文字译成学习语言（需要云服务开着）。
+    /// 把应用里选中的文字译成学习语言（需要有道翻译或 AI 服务开着）。
     pub translate_selection: KeyCombo,
 
-    /// 组句中按需调用 AI（缺省 Ctrl+Alt+J，macOS 是 ⌃⌥J）。
+    /// 打开 / 收起翻译窗口（Windows，缺省 Ctrl+Alt+F，空串关闭）；选中了文字会带进窗口翻译。
     #[serde(with = "super::optional_key_combo")]
     pub translator: Option<KeyCombo>,
 
+    /// 双击右 Ctrl 打开 / 收起翻译窗口（Windows），与 `translator` 组合键并存。
+    pub translator_double_ctrl: bool,
+
+    /// 双击右 Shift 把选中的文字原地翻译成候选，回车替换（Windows）。
+    pub translate_double_shift: bool,
+
+    /// 组句中按需调用 AI（缺省 Ctrl+Alt+J，macOS 是 ⌃⌥J）。
     pub predict: KeyCombo,
 
     /// 没在打字时打开符号面板的翻译组（缺省 Ctrl+Alt+Y，macOS 是 ⌃⌥Y；需要云服务开着）。
@@ -99,6 +106,8 @@ impl Default for ShortcutConfig {
             translation_second,
             translate_selection,
             translator: Some(KeyCombo::TRANSLATOR_DEFAULT),
+            translator_double_ctrl: true,
+            translate_double_shift: true,
             predict: KeyCombo::PREDICT_DEFAULT,
             translate_panel: KeyCombo::TRANSLATE_PANEL_DEFAULT,
             clipboard: KeyCombo::CLIPBOARD_DEFAULT,

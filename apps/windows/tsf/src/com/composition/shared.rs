@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use windows::Win32::UI::TextServices::{ITfComposition, ITfContext};
+use windows::Win32::UI::TextServices::{ITfComposition, ITfContext, ITfRange};
 
 use qingjian_platform::protocol::{Frame, ScreenRect};
 
@@ -32,6 +32,10 @@ pub(crate) struct Shared {
     /// 「翻译选中文字」评审进行中：所有键交给 Server 定接受 / 取消，轮询定时器照常拉云端译文。
     translating: Cell<bool>,
 
+    /// 评审开始时读到的选区范围：接受译文时直接替换它。有的编辑器（ChatGPT 桌面版等）在候选窗出来后
+    /// 把选区收成光标，按「当前选区」插入就成了插在旁边。结束评审时清掉。
+    review_range: RefCell<Option<ITfRange>>,
+
     /// 最近一次收键的文档上下文；失焦 / 停用回调不带上下文，落定拼音要用它。
     last_context: RefCell<Option<ITfContext>>,
 
@@ -58,6 +62,7 @@ impl Shared {
             context_reported: Cell::new(false),
             text_box: Cell::new(false),
             translating: Cell::new(false),
+            review_range: RefCell::new(None),
             last_context: RefCell::new(None),
             server_stale: Cell::new(false),
             foreground: Cell::new(false),
@@ -144,6 +149,20 @@ impl Shared {
 
     pub(crate) fn set_translating(&self, value: bool) {
         self.translating.set(value);
+        if !value {
+            self.review_range.replace(None);
+        }
+    }
+
+    /// 评审开始：记下选区范围，接受时替换它。
+    pub(crate) fn start_review(&self, range: ITfRange) {
+        self.translating.set(true);
+        self.review_range.replace(Some(range));
+    }
+
+    /// 取走评审的选区范围（只用一次）。
+    pub(crate) fn take_review_range(&self) -> Option<ITfRange> {
+        self.review_range.take()
     }
 
     /// 通知 Server 收起候选窗口。引擎正被别处借着或没连上时静默跳过。

@@ -206,6 +206,7 @@ aux_scheme = "Kiểu mã phụ"
 aux_scheme_info = "Chọn một bộ mã phụ"
 
 [about]
+logs_info = "Khi báo lỗi, bấm Đóng gói ra màn hình nền và gửi tệp zip trên màn hình. Nhật ký không chứa nội dung ghi âm, khóa trong cấu hình đã được xóa"
 license = "Phần mềm tự do theo giấy phép GPL-3.0-or-later: được tự do sử dụng, sửa đổi và phân phối lại, bản sửa đổi khi phân phối cũng phải mở mã nguồn. Miễn phí qua các kênh chính thức."
 source_dictionary = "Từ điển"
 source_dictionary_text = "Bảng chữ Hán quy phạm thông dụng; Bảng từ thông dụng tiếng Hán hiện đại (bản hiệu đính của liuxilu); THUOCL (Phòng thí nghiệm Xử lý ngôn ngữ tự nhiên, Đại học Thanh Hoa, MIT); cách đọc lấy từ Unihan (Unicode License v3)."
@@ -312,6 +313,11 @@ commit_candidate_info = "Nhấn khi gõ pinyin để đưa gợi ý đang sáng 
 commit_raw_info = "Nhấn khi gõ pinyin để đưa nguyên các chữ cái đã gõ lên"
 
 [shortcut]
+translate_double_shift = "Bấm đúp Shift phải để dịch tại chỗ"
+translate_double_shift_info = "Chọn chữ rồi bấm nhanh Shift phải hai lần; bản dịch hiện trong ô gợi ý. Enter thay thế, Esc giữ nguyên. Nếu Shift là phím chuyển Trung/Anh thì bấm đúp sẽ chuyển hai lần"
+translator_info = "Khi đang chọn chữ, chữ sẽ được đưa vào cửa sổ và dịch ngay"
+translator_double_ctrl = "Bấm đúp Ctrl phải để mở cửa sổ dịch"
+translator_double_ctrl_info = "Bấm nhanh Ctrl phải hai lần; chữ đang chọn sẽ được dịch ngay. Bấm Ctrl phải một lần vẫn dùng bình thường; nếu Ctrl là phím chuyển Trung/Anh thì bấm đúp sẽ chuyển hai lần"
 translator = "Mở cửa sổ dịch"
 translation = "Đưa lên bản dịch thứ nhất"
 translation_second = "Đưa lên bản dịch thứ hai"

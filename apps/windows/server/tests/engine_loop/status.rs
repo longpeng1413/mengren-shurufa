@@ -104,6 +104,8 @@ fn status_bar_and_mode_sync_show_vietnamese() {
     assert_eq!(recorder.calls().last(), Some(&Some("越".to_owned())));
     match router.handle(ClientMessage::SyncMode {
         accepts_commit: true,
+        reads_selection: false,
+        in_place_review: false,
         session: SessionId(2),
     }) {
         Some(ServerMessage::ModeSync {
@@ -205,6 +207,8 @@ fn mode_is_shared_by_every_app() {
 fn synced_mode(router: &mut Router, session: SessionId) -> Option<bool> {
     match router.handle(ClientMessage::SyncMode {
         accepts_commit: true,
+        reads_selection: false,
+        in_place_review: false,
         session,
     }) {
         Some(ServerMessage::ModeSync { english, .. }) => english,

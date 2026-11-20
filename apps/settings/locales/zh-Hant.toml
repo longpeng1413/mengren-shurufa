@@ -206,6 +206,7 @@ aux_scheme = "輔碼方案"
 aux_scheme_info = "選一套輔碼"
 
 [about]
+logs_info = "回報問題時點「打包到桌面」，把桌面上產生的壓縮檔傳給作者；日誌不含錄音內容，設定裡的金鑰已抹除"
 license = "自由軟件，GPL-3.0-or-later 許可證：可以自由使用、修改與再分發，修改後分發須同樣開源。官方渠道免費。"
 source_dictionary = "詞庫"
 source_dictionary_text = "通用規範漢字表；現代漢語常用詞表（liuxilu 校對版）；THUOCL（清華大學自然語言處理實驗室，MIT）；讀音取自 Unihan（Unicode License v3）。"
@@ -313,6 +314,11 @@ commit_candidate_info = "打拼音時按它上屏高亮的候選"
 commit_raw_info = "打拼音時按它把敲的字母原樣上屏"
 
 [shortcut]
+translate_double_shift = "連按兩下右 Shift 原地翻譯"
+translate_double_shift_info = "選取文字後快速連按兩下右 Shift，譯文出現在候選框，Enter 取代原文、Esc 保留。若中英切換鍵是 Shift，連按會切換兩次"
+translator_info = "選取文字後按，會把文字帶進視窗直接翻譯"
+translator_double_ctrl = "連按兩下右 Ctrl 開啟翻譯視窗"
+translator_double_ctrl_info = "快速連按兩下右 Ctrl；選取了文字會帶進視窗直接翻譯。單按右 Ctrl 照常可用；若把 Ctrl 設為中英切換鍵，連按會切換兩次"
 translator = "開啟翻譯視窗"
 translation = "上屏第一個譯詞"
 translation_second = "上屏第二個譯詞"

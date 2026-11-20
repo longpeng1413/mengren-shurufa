@@ -129,6 +129,7 @@ pub fn shortcuts(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, Rende
         )?;
         rows.push(
             SettingRow::new(tr("shortcut.translator"))
+                .info(tr("shortcut.translator_info"))
                 .control(toggle)
                 .build(ui, theme)?,
         );
@@ -137,6 +138,24 @@ pub fn shortcuts(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, Rende
             page,
             Shortcut::Translator,
             tr("shortcut.need_two_modifiers"),
+            false,
+        )?);
+        rows.push(crate::view::parts::controls::toggle_info(
+            ui,
+            page,
+            tr("shortcut.translator_double_ctrl"),
+            Some(tr("shortcut.translator_double_ctrl_info")),
+            ("shortcut", "translator_double_ctrl"),
+            config.shortcut.translator_double_ctrl,
+            false,
+        )?);
+        rows.push(crate::view::parts::controls::toggle_info(
+            ui,
+            page,
+            tr("shortcut.translate_double_shift"),
+            Some(tr("shortcut.translate_double_shift_info")),
+            ("shortcut", "translate_double_shift"),
+            config.shortcut.translate_double_shift,
             false,
         )?);
     }

@@ -15,6 +15,16 @@ impl Settings {
                 "translator",
                 qingjian_platform::KeyCombo::TRANSLATOR_DEFAULT.key_string(),
             );
+            self.write(
+                "shortcut",
+                "translator_double_ctrl",
+                defaults.translator_double_ctrl,
+            );
+            self.write(
+                "shortcut",
+                "translate_double_shift",
+                defaults.translate_double_shift,
+            );
         }
         self.write("general", "page_keys", PAGE_KEY_OPTIONS[0]);
         self.write(

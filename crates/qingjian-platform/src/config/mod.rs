@@ -243,9 +243,14 @@ switch_mode = ["shift"]
 # 任意修饰键组合（alt / shift / ctrl / win 用 + 连）。Alt+数字会被 Windows 当菜单快捷键截走，缺省用 Ctrl；组句时才拦，不打字时照常放行给应用
 translation = "ctrl"
 translation_second = "shift+ctrl"
-# 把应用里选中的文字译成学习语言（要开着云服务）：译文先出现在候选窗口，回车替换选中的文字，Esc 保留原文
+# 把应用里选中的文字译成学习语言（要开着有道翻译或 AI 服务）：译文先出现在候选窗口，回车替换选中的文字，Esc 保留原文
 translate_selection = "ctrl+alt+t"
+# 打开 / 收起翻译窗口；选中了文字会带进窗口直接翻译。空串 "" 关闭
 translator = "ctrl+alt+f"
+# 双击右 Ctrl 同样打开 / 收起翻译窗口；false 关闭
+translator_double_ctrl = true
+# 双击右 Shift 把选中的文字原地翻译成候选，回车替换原文、Esc 保留；false 关闭
+translate_double_shift = true
 # Windows 组句中按需调用 AI
 predict = "ctrl+alt+j"
 # 没在打字时打开符号面板的「翻译」组（要开着云服务）：框里打一句，译文停顿后出现在光标处，回车上屏

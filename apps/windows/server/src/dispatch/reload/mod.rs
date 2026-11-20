@@ -33,6 +33,7 @@ fn mtime(path: &Path) -> Option<SystemTime> {
 
 /// 按 `[predict]` 接云联想与释义兜底；关着或缺密钥就退回本地实现。启动与热加载共用。
 pub fn attach_cloud(engine: &mut Engine, predict: &PredictConfig, usage_path: Option<PathBuf>) {
+    attach_translation(engine, predict);
     if !predict.enabled {
         tracing::info!("云联想未开启（[predict] enabled = false）");
         engine.set_predictor(Box::new(NoPredictor));
@@ -59,6 +60,28 @@ pub fn attach_cloud(engine: &mut Engine, predict: &PredictConfig, usage_path: Op
         }
     } else {
         engine.set_gloss_filler(Box::new(NoGlossFiller));
+    }
+}
+
+/// 开了有道就把它接成「显式翻译」专用通道（翻译选中文字等）：只开有道、不开 AI 云联想时，
+/// 云联想换成了空实现，原先选区翻译因此整个不可用。用量不计入 AI 用量文件，与翻译窗口一致。
+fn attach_translation(engine: &mut Engine, predict: &PredictConfig) {
+    if !predict.youdao.enabled {
+        engine.set_translation_predictor(None);
+        return;
+    }
+    let mut config = predict.clone();
+    config.debounce_ms = 0;
+    config.min_interval_ms = 0;
+    match CloudPredictor::new(&config) {
+        Ok(predictor) => {
+            engine.set_translation_predictor(Some(Box::new(predictor)));
+            tracing::info!("selection translation uses Youdao");
+        }
+        Err(error) => {
+            tracing::warn!(%error, "Youdao translation unavailable");
+            engine.set_translation_predictor(None);
+        }
     }
 }
 

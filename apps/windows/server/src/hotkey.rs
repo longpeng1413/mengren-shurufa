@@ -2,7 +2,7 @@
 //!
 //! 低级键盘 / 鼠标钩子装在专用线程上：钩子回调必须在 LowLevelHooksTimeout（约 1 秒）内返回，
 //! 超时多次后系统会静默卸掉钩子，放在要画候选窗的 UI 线程上，机器一卡快捷键就永久失灵。
-use crate::dispatch::VoiceInsertResult;
+use crate::dispatch::{TranslatorKeys, VoiceInsertResult};
 use crate::ipc::Work;
 use qingjian_platform::foreground::InputFocus;
 use qingjian_platform::{KeyCombo, VoiceConfig, VoiceHotkey, global_hotkey};
@@ -17,8 +17,10 @@ use windows::Win32::System::Threading::{
     GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_HIGHEST,
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
-    KEYEVENTF_UNICODE, SendInput, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+    GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBD_EVENT_FLAGS, KEYBDINPUT,
+    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC, MapVirtualKeyW,
+    SendInput, VIRTUAL_KEY, VK_CONTROL, VK_LCONTROL, VK_LWIN, VK_MENU, VK_RCONTROL as RIGHT_CTRL,
+    VK_RWIN, VK_SHIFT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG,
@@ -41,7 +43,24 @@ struct State {
     swallowed: Vec<u32>,
     /// 吞掉了带 Win / Alt 的组合主键：钩子返回后补发遮罩键，免得松开 Win 弹开始菜单、松开 Alt 激活菜单栏。
     mask: bool,
+    /// 双击右 Ctrl 打开翻译窗口。
+    double_ctrl: bool,
+    /// 双击右 Shift 原地翻译。
+    double_shift: bool,
+    /// 这次单独按下的右 Ctrl / 右 Shift 及时刻；中途按了别的键就作废。
+    tap_press: Option<(u32, Instant)>,
+    /// 上一次「单独、快速」松开的右 Ctrl / 右 Shift 及时刻。
+    last_tap: Option<(u32, Instant)>,
 }
+
+/// 右 Ctrl 的虚拟键码。
+const VK_RCONTROL: u32 = 0xA3;
+/// 右 Shift 的虚拟键码。
+const VK_RSHIFT: u32 = 0xA1;
+/// 按下到松开不超过它才算轻点。
+const TAP_MAX: Duration = Duration::from_millis(300);
+/// 上一次轻点松开到这一次按下不超过它才算双击。
+const DOUBLE_GAP: Duration = Duration::from_millis(400);
 fn combo(value: Option<KeyCombo>) -> Option<Combo> {
     let value = value?;
     let m = value.modifiers;
@@ -49,7 +68,7 @@ fn combo(value: Option<KeyCombo>) -> Option<Combo> {
     Some((mods.0, key))
 }
 impl State {
-    fn configure(&mut self, voice: &VoiceConfig, translator: Option<KeyCombo>) {
+    fn configure(&mut self, voice: &VoiceConfig, translator: TranslatorKeys) {
         self.pending = None;
         if self.held_voice.take().is_some() {
             let _ = self.work.send(Work::VoiceCancel);
@@ -57,7 +76,11 @@ impl State {
         self.voice = voice.trigger();
         self.hold = Duration::from_millis(voice.hold_ms);
         self.speak = combo(voice.shortcut);
-        self.translate = combo(translator);
+        self.translate = combo(translator.combo);
+        self.double_ctrl = translator.double_ctrl;
+        self.double_shift = translator.double_shift;
+        self.tap_press = None;
+        self.last_tap = None;
     }
     fn key(&mut self, vk: u32, down: bool, injected: bool, now: Instant) -> bool {
         if injected {
@@ -78,6 +101,22 @@ impl State {
             _ => 0,
         };
         if physical != 0 {
+            // 按住说话时系统对触发键的自动连发不交给程序：连发的「Alt 按下」排在遮罩之后，Claude 这类
+            // Electron 程序当成又单独按了一次 Alt，松开就进菜单模式，删除键、空格被菜单吃掉（2026-11-20 实测）
+            if down && self.modifiers & physical != 0 && self.held_voice == Some(vk) {
+                return true;
+            }
+            let tap_key = matches!(vk, VK_RCONTROL | VK_RSHIFT);
+            if down && self.modifiers & physical == 0 {
+                // 新按下的修饰键：只有「什么都没按着时按右 Ctrl / 右 Shift」才可能是轻点
+                self.tap_press = (tap_key && self.modifiers == 0).then_some((vk, now));
+                if !tap_key {
+                    self.last_tap = None;
+                }
+            }
+            if !down && tap_key {
+                self.tap_released(vk, now);
+            }
             if down {
                 // 按住触发键时又按了别的修饰键（如 Win 后接 Shift 准备截图）：这是组合键，不是说话
                 if self.modifiers & physical == 0 && self.pending.is_some_and(|(key, _)| key != vk)
@@ -108,6 +147,8 @@ impl State {
             return false;
         }
         self.pending = None;
+        self.tap_press = None;
+        self.last_tap = None;
         let mods = (0..4).fold(0, |mask, i| {
             mask | (u32::from(self.modifiers & (3 << (2 * i)) != 0) << i)
         });
@@ -133,6 +174,35 @@ impl State {
     /// 按住触发键期间点了鼠标或滚了滚轮（右 Ctrl + 点击多选、Ctrl + 滚轮缩放）：不是说话。
     fn mouse(&mut self) {
         self.pending = None;
+        self.tap_press = None;
+        self.last_tap = None;
+    }
+    /// 右 Ctrl / 右 Shift 松开：单独、快速、没触发语音的算一次轻点，同一个键两次轻点挨得够近就触发
+    /// （右 Ctrl 开翻译窗口，右 Shift 原地翻译）。这两个键本身照常放行。
+    fn tap_released(&mut self, vk: u32, now: Instant) {
+        let voiced = self.held_voice == Some(vk);
+        let tapped = self
+            .tap_press
+            .take()
+            .filter(|(key, start)| *key == vk && !voiced && now.duration_since(*start) <= TAP_MAX);
+        let Some((_, start)) = tapped else {
+            self.last_tap = None;
+            return;
+        };
+        let (enabled, work) = match vk {
+            VK_RCONTROL => (self.double_ctrl, Work::OpenTranslator),
+            _ => (self.double_shift, Work::TranslateInPlace),
+        };
+        if enabled
+            && self.last_tap.is_some_and(|(key, previous)| {
+                key == vk && start.duration_since(previous) <= DOUBLE_GAP
+            })
+        {
+            self.last_tap = None;
+            let _ = self.work.send(work);
+        } else {
+            self.last_tap = Some((vk, now));
+        }
     }
     fn release(&mut self, vk: u32) {
         if self.held_voice == Some(vk) {
@@ -157,7 +227,7 @@ const MOD_ALT: u32 = 1;
 const MOD_WIN: u32 = 8;
 
 /// 装钩子：配置放进全局状态，钩子在专用线程上装并跑消息循环（低级钩子靠装它的线程取消息才会被调用）。
-pub fn install(work: Sender<Work>, voice: &VoiceConfig, translator: Option<KeyCombo>) {
+pub fn install(work: Sender<Work>, voice: &VoiceConfig, translator: TranslatorKeys) {
     let mut state = State {
         work,
         voice: VoiceHotkey::None,
@@ -169,12 +239,18 @@ pub fn install(work: Sender<Work>, voice: &VoiceConfig, translator: Option<KeyCo
         held_voice: None,
         swallowed: Vec::new(),
         mask: false,
+        double_ctrl: false,
+        double_shift: false,
+        tap_press: None,
+        last_tap: None,
     };
     state.configure(voice, translator);
     tracing::info!(
         trigger = ?state.voice,
         hold_ms = state.hold.as_millis() as u64,
         translator = state.translate.is_some(),
+        double_ctrl = state.double_ctrl,
+        double_shift = state.double_shift,
         "global shortcut configured"
     );
     *STATE.lock().unwrap() = Some(state);
@@ -201,7 +277,7 @@ pub fn install(work: Sender<Work>, voice: &VoiceConfig, translator: Option<KeyCo
         tracing::warn!(%error, "cannot spawn global shortcut thread");
     }
 }
-pub fn reconfigure(voice: &VoiceConfig, translator: Option<KeyCombo>) {
+pub fn reconfigure(voice: &VoiceConfig, translator: TranslatorKeys) {
     if let Some(state) = STATE.lock().unwrap().as_mut() {
         state.configure(voice, translator);
     }
@@ -256,25 +332,44 @@ pub fn tick_hold() {
     }
 }
 
-/// 补发一次未分配的虚拟键 0xE8（按下 + 抬起）：系统看到「修饰键之间夹了别的键」，
-/// 松开 Alt 不激活菜单栏、松开 Win 不弹开始菜单、松开 Ctrl 不被当成单击。
+/// 补发遮罩键：系统看到「修饰键之间夹了别的键」，松开 Win 不弹开始菜单、松开 Alt 不激活菜单栏。
+///
+/// 未分配的虚拟键 0xE8 管得住开始菜单与经典菜单栏，管不住新版记事本这类 WinUI 程序的访问键模式（实测），
+/// Alt 按着时再补按一下没按着的那侧 Ctrl。与 DLL 的 `com::key::mask` 同一做法；注入的键本钩子不理。
 fn send_mask() {
-    {
-        let mut key = KEYBDINPUT {
-            wVk: VIRTUAL_KEY(0xe8),
-            ..Default::default()
+    let held = |key: VIRTUAL_KEY| unsafe { GetAsyncKeyState(key.0.into()) } < 0;
+    let mut inputs = tap(VIRTUAL_KEY(0xe8)).to_vec();
+    if held(VK_MENU) {
+        let ctrl = if held(VK_LCONTROL) {
+            RIGHT_CTRL
+        } else {
+            VK_LCONTROL
         };
-        let down = INPUT {
-            r#type: INPUT_KEYBOARD,
-            Anonymous: INPUT_0 { ki: key },
-        };
-        key.dwFlags = KEYEVENTF_KEYUP;
-        let up = INPUT {
-            r#type: INPUT_KEYBOARD,
-            Anonymous: INPUT_0 { ki: key },
-        };
-        unsafe { SendInput(&[down, up], size_of::<INPUT>() as i32) };
+        inputs.extend(tap(ctrl));
     }
+    unsafe { SendInput(&inputs, size_of::<INPUT>() as i32) };
+}
+
+/// 按下 + 抬起一个键，带扫描码（Flutter 等按扫描码认键）；右 Ctrl 是扩展键。
+fn tap(key: VIRTUAL_KEY) -> [INPUT; 2] {
+    let scan = unsafe { MapVirtualKeyW(u32::from(key.0), MAPVK_VK_TO_VSC) } as u16;
+    let extended = if key == RIGHT_CTRL {
+        KEYEVENTF_EXTENDEDKEY
+    } else {
+        KEYBD_EVENT_FLAGS(0)
+    };
+    let input = |flags: KEYBD_EVENT_FLAGS| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: key,
+                wScan: scan,
+                dwFlags: flags,
+                ..Default::default()
+            },
+        },
+    };
+    [input(extended), input(extended | KEYEVENTF_KEYUP)]
 }
 
 /// 旧 DLL 未取走待上屏文本时，向仍持有焦点的窗口投递 Unicode。全段作为一批键消息，避免分段后焦点转移。
@@ -394,6 +489,10 @@ mod tests {
             held_voice: None,
             swallowed: vec![],
             mask: false,
+            double_ctrl: true,
+            double_shift: true,
+            tap_press: None,
+            last_tap: None,
         };
         let now = Instant::now();
         let later = now + s.hold;
@@ -410,6 +509,9 @@ mod tests {
         assert!(s.tick(later));
         assert!(!s.tick(later));
         assert!(matches!(rx.try_recv(), Ok(Work::VoiceKey { down: true })));
+        // 说话期间触发键的自动连发吞掉，松开照常放行
+        assert!(s.key(0xa5, true, false, later));
+        assert!(s.key(0xa5, true, false, later));
         assert!(!s.key(0xa5, false, false, later));
         assert!(matches!(rx.try_recv(), Ok(Work::VoiceKey { down: false })));
         s.key(0xa5, true, false, now);
@@ -440,6 +542,10 @@ mod tests {
             held_voice: None,
             swallowed: vec![],
             mask: false,
+            double_ctrl: true,
+            double_shift: true,
+            tap_press: None,
+            last_tap: None,
         };
         let now = Instant::now();
         let later = now + s.hold;
@@ -461,6 +567,92 @@ mod tests {
         assert!(std::mem::take(&mut s.mask));
         assert!(s.key(70, false, false, now));
         assert!(matches!(rx.try_recv(), Ok(Work::OpenTranslator)));
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn double_tap_right_ctrl_opens_the_translator() {
+        let (work, rx) = channel();
+        let mut s = State {
+            work,
+            voice: VoiceHotkey::RightAlt,
+            hold: Duration::from_millis(400),
+            speak: None,
+            translate: None,
+            modifiers: 0,
+            pending: None,
+            held_voice: None,
+            swallowed: vec![],
+            mask: false,
+            double_ctrl: true,
+            double_shift: true,
+            tap_press: None,
+            last_tap: None,
+        };
+        let t0 = Instant::now();
+        let at = |ms: u64| t0 + Duration::from_millis(ms);
+        let tap = |s: &mut State, down: u64, up: u64| {
+            assert!(
+                !s.key(VK_RCONTROL, true, false, at(down)),
+                "right Ctrl is never swallowed"
+            );
+            assert!(!s.key(VK_RCONTROL, false, false, at(up)));
+        };
+        // 两下快速轻点：打开
+        tap(&mut s, 0, 80);
+        tap(&mut s, 200, 260);
+        assert!(matches!(rx.try_recv(), Ok(Work::OpenTranslator)));
+        // 第三下不连着算
+        tap(&mut s, 330, 380);
+        assert!(rx.try_recv().is_err());
+        // 间隔太长：不算
+        tap(&mut s, 2_000, 2_050);
+        tap(&mut s, 2_600, 2_650);
+        assert!(rx.try_recv().is_err());
+        // 按太久（Ctrl+滚轮之类）：不算
+        tap(&mut s, 4_000, 4_500);
+        tap(&mut s, 4_600, 4_650);
+        assert!(rx.try_recv().is_err());
+        // 中间按了别的键（Ctrl+C 后再按 Ctrl）：不算
+        tap(&mut s, 6_000, 6_050);
+        s.key(0x43, true, false, at(6_100));
+        s.key(0x43, false, false, at(6_120));
+        tap(&mut s, 6_200, 6_250);
+        assert!(rx.try_recv().is_err());
+        // 中间点了鼠标：不算
+        tap(&mut s, 8_000, 8_050);
+        s.mouse();
+        tap(&mut s, 8_200, 8_250);
+        assert!(rx.try_recv().is_err());
+        // 按着别的修饰键时的右 Ctrl：不算
+        s.key(0xA0, true, false, at(10_000));
+        tap(&mut s, 10_010, 10_050);
+        tap(&mut s, 10_100, 10_150);
+        s.key(0xA0, false, false, at(10_200));
+        assert!(rx.try_recv().is_err());
+        // 关掉开关：不算
+        s.double_ctrl = false;
+        tap(&mut s, 12_000, 12_050);
+        tap(&mut s, 12_200, 12_250);
+        assert!(rx.try_recv().is_err());
+        // 右 Shift 双击：原地翻译；右 Ctrl 接右 Shift 不算双击
+        let shift = |s: &mut State, down: u64, up: u64| {
+            assert!(
+                !s.key(VK_RSHIFT, true, false, at(down)),
+                "right Shift is never swallowed"
+            );
+            assert!(!s.key(VK_RSHIFT, false, false, at(up)));
+        };
+        shift(&mut s, 14_000, 14_050);
+        shift(&mut s, 14_200, 14_250);
+        assert!(matches!(rx.try_recv(), Ok(Work::TranslateInPlace)));
+        s.double_ctrl = true;
+        tap(&mut s, 16_000, 16_050);
+        shift(&mut s, 16_200, 16_250);
+        assert!(rx.try_recv().is_err());
+        s.double_shift = false;
+        shift(&mut s, 18_000, 18_050);
+        shift(&mut s, 18_200, 18_250);
         assert!(rx.try_recv().is_err());
     }
 }

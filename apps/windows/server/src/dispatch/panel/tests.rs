@@ -138,6 +138,8 @@ fn menu_opens_without_composition_and_mouse_commits() {
     let mut router = router();
     router.handle(ClientMessage::SyncMode {
         accepts_commit: true,
+        reads_selection: false,
+        in_place_review: false,
         session: SessionId(1),
     });
     router.handle(ClientMessage::Indicator {
@@ -176,6 +178,8 @@ fn close_button_and_escape_without_composition_end_the_frame() {
     let mut router = router();
     router.handle(ClientMessage::SyncMode {
         accepts_commit: true,
+        reads_selection: false,
+        in_place_review: false,
         session: SessionId(1),
     });
     router.handle(ClientMessage::Indicator {

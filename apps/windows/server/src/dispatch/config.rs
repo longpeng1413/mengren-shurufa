@@ -158,8 +158,10 @@ pub struct RouterConfig {
     /// 键位提示窗口的不透明度与键盘大小，百分比（`[general] key_hint_opacity` / `key_hint_size`，已夹到范围内）。
     pub key_hint_look: (u8, u8),
 
+    /// 打开翻译窗口的快捷键（`[shortcut] translator` / `translator_double_ctrl`）。
+    pub translator: super::TranslatorKeys,
+
     /// 语音识别配置（`[voice]`），新建识别方与下发触发设置用。
-    pub translator: Option<qingjian_platform::KeyCombo>,
     pub voice: VoiceConfig,
 }
 
@@ -260,7 +262,7 @@ impl From<&Config> for RouterConfig {
                 config.general.key_hint_opacity.clamp(30, 100),
                 config.general.key_hint_size.clamp(60, 150),
             ),
-            translator: config.shortcut.translator,
+            translator: super::TranslatorKeys::from_config(config),
             voice: config.voice.clone(),
         }
     }

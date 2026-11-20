@@ -82,6 +82,11 @@ pub enum ClientMessage {
 
         /// 选区的屏幕矩形（拿翻译候选窗口摆在它下方，与组句候选窗一致）；取不到是鼠标处近似。
         rect: ScreenRect,
+
+        /// 文档不让读（网页正文这类非可编辑内容，应用拒绝编辑会话）：Server 改用别的办法取选中文字。
+        /// 旧 DLL 不带时为 false。
+        #[serde(default)]
+        unreadable: bool,
     },
 
     /// 组句更新后，DLL 在编辑会话里量到组句范围的屏幕矩形，发来让 Server 把候选窗口摆到光标下方。
@@ -123,6 +128,16 @@ pub enum ClientMessage {
         /// 新 DLL 可在模式轮询时直接上屏；旧 DLL 留到下一键或 Poll。
         #[serde(default)]
         accepts_commit: bool,
+
+        /// 新 DLL 能按回包的 [`super::ServerMessage::ModeSync`] `read_selection` 在空闲时读选区
+        /// （翻译窗口快捷键带入选中文字）；旧 DLL 不带，Server 就直接开空的翻译窗口。
+        #[serde(default)]
+        reads_selection: bool,
+
+        /// 新 DLL 认得 `ModeSync` 的 `review_selection` / `start_review`，能做原地翻译评审；
+        /// 0.4.14 之前的 DLL 不带，Server 改开翻译窗口显示译文，不把评审交给它。
+        #[serde(default)]
+        in_place_review: bool,
 
         /// 会话标识。
         session: SessionId,
