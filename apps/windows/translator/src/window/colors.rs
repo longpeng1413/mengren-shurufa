@@ -210,7 +210,7 @@ pub fn draw_menu_item(
     PALETTE.with_borrow(|slot| {
         let Some(p) = slot else { return };
         let ink = foreground(p.background);
-        let fill = if selected {
+        let fill = if selected && !label.is_empty() {
             mix(p.background, ink, 18)
         } else {
             p.background
@@ -218,6 +218,19 @@ pub fn draw_menu_item(
         unsafe {
             gdi::SetDCBrushColor(dc, fill);
             FillRect(dc, &rect, HBRUSH(gdi::GetStockObject(gdi::DC_BRUSH).0));
+            if label.is_empty() {
+                // 分隔线
+                let y = (rect.top + rect.bottom) / 2;
+                let line = RECT {
+                    left: rect.left + 8 * dpi / 96,
+                    right: rect.right - 8 * dpi / 96,
+                    top: y,
+                    bottom: y + (dpi / 96).max(1),
+                };
+                gdi::SetDCBrushColor(dc, mix(p.background, ink, 22));
+                FillRect(dc, &line, HBRUSH(gdi::GetStockObject(gdi::DC_BRUSH).0));
+                return;
+            }
             gdi::SetBkMode(dc, gdi::TRANSPARENT);
             SetTextColor(dc, ink);
             let old = gdi::SelectObject(dc, font.into());

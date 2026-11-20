@@ -14,6 +14,32 @@ pub const LANGS: [(&str, &str, &str); 8] = [
     ("ru", "Русский", "419"),
     ("vi", "Tiếng Việt", "42A"),
 ];
+/// 语言在当前界面语言里的名称（中文界面下 `ru` 是「俄语」）；`zh` 也认。
+pub fn local_name(code: &str) -> &'static str {
+    tr(match code {
+        "en" => "lang_en",
+        "ja" => "lang_ja",
+        "ko" => "lang_ko",
+        "fr" => "lang_fr",
+        "de" => "lang_de",
+        "es" => "lang_es",
+        "ru" => "lang_ru",
+        "vi" => "lang_vi",
+        _ => "chinese",
+    })
+}
+/// 下拉菜单与语言按钮上的写法：原文名后标上界面语言里的名称（两者相同就只写一次）。
+pub fn label(index: usize) -> String {
+    let (code, native, _) = LANGS[index];
+    let name = local_name(code);
+    if name == native {
+        native.to_owned()
+    } else {
+        tr("lang_label")
+            .replace("{native}", native)
+            .replace("{name}", name)
+    }
+}
 pub fn target(text: &str, language: &str) -> String {
     let mut han = 0;
     let mut other = 0;

@@ -5,7 +5,7 @@ mod popup;
 mod speech;
 mod translation;
 use qingjian_platform::{Config, dirs, windows_text::tr};
-use speech::{SPEEDS, Speech};
+use speech::{MM_MCINOTIFY, Outcome, SPEEDS, Source, Speech, VOICE_IN};
 use std::{
     cell::RefCell,
     collections::VecDeque,
@@ -109,7 +109,12 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) -> LR
                 LRESULT(0)
             }
         }
-        WM_CLOSE | WM_SIZE | WM_TIMER | WM_COMMAND | TOGGLE | TEXT_IN => {
+        // 切回窗口时重查朗读声音：用户可能刚在系统设置里装了语音
+        WM_ACTIVATE if w.0 & 0xFFFF != WA_INACTIVE as usize => {
+            EVENTS.with_borrow_mut(|q| q.push_back((msg, w.0)));
+            unsafe { DefWindowProcW(hwnd, msg, w, l) }
+        }
+        WM_CLOSE | WM_SIZE | WM_TIMER | WM_COMMAND | TOGGLE | TEXT_IN | VOICE_IN | MM_MCINOTIFY => {
             EVENTS.with_borrow_mut(|q| q.push_back((msg, w.0)));
             LRESULT(0)
         }
@@ -279,7 +284,7 @@ impl Window {
                 small: HFONT::default(),
                 dpi: 0,
                 model,
-                speech: Speech::new(),
+                speech: Speech::new(hwnd),
                 hidden: None,
             };
             this.layout();
@@ -361,7 +366,8 @@ impl Window {
             let label = self.text_width(tr("language")) + 4;
             let lang = LANGS
                 .iter()
-                .map(|l| self.button_width(&format!("{}  ▾", l.1), 110))
+                .enumerate()
+                .map(|(i, _)| self.button_width(&format!("{}  ▾", translation::label(i)), 110))
                 .max()
                 .unwrap_or(110);
             let swap = self.button_width(tr("swap"), 64);
@@ -421,7 +427,7 @@ impl Window {
     }
 
     /// 在按钮下方弹出跟随配色的下拉菜单，返回选中项的下标。
-    fn menu(&self, id: usize, labels: &[&str], checked: Option<usize>) -> Option<usize> {
+    fn menu(&self, id: usize, labels: &[&str], checked: &[usize]) -> Option<usize> {
         let mut r = RECT::default();
         unsafe { GetWindowRect(self.controls[id], &mut r) }.ok()?;
         popup::show(self.hwnd, r, self.font, labels, checked)
@@ -498,29 +504,28 @@ impl Window {
     }
     /// 底部小字：本机能朗读哪些语言；当前外语读不了时直接点明。
     fn speech_note(&self) -> String {
-        let names: Vec<&str> = self
-            .speech
-            .voices()
-            .iter()
-            .map(|lang| {
-                LANGS
-                    .iter()
-                    .find(|l| l.0 == *lang)
-                    .map_or(tr("chinese"), |l| l.1)
-            })
-            .collect();
-        if names.is_empty() {
-            return tr("speech_failed").to_owned();
+        let names = |langs: Vec<&'static str>| {
+            langs
+                .iter()
+                .map(|lang| translation::local_name(lang))
+                .collect::<Vec<_>>()
+                .join(" · ")
+        };
+        let code = LANGS[self.model.language].0;
+        if !self.speech.readable(code) {
+            return tr("speech_missing").replace("{lang}", translation::local_name(code));
         }
-        let list = names.join(" · ");
-        let (code, name, _) = LANGS[self.model.language];
-        if self.speech.readable(code) {
-            tr("speech_voices").replace("{list}", &list)
+        let local = self.speech.local_languages();
+        let online = self.speech.online_languages();
+        let mut note = if local.is_empty() {
+            String::new()
         } else {
-            tr("speech_missing")
-                .replace("{lang}", name)
-                .replace("{list}", &list)
+            tr("speech_local").replace("{list}", &names(local))
+        };
+        if !online.is_empty() {
+            note.push_str(&tr("speech_online").replace("{list}", &names(online)));
         }
+        note
     }
     fn change(&mut self) {
         self.model
@@ -539,7 +544,10 @@ impl Window {
             self.set(RESULT, &self.model.output);
         }
         self.set(STATUS, self.model.status);
-        self.set(LANG, &format!("{}  ▾", LANGS[self.model.language].1));
+        self.set(
+            LANG,
+            &format!("{}  ▾", translation::label(self.model.language)),
+        );
         self.set(SPEED, SPEEDS[self.speech.speed].0);
         self.set(NOTE, &self.speech_note());
         let (source_voice, result_voice) = self.speech_languages();
@@ -568,6 +576,7 @@ impl Window {
     /// Server 带进来的选中文字：放进原文框立即翻译，窗口带到前台。
     fn receive(&mut self, text: String) {
         self.hidden = None;
+        self.speech.refresh();
         self.set(SOURCE, &text);
         self.translate_now();
         unsafe {
@@ -598,7 +607,9 @@ impl Window {
                 let _ = windows::Win32::Graphics::Gdi::InvalidateRect(Some(self.hwnd), None, true);
             },
             LANG => {
-                if let Some(i) = self.menu(LANG, &LANGS.map(|l| l.1), Some(self.model.language)) {
+                let labels: Vec<String> = (0..LANGS.len()).map(translation::label).collect();
+                let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
+                if let Some(i) = self.menu(LANG, &labels, &[self.model.language]) {
                     self.model.change(self.text(SOURCE), i, Instant::now());
                     self.render();
                 }
@@ -610,15 +621,13 @@ impl Window {
                 self.model.send();
                 self.render();
             }
-            BACKGROUND => match self.menu(
-                BACKGROUND,
-                &[tr("background"), tr("reset_background")],
-                None,
-            ) {
-                Some(0) => colors::choose(self.hwnd),
-                Some(1) => colors::apply(self.hwnd, windows::Win32::Foundation::COLORREF(0)),
-                _ => {}
-            },
+            BACKGROUND => {
+                match self.menu(BACKGROUND, &[tr("background"), tr("reset_background")], &[]) {
+                    Some(0) => colors::choose(self.hwnd),
+                    Some(1) => colors::apply(self.hwnd, windows::Win32::Foundation::COLORREF(0)),
+                    _ => {}
+                }
+            }
             CLEAR => {
                 self.set(SOURCE, "");
                 self.change();
@@ -644,11 +653,24 @@ impl Window {
                 }
             }
             SPEED => {
-                let labels = SPEEDS.map(|s| s.0);
-                if let Some(index) = self.menu(SPEED, &labels, Some(self.speech.speed)) {
-                    self.speech.set_speed(index);
-                    self.render();
+                // 倍速各档，分隔线，再是朗读来源两项
+                let mut labels: Vec<&str> = SPEEDS.iter().map(|s| s.0).collect();
+                labels.extend(["", tr("source_auto"), tr("source_local")]);
+                let source = SPEEDS.len() + 1;
+                let checked = [
+                    self.speech.speed,
+                    source + usize::from(self.speech.source == Source::Local),
+                ];
+                match self.menu(SPEED, &labels, &checked) {
+                    Some(index) if index < SPEEDS.len() => self.speech.set_speed(index),
+                    Some(index) if index == source => self.speech.set_source(Source::Auto),
+                    Some(index) if index == source + 1 => {
+                        self.speech.stop();
+                        self.speech.set_source(Source::Local);
+                    }
+                    _ => {}
                 }
+                self.render();
             }
             _ => {}
         }
@@ -669,6 +691,16 @@ impl Window {
                 WM_SIZE => self.layout(),
                 WM_COMMAND => self.command(param),
                 WM_CLOSE => self.hide(),
+                VOICE_IN => {
+                    if let Some(Outcome::Failed) = self.speech.online_ready() {
+                        self.set(STATUS, tr("speech_online_failed"));
+                    }
+                }
+                MM_MCINOTIFY => self.speech.online_notify(param),
+                WM_ACTIVATE => {
+                    self.speech.refresh();
+                    self.render();
+                }
                 TEXT_IN => {
                     if let Some(text) = incoming::take() {
                         self.receive(text);
@@ -679,6 +711,8 @@ impl Window {
                         self.hide();
                     } else {
                         self.hidden = None;
+                        self.speech.refresh();
+                        self.render();
                         let _ = ShowWindow(self.hwnd, SW_RESTORE);
                         let _ = SetForegroundWindow(self.hwnd);
                         let _ = SetFocus(Some(self.controls[SOURCE]));

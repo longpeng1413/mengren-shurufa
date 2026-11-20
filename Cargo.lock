@@ -4439,7 +4439,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian-clipboard-app"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "arboard",
  "bamboo-slip",
@@ -4756,7 +4756,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian-settings"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "bamboo-slip",
  "bamboo-slip-i18n",
@@ -4858,7 +4858,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian-windows-server"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "bamboo-slip-i18n",
  "dotenvy",
@@ -4889,7 +4889,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian-windows-settings"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "jiff",
  "qingjian-core",
@@ -4910,7 +4910,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian-windows-translator"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "bamboo-slip-i18n",
  "dotenvy",
@@ -4918,6 +4918,7 @@ dependencies = [
  "qingjian-core",
  "qingjian-platform",
  "qingjian-predict",
+ "reqwest",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
@@ -4927,7 +4928,7 @@ dependencies = [
 
 [[package]]
 name = "qingjian-windows-tsf"
-version = "0.4.14"
+version = "0.4.15"
 dependencies = [
  "qingjian-core",
  "qingjian-platform",
@@ -5237,6 +5238,7 @@ checksum = "16a1cfa75cc186dd73d5818e510e042e40927bccc9c236b061cea97e1eb08029"
 dependencies = [
  "base64 0.23.1",
  "bytes",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "http",

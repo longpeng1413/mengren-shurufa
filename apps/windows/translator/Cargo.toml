@@ -1,7 +1,7 @@
 [package]
 name = "qingjian-windows-translator"
 description = "猛人输入法 Windows 翻译窗口"
-version = "0.4.14"
+version = "0.4.15"
 edition.workspace = true
 license.workspace = true
 
@@ -18,7 +18,9 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 tracing-appender.workspace = true
 dotenvy.workspace = true
-windows = { version = "0.62.2", features = ["Win32_Foundation","Win32_Graphics_Gdi","Win32_Graphics_Dwm","Win32_Security","Win32_System_Com","Win32_System_DataExchange","Win32_System_LibraryLoader","Win32_System_Threading","Win32_UI_Controls", "Win32_UI_Controls_Dialogs","Win32_UI_HiDpi","Win32_UI_Input_KeyboardAndMouse","Win32_UI_WindowsAndMessaging","Win32_Media_Speech"] }
+# 百度在线朗读：阻塞客户端跑在后台线程；系统 TLS 与系统代理与预测模块一致
+reqwest = { workspace = true, features = ["blocking", "native-tls", "system-proxy"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation","Win32_Graphics_Gdi","Win32_Graphics_Dwm","Win32_Security","Win32_System_Com","Win32_System_DataExchange","Win32_System_LibraryLoader","Win32_System_Threading","Win32_UI_Controls", "Win32_UI_Controls_Dialogs","Win32_UI_HiDpi","Win32_UI_Input_KeyboardAndMouse","Win32_UI_WindowsAndMessaging","Win32_Media_Speech","Win32_Media_Multimedia"] }
 
 [build-dependencies]
 embed-manifest.workspace = true

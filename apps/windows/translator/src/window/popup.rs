@@ -10,8 +10,8 @@ use windows::Win32::{
     UI::Controls::{DRAWITEMSTRUCT, MEASUREITEMSTRUCT, ODS_SELECTED},
     UI::HiDpi::GetDpiForWindow,
     UI::WindowsAndMessaging::{
-        AppendMenuW, CreatePopupMenu, DestroyMenu, MENUINFO, MF_OWNERDRAW, MIM_BACKGROUND,
-        SetMenuInfo, TPM_RETURNCMD, TrackPopupMenu,
+        AppendMenuW, CreatePopupMenu, DestroyMenu, MENUINFO, MF_DISABLED, MF_OWNERDRAW,
+        MIM_BACKGROUND, SetMenuInfo, TPM_RETURNCMD, TrackPopupMenu,
     },
 };
 use windows::core::PCWSTR;
@@ -20,8 +20,8 @@ use windows::core::PCWSTR;
 struct Open {
     labels: Vec<String>,
 
-    /// 打勾的那一项。
-    checked: Option<usize>,
+    /// 打勾的项（语速菜单里倍速、来源各勾一项）。
+    checked: Vec<usize>,
 
     font: HFONT,
 
@@ -35,13 +35,13 @@ thread_local! {
     static OPEN: RefCell<Option<Open>> = const { RefCell::new(None) };
 }
 
-/// 在 `anchor` 下方弹出菜单，返回选中项的下标；点空白处收起回 `None`。
+/// 在 `anchor` 下方弹出菜单，返回选中项的下标；点空白处收起回 `None`。空串的项画成分隔线、不能点。
 pub fn show(
     owner: HWND,
     anchor: RECT,
     font: HFONT,
     labels: &[&str],
-    checked: Option<usize>,
+    checked: &[usize],
 ) -> Option<usize> {
     unsafe {
         let menu = CreatePopupMenu().ok()?;
@@ -54,15 +54,20 @@ pub fn show(
             };
             let _ = SetMenuInfo(menu, &info);
         }
-        for index in 0..labels.len() {
-            if AppendMenuW(menu, MF_OWNERDRAW, index + 1, PCWSTR::null()).is_err() {
+        for (index, label) in labels.iter().enumerate() {
+            let flags = if label.is_empty() {
+                MF_OWNERDRAW | MF_DISABLED
+            } else {
+                MF_OWNERDRAW
+            };
+            if AppendMenuW(menu, flags, index + 1, PCWSTR::null()).is_err() {
                 let _ = DestroyMenu(menu);
                 return None;
             }
         }
         OPEN.set(Some(Open {
             labels: labels.iter().map(|label| (*label).to_owned()).collect(),
-            checked,
+            checked: checked.to_vec(),
             font,
             owner,
             framed: None,
@@ -94,6 +99,11 @@ pub fn measure(item: &mut MEASUREITEMSTRUCT) {
             return;
         };
         let dpi = unsafe { GetDpiForWindow(open.owner) }.max(96) as i32;
+        if label.is_empty() {
+            item.itemWidth = 1;
+            item.itemHeight = (9 * dpi / 96) as u32;
+            return;
+        }
         let wide: Vec<u16> = label.encode_utf16().collect();
         let mut size = SIZE::default();
         unsafe {
@@ -123,7 +133,7 @@ pub fn draw(item: &DRAWITEMSTRUCT) {
             item.hDC,
             item.rcItem,
             label,
-            open.checked == Some(index),
+            open.checked.contains(&index),
             item.itemState.0 & ODS_SELECTED.0 != 0,
             open.font,
             dpi,
