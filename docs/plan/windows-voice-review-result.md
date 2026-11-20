@@ -2,6 +2,8 @@
 
 对照 [windows-voice-translate.md](windows-voice-translate.md) 与 Codex 的记录（[windows-voice-translate-result.md](windows-voice-translate-result.md)、`mengren/releases/v0.4.9～v0.4.11.md`）复查已发布的 Windows 0.4.9～0.4.11。本轮只改 Windows 端及其共享代码。复查完成后用户决定直接发布，Windows 升为 0.4.12（发布说明见 `mengren/releases/v0.4.12.md`），安卓保持 0.4.8；笔记本效果待用户更新后复测。
 
+**0.4.12 发布后的事故与 0.4.13**：用户在台式机更新 0.4.12 后，按住右 Alt 时任务栏出现麦克风图标，但语音面板不出现、松开无文字。server 日志显示每次 `voice started` 后约 3 秒 Server 重新启动；Windows 事件日志记录 `qingjian-server.exe` 在 `USER32.dll` 内 0xc0000005（非法内存访问）。根因是本轮新加的面板换行绘制：开始听写时面板第一帧文字为空，空字符串转成的空切片指针是占位地址，交给 `DrawTextW` 后系统函数读取该地址崩溃。原单元测试只测了有字的情况，漏了空文字。修复：`ui/voice.rs` 的 `draw_text` 对空文字直接跳过；补测试 `panel_paints_empty_long_and_error_views` 在内存画布上完整绘制空文字、长结果、出错三种面板（修复前该测试同样以 0xc0000005 崩溃）。Windows 升为 0.4.13。
+
 说明：工作区里 Codex 这三版的源码改动本地都还没有提交，`git diff` 分不出两轮各改了什么，下面「改了哪些文件」只列本轮的改动。
 
 ## 一、笔记本语音识别用不了（最优先）

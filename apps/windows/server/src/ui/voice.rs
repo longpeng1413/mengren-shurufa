@@ -225,7 +225,7 @@ fn paint_content(hdc: HDC, _client: RECT, view: &VoiceView, scale: f32) {
         };
         let text = fit_tail(hdc, &view.text, area);
         let mut rect = area;
-        let _ = DrawTextW(hdc, &mut utf16(&text), &mut rect, WRAP);
+        draw_text(hdc, &text, &mut rect, WRAP);
     }
 
     unsafe {
@@ -259,11 +259,27 @@ const WRAP: windows::Win32::Graphics::Gdi::DRAW_TEXT_FORMAT =
         DT_WORDBREAK.0 | DT_EDITCONTROL.0 | DT_NOPREFIX.0,
     );
 
+/// 调 DrawTextW；空文字直接跳过（量高度时高度记 0）。空切片交给 DrawTextW 会在 USER32 里非法访问内存，
+/// 开始听写时面板第一帧就是空文字，0.4.12 因此一按就崩。
+fn draw_text(
+    hdc: HDC,
+    text: &str,
+    rect: &mut RECT,
+    format: windows::Win32::Graphics::Gdi::DRAW_TEXT_FORMAT,
+) {
+    if text.is_empty() {
+        rect.bottom = rect.top;
+        return;
+    }
+    let mut buffer = utf16(text);
+    unsafe { DrawTextW(hdc, &mut buffer, rect, format) };
+}
+
 /// 文字换行后高过区域时，从前面去掉字（加省略号）直到放得下。
 fn fit_tail(hdc: HDC, text: &str, area: RECT) -> String {
     let height = |candidate: &str| {
         let mut rect = area;
-        unsafe { DrawTextW(hdc, &mut utf16(candidate), &mut rect, WRAP | DT_CALCRECT) };
+        draw_text(hdc, candidate, &mut rect, WRAP | DT_CALCRECT);
         rect.bottom - rect.top
     };
     let limit = area.bottom - area.top;
@@ -310,11 +326,53 @@ mod tests {
             bottom: 40,
         };
         assert_eq!(fit_tail(hdc, "你好", area), "你好");
+        // 开始听写时面板先画空文字：曾因把空切片交给 DrawTextW 在 USER32 里崩溃
+        assert_eq!(fit_tail(hdc, "", area), "");
         let long = "一二三四五六七八九十".repeat(20) + "最后一句";
         let fitted = fit_tail(hdc, &long, area);
         assert!(fitted.starts_with('…'));
         assert!(fitted.ends_with("最后一句"));
         assert!(fitted.chars().count() < long.chars().count());
+        let _ = unsafe { DeleteDC(hdc) };
+    }
+
+    /// 走真实的面板绘制：刚开始听写（空文字、空状态行）、长中间结果、出错提示（无提示行）都不能崩。
+    #[test]
+    fn panel_paints_empty_long_and_error_views() {
+        use super::{CONTENT_H, CONTENT_W, VoiceView, paint_content};
+        let hdc = unsafe { CreateCompatibleDC(None) };
+        let client = RECT {
+            left: 0,
+            top: 0,
+            right: CONTENT_W,
+            bottom: CONTENT_H,
+        };
+        for (state, text, hint) in [
+            ("", "", "松开结束 · Esc 取消"),
+            ("正在听…", "", "松开结束 · Esc 取消"),
+            (
+                "识别中…",
+                &"很长的一段识别结果".repeat(30),
+                "再点「说」结束 · Esc 取消",
+            ),
+            (
+                "语音识别出错",
+                "麦克风被系统拒绝：请在「设置 → 隐私和安全性 → 麦克风」允许桌面应用访问，并检查静音键",
+                "",
+            ),
+            ("语音识别出错", "", ""),
+        ] {
+            let view = VoiceView {
+                hint: hint.to_owned(),
+                state: state.to_owned(),
+                text: text.to_owned(),
+                level: 0.5,
+                history: vec![0.1, 0.9],
+            };
+            for scale in [1.0, 1.5] {
+                paint_content(hdc, client, &view, scale);
+            }
+        }
         let _ = unsafe { DeleteDC(hdc) };
     }
 }
