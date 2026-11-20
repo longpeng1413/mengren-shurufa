@@ -398,7 +398,7 @@ fn serve(
     let on_panel = Box::new(move |hit| {
         let _ = panel_events.send(Work::Panel(hit));
     });
-    // 语音热键钩子装在 UI 线程（它有消息循环）。把 work 发送端与配置带过去。
+    // 语音 / 翻译快捷键：UI 起来后装钩子（hotkey::install 自己开专用线程跑消息循环）。
     let hotkey_work = work_tx.clone();
     router.set_voice_foreground(qingjian_platform::foreground::InputFocus::current);
     router.set_voice_insertion(hotkey::insert_voice);

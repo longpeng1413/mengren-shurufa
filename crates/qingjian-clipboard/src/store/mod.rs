@@ -331,10 +331,11 @@ impl ClipStore {
     }
 
     /// 全部删掉，留下删除标记；再把释放出来的页收掉，文件不留痕迹。
+    /// 删除标记的时间至少比原记录晚 1 毫秒，对方设备时钟偏快时同步合并仍以删除为准（与 [`Self::delete`] 一致）。
     pub fn clear(&mut self, now: i64) -> Result<(), ClipboardError> {
         let transaction = self.connection.transaction()?;
         transaction.execute(
-            "UPDATE items SET text = '', source = '', fingerprint = '', deleted = 1, forgotten = 1, updated_at = ?1
+            "UPDATE items SET text = '', source = '', fingerprint = '', deleted = 1, forgotten = 1, updated_at = MAX(?1, updated_at + 1)
              WHERE deleted = 0",
             [now],
         )?;

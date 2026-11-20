@@ -20,7 +20,16 @@ $ErrorActionPreference = 'Stop'
 if (-not $Android -and -not $Windows) { $Android = $true; $Windows = $true }
 
 $Repo = 'D:\mengren-dev\shurufa'
-$ProductRoot = (Get-Item -LiteralPath $PSScriptRoot).Parent.FullName
+# 按约定从英文联接 D:\mengren-dev\shurufa 调用时，先解析成真实仓库目录；否则下面清旧包时会因路径含联接而拒绝。
+$ProductItem = (Get-Item -LiteralPath $PSScriptRoot).Parent
+$ProductRoot = if ($ProductItem.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+    [string](@($ProductItem.Target)[0])
+} else {
+    $ProductItem.FullName
+}
+if (-not (Test-Path -LiteralPath (Join-Path $ProductRoot 'mengren\build.ps1'))) {
+    throw "无法确定仓库目录：$ProductRoot"
+}
 $Out = Join-Path $ProductRoot 'mengren\安装包'
 $Proxy = 'http://127.0.0.1:7897'
 New-Item -ItemType Directory -Force $Out | Out-Null

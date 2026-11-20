@@ -145,6 +145,20 @@ impl Window {
                 Some(inst.into()),
                 None,
             )?;
+            // 进程按 PerMonitorV2 运行，创建时给的是物理像素：按窗口所在屏的缩放放大到设计尺寸，
+            // 否则 125% / 150% 缩放的屏上按钮按缩放摆放会挤出窗口
+            let dpi = GetDpiForWindow(hwnd).max(96) as i32;
+            if dpi != 96 {
+                let _ = SetWindowPos(
+                    hwnd,
+                    None,
+                    0,
+                    0,
+                    660 * dpi / 96,
+                    615 * dpi / 96,
+                    SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+                );
+            }
             colors::caption(hwnd);
             let mut controls = [HWND::default(); CONTROL_COUNT];
             for (id, class, label, flags) in [
@@ -346,6 +360,13 @@ impl Window {
             .change(self.text(SOURCE), self.model.language, Instant::now());
         self.render();
     }
+    /// 「翻译」按钮与 Ctrl+Enter：内容没变但上次失败（没有译文）时也重发。
+    fn translate_now(&mut self) {
+        self.change();
+        self.model.retry(Instant::now());
+        self.model.send();
+        self.render();
+    }
     fn render(&self) {
         if self.text(RESULT) != self.model.output {
             self.set(RESULT, &self.model.output);
@@ -387,11 +408,7 @@ impl Window {
                     self.render();
                 }
             }
-            TRANSLATE => {
-                self.change();
-                self.model.send();
-                self.render();
-            }
+            TRANSLATE => self.translate_now(),
             SWAP if !self.model.output.is_empty() => {
                 self.set(SOURCE, &self.model.output);
                 self.change();
@@ -538,9 +555,7 @@ pub fn run() -> Result<()> {
                 && msg.wParam.0 == 13
                 && GetKeyState(VK_CONTROL.0 as i32) < 0
             {
-                win.change();
-                win.model.send();
-                win.render();
+                win.translate_now();
                 continue;
             }
             if !IsDialogMessageW(win.hwnd, &msg).as_bool() {

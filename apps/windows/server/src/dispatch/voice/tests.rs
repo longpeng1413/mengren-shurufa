@@ -43,6 +43,7 @@ fn router() -> Router {
             pcm: mpsc::channel().1,
             level: None,
             stop: Arc::default(),
+            failure: None,
         })
     })));
     r
@@ -215,6 +216,7 @@ fn releasing_the_key_waits_for_the_last_capture_packet() {
             pcm: receiver.lock().unwrap().take().unwrap(),
             level: None,
             stop: Arc::clone(&capture_stop),
+            failure: None,
         })
     })));
 
@@ -235,4 +237,134 @@ fn releasing_the_key_waits_for_the_last_capture_packet() {
     );
     router.advance_voice();
     assert!(router.take_async_commit(session).is_none());
+}
+
+/// 记下面板收到的提示与收起。
+#[derive(Clone, Default)]
+struct Notes(Arc<std::sync::Mutex<Vec<String>>>);
+impl super::VoiceSink for Notes {
+    fn listening(&self, _: &str, _: f32, _: &str) {}
+    fn recognizing(&self, _: &str, _: &str) {}
+    fn error(&self, message: &str) {
+        self.0.lock().unwrap().push(message.to_owned());
+    }
+    fn hide(&self) {}
+}
+impl Notes {
+    fn last(&self) -> Option<String> {
+        self.0.lock().unwrap().last().cloned()
+    }
+}
+
+fn open(router: &mut Router) -> Notes {
+    router.handle(ClientMessage::OpenSession {
+        session: SessionId(1),
+        app: None,
+        protocol: PROTOCOL_VERSION,
+    });
+    router.handle(ClientMessage::SyncMode {
+        session: SessionId(1),
+        accepts_commit: true,
+    });
+    let notes = Notes::default();
+    router.set_voice_sink(Box::new(notes.clone()));
+    notes
+}
+
+#[test]
+fn capture_problems_reach_the_panel_and_end_the_segment() {
+    use qingjian_platform::windows_text::tr;
+    use std::sync::Mutex;
+
+    // 打不开：工厂给的原因原样显示，不进入录音
+    let mut router = router();
+    let notes = open(&mut router);
+    router.set_voice_capture(Some(Arc::new(|| Err("麦克风被系统拒绝".to_owned()))));
+    router.toggle_status_voice();
+    assert!(!router.recording());
+    assert_eq!(notes.last().as_deref(), Some("麦克风被系统拒绝"));
+
+    // 录到一半报错：结束这一段并显示原因
+    let (fail_tx, fail_rx) = mpsc::channel();
+    let slot = Mutex::new(Some(fail_rx));
+    let (_pcm_tx, pcm_rx) = mpsc::channel();
+    let pcm = Mutex::new(Some(pcm_rx));
+    router.set_voice_capture(Some(Arc::new(move || {
+        Ok(Capture {
+            pcm: pcm.lock().unwrap().take().unwrap(),
+            level: None,
+            stop: Arc::default(),
+            failure: slot.lock().unwrap().take(),
+        })
+    })));
+    router.toggle_status_voice();
+    assert!(router.recording());
+    fail_tx.send(Err("录音中断".to_owned())).unwrap();
+    router.advance_voice();
+    assert!(router.voice.active.is_none());
+    assert_eq!(notes.last().as_deref(), Some("录音中断"));
+
+    // 线程没留原因就退了（通道断开）：按中断处理
+    let (fail_tx, fail_rx) = mpsc::channel::<Result<(), String>>();
+    let slot = Mutex::new(Some(fail_rx));
+    router.set_voice_capture(Some(Arc::new(move || {
+        Ok(Capture {
+            pcm: mpsc::channel().1,
+            level: None,
+            stop: Arc::default(),
+            failure: slot.lock().unwrap().take(),
+        })
+    })));
+    router.voice.notice_until = None;
+    router.toggle_status_voice();
+    drop(fail_tx);
+    router.advance_voice();
+    assert!(router.voice.active.is_none());
+    assert_eq!(notes.last().as_deref(), Some(tr("mic_lost")));
+}
+
+#[test]
+fn empty_results_explain_silence_or_ask_to_repeat() {
+    use qingjian_platform::windows_text::tr;
+    use std::sync::Mutex;
+
+    struct Empty(Option<TranscriptEvent>);
+    impl Transcriber for Empty {
+        fn available(&self) -> bool {
+            true
+        }
+        fn start(&mut self, _: u32) {}
+        fn feed(&mut self, _: &[i16]) {}
+        fn finish(&mut self) {
+            self.0 = Some(TranscriptEvent::Final("  ".into()));
+        }
+        fn cancel(&mut self) {}
+        fn poll(&mut self) -> Option<TranscriptEvent> {
+            self.0.take()
+        }
+    }
+    for (level, expected) in [(0.0, "mic_silent"), (0.2, "voice_empty")] {
+        let mut router = router();
+        router.voice.transcriber = Box::new(Empty(None));
+        let notes = open(&mut router);
+        let (level_tx, level_rx) = mpsc::channel();
+        let slot = Mutex::new(Some(level_rx));
+        router.set_voice_capture(Some(Arc::new(move || {
+            Ok(Capture {
+                pcm: mpsc::channel().1,
+                level: slot.lock().unwrap().take(),
+                stop: Arc::default(),
+                failure: None,
+            })
+        })));
+        router.toggle_status_voice();
+        level_tx.send(level).unwrap();
+        router.advance_voice();
+        router.toggle_status_voice();
+        router.advance_voice();
+        router.advance_voice();
+        assert!(router.voice.active.is_none());
+        assert_eq!(notes.last().as_deref(), Some(tr(expected)));
+        assert!(router.take_async_commit(SessionId(1)).is_none());
+    }
 }

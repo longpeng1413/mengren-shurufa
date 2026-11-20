@@ -12,7 +12,7 @@ use std::thread;
 
 use qingjian_core::{Transcriber, TranscriptEvent};
 
-use crate::{OfflineConfig, OfflineError, library};
+use crate::{OfflineConfig, OfflineError};
 use command::Command;
 use running::Running;
 
@@ -34,7 +34,7 @@ impl OfflineTranscriber {
 impl Transcriber for OfflineTranscriber {
     /// 模型下好了、引擎库载得进来。
     fn available(&self) -> bool {
-        self.config.model.installed() && library::api(self.config.library_dir.as_deref()).is_ok()
+        self.config.problem().is_none()
     }
 
     fn start(&mut self, sample_rate: u32) {

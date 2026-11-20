@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use crate::SpeechModel;
+use crate::{OfflineError, SpeechModel, library};
 
 #[derive(Debug, Clone)]
 pub struct OfflineConfig {
@@ -24,5 +24,13 @@ impl OfflineConfig {
             library_dir,
             threads: cores.clamp(1, 4) as i32,
         }
+    }
+
+    /// 不能识别的原因：模型没装好或引擎库载不进来；能用时回 `None`。壳据此给用户具体提示。
+    pub fn problem(&self) -> Option<OfflineError> {
+        if !self.model.installed() {
+            return Some(OfflineError::ModelMissing);
+        }
+        library::api(self.library_dir.as_deref()).err()
     }
 }

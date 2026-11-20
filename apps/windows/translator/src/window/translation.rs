@@ -88,6 +88,13 @@ impl Translation {
         }
         self.pending = (!self.source.trim().is_empty()).then_some(now + Duration::from_millis(800));
     }
+    /// 原文没变、也没在等防抖，但上次没拿到译文：排一次立即重发（换代次，丢弃迟到的旧结果）。
+    pub fn retry(&mut self, now: Instant) {
+        if self.pending.is_none() && self.output.is_empty() && !self.source.trim().is_empty() {
+            self.sequence += 1;
+            self.pending = Some(now);
+        }
+    }
     pub fn send(&mut self) {
         if self.pending.take().is_none() {
             return;
@@ -148,5 +155,32 @@ mod tests {
             assert_eq!(target(text, "de"), "zh");
         }
         assert_eq!(target("你好！", "vi"), "vi");
+    }
+
+    #[test]
+    fn retry_only_when_the_last_attempt_left_no_translation() {
+        let mut model = Translation {
+            source: String::new(),
+            language: 0,
+            output: String::new(),
+            status: "",
+            sequence: 0,
+            pending: None,
+            worker: Err("disabled"),
+            done: "ai",
+        };
+        let now = Instant::now();
+        model.retry(now);
+        assert!(model.pending.is_none(), "empty source never sends");
+        model.source = "你好".into();
+        model.retry(now);
+        assert_eq!((model.pending, model.sequence), (Some(now), 1));
+        model.send();
+        model.output = "hello".into();
+        model.retry(now);
+        assert!(
+            model.pending.is_none(),
+            "a finished translation is not resent"
+        );
     }
 }

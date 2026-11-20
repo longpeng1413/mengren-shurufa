@@ -7,8 +7,9 @@ use std::cell::RefCell;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
     BACKGROUND_MODE, CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, CreateFontW, CreateSolidBrush,
-    DEFAULT_CHARSET, DeleteObject, FF_DONTCARE, FillRect, HDC, OUT_TT_PRECIS, SelectObject,
-    SetBkMode, SetTextColor, TRANSPARENT, TextOutW, VARIABLE_PITCH,
+    DEFAULT_CHARSET, DT_CALCRECT, DT_EDITCONTROL, DT_NOPREFIX, DT_WORDBREAK, DeleteObject,
+    DrawTextW, FF_DONTCARE, FillRect, HDC, OUT_TT_PRECIS, SelectObject, SetBkMode, SetTextColor,
+    TRANSPARENT, TextOutW, VARIABLE_PITCH,
 };
 use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -203,11 +204,28 @@ fn paint_content(hdc: HDC, _client: RECT, view: &VoiceView, scale: f32) {
         h,
     );
 
-    // 中间结果 / 提示文字
+    // 中间结果 / 出错原因：在区域内换行。出错时没有波形和提示行，文字从波形位置排到底；
+    // 中间结果放不下时留最后几行（最新说的话），前面用省略号。
     unsafe {
         SetTextColor(hdc, FG);
-        let text = utf16(view.text.as_str());
-        let _ = TextOutW(hdc, pad, wave_top + wave_h + (16.0 * scale) as i32, &text);
+        let error = view.hint.is_empty();
+        let area = RECT {
+            left: pad,
+            top: if error {
+                wave_top
+            } else {
+                wave_top + wave_h + (12.0 * scale) as i32
+            },
+            right: (CONTENT_W as f32 * scale) as i32 - pad,
+            bottom: if error {
+                (CONTENT_H as f32 * scale) as i32 - pad / 2
+            } else {
+                (134.0 * scale) as i32
+            },
+        };
+        let text = fit_tail(hdc, &view.text, area);
+        let mut rect = area;
+        let _ = DrawTextW(hdc, &mut utf16(&text), &mut rect, WRAP);
     }
 
     unsafe {
@@ -236,6 +254,33 @@ fn draw_bar(hdc: HDC, x: i32, y: i32, w: i32, h: i32) {
     }
 }
 
+const WRAP: windows::Win32::Graphics::Gdi::DRAW_TEXT_FORMAT =
+    windows::Win32::Graphics::Gdi::DRAW_TEXT_FORMAT(
+        DT_WORDBREAK.0 | DT_EDITCONTROL.0 | DT_NOPREFIX.0,
+    );
+
+/// 文字换行后高过区域时，从前面去掉字（加省略号）直到放得下。
+fn fit_tail(hdc: HDC, text: &str, area: RECT) -> String {
+    let height = |candidate: &str| {
+        let mut rect = area;
+        unsafe { DrawTextW(hdc, &mut utf16(candidate), &mut rect, WRAP | DT_CALCRECT) };
+        rect.bottom - rect.top
+    };
+    let limit = area.bottom - area.top;
+    if height(text) <= limit {
+        return text.to_owned();
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let tail = |skip: usize| format!("…{}", chars[skip..].iter().collect::<String>());
+    // 去掉的字越多越矮：二分找最少要去掉几个
+    let skips: Vec<usize> = (1..chars.len()).collect();
+    let fewest = skips.partition_point(|&skip| height(&tail(skip)) > limit);
+    skips
+        .get(fewest)
+        .map(|&skip| tail(skip))
+        .unwrap_or_default()
+}
+
 fn utf16(text: &str) -> Vec<u16> {
     text.encode_utf16().collect()
 }
@@ -247,4 +292,29 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     }
     // SAFETY: 窗口过程参数由系统传入，原样转发给默认处理。
     unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fit_tail;
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::Graphics::Gdi::{CreateCompatibleDC, DeleteDC};
+
+    #[test]
+    fn long_text_keeps_the_latest_words_and_short_text_is_untouched() {
+        let hdc = unsafe { CreateCompatibleDC(None) };
+        let area = RECT {
+            left: 0,
+            top: 0,
+            right: 200,
+            bottom: 40,
+        };
+        assert_eq!(fit_tail(hdc, "你好", area), "你好");
+        let long = "一二三四五六七八九十".repeat(20) + "最后一句";
+        let fitted = fit_tail(hdc, &long, area);
+        assert!(fitted.starts_with('…'));
+        assert!(fitted.ends_with("最后一句"));
+        assert!(fitted.chars().count() < long.chars().count());
+        let _ = unsafe { DeleteDC(hdc) };
+    }
 }

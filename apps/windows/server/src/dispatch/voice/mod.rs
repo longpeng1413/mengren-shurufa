@@ -45,6 +45,9 @@ pub const SAMPLE_RATE: u32 = 16_000;
 /// 正常采集在下一次轮询就收尾。若驱动卡住，限制等尾包的时间。
 const CAPTURE_DRAIN_TIMEOUT: Duration = Duration::from_millis(150);
 
+/// 整段原始峰值低于它（约 -50 dBFS）又没识别出字：麦克风多半被静音或被隐私设置挡住。
+const SILENT_PEAK: f32 = 0.003;
+
 /// 一次录音会话里，录音线程 -> Router 的东西。
 pub struct Capture {
     /// 单声道 16 位 PCM 块。
@@ -53,6 +56,9 @@ pub struct Capture {
     pub level: Option<Receiver<f32>>,
     /// 置 true 让录音线程停下；线程自行收尾并关闭发送端。
     pub stop: Arc<AtomicBool>,
+
+    /// 录到一半出错时收到 `Err(给用户看的原因)`；线程正常结束只是断开。没有就忽略。
+    pub failure: Option<Receiver<Result<(), String>>>,
 }
 
 /// 录音源工厂：开一段新录音，返回通道。注入的闭包在 Router 线程调用，不能阻塞太久。
@@ -92,6 +98,11 @@ struct Active {
     /// 说完后还在等最终结果的起点，用于 UI 状态切换。
     finished_at: Option<Instant>,
 
+    started: Instant,
+
+    /// 这段录音的原始峰值（0..1），判断是不是整段没声音。
+    peak: f32,
+
     finish_sent: bool,
 }
 
@@ -100,6 +111,9 @@ pub struct VoiceRuntime {
     transcriber: Box<dyn Transcriber>,
     /// 当前装配的是不是本机离线：私密输入的判断用（云端在私密框里不发声）。
     offline: bool,
+
+    /// 识别方类型，写日志用。
+    provider: &'static str,
     capture_factory: Option<CaptureFactory>,
     sink: Box<dyn VoiceSink>,
     active: Option<Active>,
@@ -119,6 +133,7 @@ impl Default for VoiceRuntime {
         Self {
             transcriber: Box::new(NoTranscriber),
             offline: false,
+            provider: "none",
             capture_factory: None,
             sink: Box::new(NoopVoiceSink),
             active: None,
@@ -191,7 +206,17 @@ impl Router {
         }
         self.voice.from_status = from_status;
         if !self.voice_available() {
-            self.voice.notice(tr("off"));
+            let reason = if self.voice.capture_factory.is_none() {
+                tr("mic").to_owned()
+            } else {
+                transcriber::unavailable_reason(
+                    &self.config.voice,
+                    dirs::user_dir().as_deref(),
+                    exe_dir().as_deref(),
+                )
+            };
+            tracing::info!(provider = self.voice.provider, %reason, "voice unavailable");
+            self.voice.notice(&reason);
             return;
         }
         let session = match self.voice.foreground {
@@ -201,6 +226,7 @@ impl Router {
         if let Some(session) = session.filter(|id| self.sessions.contains_key(id)) {
             self.handle_voice_start(session);
         } else {
+            tracing::info!(?session, "voice trigger without a Mengren input session");
             self.voice.notice(tr("voice_focus"));
         }
     }
@@ -208,11 +234,16 @@ impl Router {
     /// 按配置重建识别方；启动时与配置热加载（换了服务 / 密钥）都走这里。
     pub fn configure_voice(&mut self, config: &VoiceConfig) {
         let user_dir = dirs::user_dir();
-        let exe_dir = std::env::current_exe()
-            .ok()
-            .and_then(|path| path.parent().map(Path::to_path_buf));
+        let exe_dir = exe_dir();
         self.voice.cancel_active("配置已更新");
         self.voice.offline = config.is_offline();
+        self.voice.provider = if config.is_offline() {
+            "offline"
+        } else if config.is_volcengine() {
+            "volcengine"
+        } else {
+            "none"
+        };
         self.voice.transcriber =
             transcriber::build(config, user_dir.as_deref(), exe_dir.as_deref());
     }
@@ -255,8 +286,8 @@ impl Router {
         let capture = match factory() {
             Ok(capture) => capture,
             Err(error) => {
-                tracing::warn!(%error, "语音录音启动失败");
-                self.voice.notice(tr("mic"));
+                tracing::warn!(%error, "voice capture could not start");
+                self.voice.notice(&error);
                 return;
             }
         };
@@ -269,6 +300,8 @@ impl Router {
             capture,
             partial: String::new(),
             finished_at: None,
+            started: Instant::now(),
+            peak: 0.0,
             finish_sent: false,
         });
         self.voice.last_level = 0.0;
@@ -276,7 +309,12 @@ impl Router {
         (self.voice.listening_changed)(true);
         self.voice.sink.listening("", 0.0, self.voice.hint());
         self.reconcile_status();
-        tracing::debug!(?session, private, "语音开始");
+        tracing::info!(
+            ?session,
+            private,
+            provider = self.voice.provider,
+            "voice started"
+        );
     }
 
     /// 全局热键触发（长按 Win / 自定义键）：用当前聚焦会话开始 / 结束一段语音。
@@ -363,7 +401,7 @@ impl Router {
                 self.voice.pending = None;
             } else if pending.session == session {
                 let voice = self.voice.pending.take()?.text;
-                tracing::debug!(?session, "voice final delivered to input thread");
+                tracing::info!(?session, "voice final delivered to input thread");
                 return Some(clicked.unwrap_or_default() + &voice);
             }
         }
@@ -375,9 +413,12 @@ impl Router {
             return;
         };
         if !self.voice.focus_matches(pending.focus) {
+            tracing::info!(session = ?pending.session, "voice final dropped: focus changed");
             return;
         }
         if now >= pending.expires {
+            // 走到这里多半是修饰键一直按着（兜底要等它们松开）或输入框没来取
+            tracing::info!(session = ?pending.session, "voice final expired before delivery");
             self.voice.notice(tr("voice_insert_failed"));
             return;
         }
@@ -386,7 +427,7 @@ impl Router {
         {
             match insert(focus, &pending.text) {
                 VoiceInsertResult::Sent => {
-                    tracing::debug!(session=?pending.session, "voice final sent as Unicode input");
+                    tracing::info!(session=?pending.session, "voice final sent as Unicode input");
                     return;
                 }
                 VoiceInsertResult::Failed => {
@@ -426,11 +467,20 @@ impl Router {
         let Some(active) = self.voice.active.as_mut() else {
             return false;
         };
+        // 录音线程中途出错（麦克风被拔、被独占）：这段到此为止，面板说明原因
+        if let Some(message) = capture_failure(active) {
+            tracing::warn!(%message, "voice capture ended unexpectedly");
+            self.voice.cancel_active("录音中断");
+            self.voice.notice(&message);
+            self.reconcile_status();
+            return true;
+        }
         // 先看音量（可能没有通道）
         let mut level = self.voice.last_level;
         if let Some(receiver) = &active.capture.level {
             while let Ok(value) = receiver.try_recv() {
                 level = value.clamp(0.0, 1.0);
+                active.peak = active.peak.max(level);
             }
         }
         self.voice.last_level = level * 0.8 + self.voice.last_level * 0.2;
@@ -469,6 +519,11 @@ impl Router {
 
         let session = active.session;
         let focus = active.focus;
+        let peak = active.peak;
+        let spoken = active
+            .finished_at
+            .unwrap_or_else(Instant::now)
+            .duration_since(active.started);
         let mut done = false;
         for event in events {
             match event {
@@ -479,7 +534,20 @@ impl Router {
                 }
                 TranscriptEvent::Final(text) => {
                     let text = text.trim().to_owned();
-                    if !text.is_empty() {
+                    tracing::info!(
+                        provider = self.voice.provider,
+                        chars = text.chars().count(),
+                        peak = format!("{peak:.4}"),
+                        seconds = format!("{:.2}", spoken.as_secs_f32()),
+                        "voice final"
+                    );
+                    if text.is_empty() {
+                        self.voice.notice(tr(if peak < SILENT_PEAK {
+                            "mic_silent"
+                        } else {
+                            "voice_empty"
+                        }));
+                    } else {
                         let commit = self.engine.commit_voice(&text);
                         if self.voice.focus_matches(focus) {
                             tracing::debug!(
@@ -500,6 +568,7 @@ impl Router {
                     done = true;
                 }
                 TranscriptEvent::Error(message) => {
+                    tracing::warn!(provider = self.voice.provider, %message, "voice recognition error");
                     self.voice.notice(&message);
                     done = true;
                 }
@@ -525,6 +594,24 @@ impl Router {
             }
         }
         true
+    }
+}
+
+fn exe_dir() -> Option<std::path::PathBuf> {
+    std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(Path::to_path_buf))
+}
+
+/// 录音线程报的中途错误；还没松手线程就退了却没留原因（不该发生）时同样按中断处理。
+fn capture_failure(active: &Active) -> Option<String> {
+    match active.capture.failure.as_ref()?.try_recv() {
+        Ok(Err(message)) => Some(message),
+        // 线程退出就会关掉这个通道；松手前就断开说明线程意外结束
+        Err(TryRecvError::Disconnected) if active.finished_at.is_none() => {
+            Some(tr("mic_lost").to_owned())
+        }
+        _ => None,
     }
 }
 

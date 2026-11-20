@@ -61,11 +61,28 @@ pub fn api(library_dir: Option<&Path>) -> Result<&'static SherpaApi, OfflineErro
 
 fn load(library_dir: Option<&Path>) -> Result<SherpaApi, OfflineError> {
     // Windows 11 的 System32 带一份旧的 onnxruntime.dll：先按完整路径把随包那份载进来，c-api 再找依赖时就用它
-    let onnxruntime = library_dir.and_then(|dir| open(&dir.join(ONNXRUNTIME)).ok());
+    let onnxruntime = library_dir.and_then(|dir| {
+        let path = dir.join(ONNXRUNTIME);
+        open(&path)
+            .inspect_err(|error| {
+                tracing::warn!(path = %path.display(), %error, "cannot preload bundled onnxruntime");
+            })
+            .ok()
+    });
+    // 系统给的原因（缺依赖、位数不对、被安全软件拦）一并留下，否则日志里只剩一句载不进来
+    let mut failures = Vec::new();
     let library = candidates(library_dir)
         .iter()
-        .find_map(|path| open(path).ok())
-        .ok_or_else(|| OfflineError::Library(format!("cannot load {SHERPA}")))?;
+        .find_map(|path| match open(path) {
+            Ok(library) => Some(library),
+            Err(error) => {
+                failures.push(format!("{}: {error}", path.display()));
+                None
+            }
+        })
+        .ok_or_else(|| {
+            OfflineError::Library(format!("cannot load {SHERPA}: {}", failures.join("; ")))
+        })?;
     // SAFETY: 名字与签名对照随包版本的 c-api.h；下面先核对版本，版本不对就不用这些指针
     unsafe {
         let version: Version = *library.get::<Version>(b"SherpaOnnxGetVersionStr\0")?;

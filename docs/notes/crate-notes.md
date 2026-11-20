@@ -906,6 +906,6 @@ Windows `cloud_usage` 本机 HTTP 回归服务在回复后先半关闭写方向�
 
 Windows Server 在 UI 线程安装一个低级键盘钩子，识别语音和翻译两套快捷键。修饰键按物理左右键分别跟踪，组合键通过当前布局映射，计时器只在到达长按阈值后发送遮罩键。Router 工人线程负责音频、取消、配置热加载及会话结果交付。
 
-Windows 麦克风采集在 `apps/windows/server/src/audio`。每包 16 kHz 单声道 PCM 先计算均方根电平和峰值，再按需增益。目标均方根为 −20 dBFS，增益上限为 +24 dB，放大后的峰值限制为 −1 dBFS。低于 −60 dBFS 的包保持原电平。增益上升采用 40 毫秒时间常数，峰值限制立即应用。波形显示原始峰值，离线和云端识别接收调整后的 PCM。松键后先让采集线程交出末尾音频，Router 最多等 150 毫秒再通知识别器结束。
+Windows 麦克风采集在 `apps/windows/server/src/audio`。设备取系统默认录音设备（eConsole），取不到退回默认通信设备。共享模式 `Initialize` 先带 `AUTOCONVERTPCM | SRC_DEFAULT_QUALITY` 直接要 16 kHz 单声道 16 位；被拒（多为混音格式 48 kHz 多声道的笔记本阵列麦克风，`AUDCLNT_E_UNSUPPORTED_FORMAT`）就换新客户端按 `GetMixFormat` 录，进程内折成单声道（int16 / int24 / int32 / float32，含扩展格式头）并用加窗 sinc 重采样到 16 kHz（`format.rs`、`resample.rs`）。工厂等录音线程 `Start` 成功（最多 1.5 秒）才返回，打不开时把分类后的原因（拒绝访问、被独占、没设备、超时、错误码）交给语音面板；录到一半出错经 `Capture.failure` 通道让 Router 结束这一段。info 日志记设备名、混音格式、每次 `Initialize` 的标志与 HRESULT、每段的时长、包数、静音包数与原始峰值，Router 记识别方类型、最终字数与峰值；结果为空时按峰值（低于约 −50 dBFS）区分「没收到声音」和「没听清」。`cargo test -p qingjian-windows-server --lib real_microphone -- --ignored` 在有麦克风的机器上实测两条初始化路径。每包 16 kHz 单声道 PCM 先计算均方根电平和峰值，再按需增益。目标均方根为 −20 dBFS，增益上限为 +24 dB，放大后的峰值限制为 −1 dBFS。低于 −60 dBFS 的包保持原电平。增益上升采用 40 毫秒时间常数，峰值限制立即应用。波形显示原始峰值，离线和云端识别接收调整后的 PCM。松键后先让采集线程交出末尾音频，Router 最多等 150 毫秒再通知识别器结束。
 
 `apps/windows/translator` 生成 `qingjian-translator.exe`。窗口用 Win32 多行编辑控件支持 TSF，复用 CloudPredictor 后台翻译与 Windows SAPI。只有与当前输入代次匹配的响应才能刷新译文。互译语言代码单独保存在用户配置目录的 `translator-language` 文件；隐藏窗口在本进程内保留位置和内容，十分钟后退出。

@@ -1,4 +1,7 @@
 //! Windows 全局语音及翻译快捷键。物理修饰键始终成对放行。
+//!
+//! 低级键盘 / 鼠标钩子装在专用线程上：钩子回调必须在 LowLevelHooksTimeout（约 1 秒）内返回，
+//! 超时多次后系统会静默卸掉钩子，放在要画候选窗的 UI 线程上，机器一卡快捷键就永久失灵。
 use crate::dispatch::VoiceInsertResult;
 use crate::ipc::Work;
 use qingjian_platform::foreground::InputFocus;
@@ -10,13 +13,17 @@ use std::sync::{
 };
 use std::time::{Duration, Instant};
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+use windows::Win32::System::Threading::{
+    GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_HIGHEST,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
     KEYEVENTF_UNICODE, SendInput, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, SetWindowsHookExW, WH_KEYBOARD_LL,
-    WM_KEYDOWN, WM_SYSKEYDOWN,
+    CallNextHookEx, DispatchMessageW, GetMessageW, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG,
+    SetWindowsHookExW, TranslateMessage, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_LBUTTONDOWN,
+    WM_MBUTTONDOWN, WM_MOUSEHWHEEL, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_XBUTTONDOWN,
 };
 
 pub static LISTENING: AtomicBool = AtomicBool::new(false);
@@ -32,6 +39,8 @@ struct State {
     pending: Option<(u32, Instant)>,
     held_voice: Option<u32>,
     swallowed: Vec<u32>,
+    /// 吞掉了带 Win / Alt 的组合主键：钩子返回后补发遮罩键，免得松开 Win 弹开始菜单、松开 Alt 激活菜单栏。
+    mask: bool,
 }
 fn combo(value: Option<KeyCombo>) -> Option<Combo> {
     let value = value?;
@@ -70,6 +79,11 @@ impl State {
         };
         if physical != 0 {
             if down {
+                // 按住触发键时又按了别的修饰键（如 Win 后接 Shift 准备截图）：这是组合键，不是说话
+                if self.modifiers & physical == 0 && self.pending.is_some_and(|(key, _)| key != vk)
+                {
+                    self.pending = None;
+                }
                 if self.modifiers & physical == 0
                     && matches!(
                         (self.voice, vk),
@@ -103,8 +117,10 @@ impl State {
             self.held_voice = None;
             Work::VoiceCancel
         } else if self.translate == pressed {
+            self.mask = mods & (MOD_ALT | MOD_WIN) != 0;
             Work::OpenTranslator
         } else if self.voice == VoiceHotkey::Shortcut && self.speak == pressed {
+            self.mask = mods & (MOD_ALT | MOD_WIN) != 0;
             self.held_voice = Some(vk);
             Work::VoiceKey { down: true }
         } else {
@@ -113,6 +129,10 @@ impl State {
         self.swallowed.push(vk);
         let _ = self.work.send(work);
         true
+    }
+    /// 按住触发键期间点了鼠标或滚了滚轮（右 Ctrl + 点击多选、Ctrl + 滚轮缩放）：不是说话。
+    fn mouse(&mut self) {
+        self.pending = None;
     }
     fn release(&mut self, vk: u32) {
         if self.held_voice == Some(vk) {
@@ -132,6 +152,11 @@ impl State {
         false
     }
 }
+/// 组合键修饰位，与 RegisterHotKey 的 MOD_* 一致（见 `global_hotkey::binding`）。
+const MOD_ALT: u32 = 1;
+const MOD_WIN: u32 = 8;
+
+/// 装钩子：配置放进全局状态，钩子在专用线程上装并跑消息循环（低级钩子靠装它的线程取消息才会被调用）。
 pub fn install(work: Sender<Work>, voice: &VoiceConfig, translator: Option<KeyCombo>) {
     let mut state = State {
         work,
@@ -143,11 +168,37 @@ pub fn install(work: Sender<Work>, voice: &VoiceConfig, translator: Option<KeyCo
         pending: None,
         held_voice: None,
         swallowed: Vec::new(),
+        mask: false,
     };
     state.configure(voice, translator);
+    tracing::info!(
+        trigger = ?state.voice,
+        hold_ms = state.hold.as_millis() as u64,
+        translator = state.translate.is_some(),
+        "global shortcut configured"
+    );
     *STATE.lock().unwrap() = Some(state);
-    if let Err(error) = unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook), None, 0) } {
-        tracing::warn!(%error,"global shortcut hook unavailable");
+    let spawned = std::thread::Builder::new()
+        .name("qingjian-hotkey".to_owned())
+        .spawn(|| unsafe {
+            // 钩子回调慢了所有程序的键盘都会卡，这条线程只做这件事，优先级调高
+            let _ = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+            if let Err(error) = SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook), None, 0) {
+                tracing::warn!(%error, "global shortcut hook unavailable");
+                return;
+            }
+            if let Err(error) = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook), None, 0) {
+                tracing::warn!(%error, "mouse hook unavailable; clicks will not cancel a pending hold");
+            }
+            tracing::info!("global shortcut hook installed");
+            let mut msg = MSG::default();
+            while GetMessageW(&mut msg, None, 0, 0).0 > 0 {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        });
+    if let Err(error) = spawned {
+        tracing::warn!(%error, "cannot spawn global shortcut thread");
     }
 }
 pub fn reconfigure(voice: &VoiceConfig, translator: Option<KeyCombo>) {
@@ -158,16 +209,39 @@ pub fn reconfigure(voice: &VoiceConfig, translator: Option<KeyCombo>) {
 unsafe extern "system" fn hook(code: i32, w: WPARAM, l: LPARAM) -> LRESULT {
     if code == HC_ACTION as i32 {
         let k = unsafe { &*(l.0 as *const KBDLLHOOKSTRUCT) };
-        if STATE.lock().unwrap().as_mut().is_some_and(|s| {
-            s.key(
+        let (swallow, mask) = STATE.lock().unwrap().as_mut().map_or((false, false), |s| {
+            let swallow = s.key(
                 k.vkCode,
                 w.0 == WM_KEYDOWN as usize || w.0 == WM_SYSKEYDOWN as usize,
                 k.flags.contains(LLKHF_INJECTED),
                 Instant::now(),
-            )
-        }) {
+            );
+            (swallow, std::mem::take(&mut s.mask))
+        });
+        // 锁放开后再注入：注入的键会再进一次本钩子
+        if mask {
+            send_mask();
+        }
+        if swallow {
             return LRESULT(1);
         }
+    }
+    unsafe { CallNextHookEx(None, code, w, l) }
+}
+unsafe extern "system" fn mouse_hook(code: i32, w: WPARAM, l: LPARAM) -> LRESULT {
+    if code == HC_ACTION as i32
+        && matches!(
+            w.0 as u32,
+            WM_LBUTTONDOWN
+                | WM_RBUTTONDOWN
+                | WM_MBUTTONDOWN
+                | WM_XBUTTONDOWN
+                | WM_MOUSEWHEEL
+                | WM_MOUSEHWHEEL
+        )
+        && let Some(state) = STATE.lock().unwrap().as_mut()
+    {
+        state.mouse();
     }
     unsafe { CallNextHookEx(None, code, w, l) }
 }
@@ -178,6 +252,14 @@ pub fn tick_hold() {
         .as_mut()
         .is_some_and(|s| s.tick(Instant::now()));
     if fired {
+        send_mask();
+    }
+}
+
+/// 补发一次未分配的虚拟键 0xE8（按下 + 抬起）：系统看到「修饰键之间夹了别的键」，
+/// 松开 Alt 不激活菜单栏、松开 Win 不弹开始菜单、松开 Ctrl 不被当成单击。
+fn send_mask() {
+    {
         let mut key = KEYBDINPUT {
             wVk: VIRTUAL_KEY(0xe8),
             ..Default::default()
@@ -311,6 +393,7 @@ mod tests {
             pending: None,
             held_voice: None,
             swallowed: vec![],
+            mask: false,
         };
         let now = Instant::now();
         let later = now + s.hold;
@@ -340,6 +423,44 @@ mod tests {
         assert!(s.key(27, false, false, now));
         assert!(matches!(rx.try_recv(), Ok(Work::VoiceCancel)));
         LISTENING.store(false, Ordering::Release);
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn hold_is_voided_by_other_modifiers_and_mouse_and_win_combos_are_masked() {
+        let (work, rx) = channel();
+        let mut s = State {
+            work,
+            voice: VoiceHotkey::Win,
+            hold: Duration::from_millis(400),
+            speak: None,
+            translate: Some((MOD_WIN | 4, 70)),
+            modifiers: 0,
+            pending: None,
+            held_voice: None,
+            swallowed: vec![],
+            mask: false,
+        };
+        let now = Instant::now();
+        let later = now + s.hold;
+        // Win 按住后加 Shift：作废；Win 自动重复不算新按下
+        s.key(0x5b, true, false, now);
+        s.key(0x5b, true, false, now);
+        assert!(s.pending.is_some());
+        s.key(0xa0, true, false, now);
+        assert!(!s.tick(later));
+        s.key(0xa0, false, false, now);
+        s.key(0x5b, false, false, now);
+        // 按住时点鼠标：作废
+        s.key(0x5b, true, false, now);
+        s.mouse();
+        assert!(!s.tick(later));
+        // Win + Shift + F 命中翻译组合：吞掉主键，并要求补发遮罩键
+        s.key(0xa0, true, false, now);
+        assert!(s.key(70, true, false, now));
+        assert!(std::mem::take(&mut s.mask));
+        assert!(s.key(70, false, false, now));
+        assert!(matches!(rx.try_recv(), Ok(Work::OpenTranslator)));
         assert!(rx.try_recv().is_err());
     }
 }

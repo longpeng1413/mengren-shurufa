@@ -1,7 +1,7 @@
 [package]
 name = "qingjian-windows-translator"
 description = "猛人输入法 Windows 翻译窗口"
-version = "0.4.11"
+version = "0.4.12"
 edition.workspace = true
 license.workspace = true
 

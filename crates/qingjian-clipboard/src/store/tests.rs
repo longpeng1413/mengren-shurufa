@@ -312,3 +312,28 @@ fn delete_supersedes_an_item_with_a_future_timestamp() {
         .unwrap();
     assert_eq!(state, (true, 10_001));
 }
+
+#[test]
+fn clear_supersedes_items_with_future_timestamps() {
+    let mut store = ClipStore::with_connection(Connection::open_in_memory().unwrap(), 10).unwrap();
+    store
+        .add(
+            &Capture::text("remote".into(), String::new(), vec![]),
+            10_000,
+        )
+        .unwrap();
+    store
+        .add(&Capture::text("local".into(), String::new(), vec![]), 300)
+        .unwrap();
+    store.clear(500).unwrap();
+    let mut stamps: Vec<(bool, i64)> = store
+        .connection
+        .prepare("SELECT deleted,updated_at FROM items ORDER BY updated_at")
+        .unwrap()
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect();
+    stamps.sort_unstable();
+    assert_eq!(stamps, [(true, 500), (true, 10_001)]);
+}
