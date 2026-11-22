@@ -107,6 +107,10 @@ Source: "{#Repo}\assets\emoji\emoji-zh.tsv";     DestDir: "{app}\assets\emoji"; 
 Source: "{#Repo}\assets\emoji\emoji-en.tsv";     DestDir: "{app}\assets\emoji";  Flags: ignoreversion
 Source: "{#Repo}\assets\levels\levels-en.tsv";   DestDir: "{app}\assets\levels"; Flags: ignoreversion
 Source: "{#Repo}\assets\levels\levels-ja.tsv";   DestDir: "{app}\assets\levels"; Flags: ignoreversion
+; 划词翻译的英文词典卡片（ECDICT MIT + CMUdict BSD，许可证随装，见 assets/wordcard/README.md）
+Source: "{#Repo}\assets\wordcard\wordcard-en.tsv";      DestDir: "{app}\assets\wordcard"; Flags: ignoreversion
+Source: "{#Repo}\assets\wordcard\LICENSE-ECDICT.txt";   DestDir: "{app}\assets\wordcard"; Flags: ignoreversion
+Source: "{#Repo}\assets\wordcard\LICENSE-CMUdict.txt";  DestDir: "{app}\assets\wordcard"; Flags: ignoreversion
 ; 随包形码方案（五笔，见 assets/schemes/wubi86/README.md；极点 86 码表，Apache-2.0）。
 ; 走 assets\ 与 emoji / levels 一致，Server 的 `dispatch::code::find_bundled_schemes` 照同一个相对路径找，
 ; 开发布局（cargo run）也对得上

@@ -429,6 +429,8 @@ fn serve(
         hotkey::LISTENING.store(on, std::sync::atomic::Ordering::Release)
     });
     let start_hook: Box<dyn FnOnce() + Send> = Box::new(move || {
+        // 划词图标线程先起，钩子装好后按配置打开
+        qingjian_windows_server::lookup::start();
         hotkey::install(hotkey_work, &voice, translator);
     });
     // 长按 Win 的计时线程：用户按住 Win 不动时没有别的按键事件，靠它到点推进。

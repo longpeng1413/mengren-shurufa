@@ -348,3 +348,16 @@ fn manual_prediction_shortcut_round_trips() {
         config
     );
 }
+
+#[test]
+fn hover_mode_reads_known_values_and_falls_back_to_off() {
+    for (text, mode) in [
+        ("ctrl", crate::HoverMode::Ctrl),
+        ("always", crate::HoverMode::Always),
+        ("off", crate::HoverMode::Off),
+        ("sometimes", crate::HoverMode::Off),
+    ] {
+        let config: Config = toml::from_str(&format!("[lookup]\nhover = \"{text}\"\n")).unwrap();
+        assert_eq!(config.lookup.hover, mode, "{text}");
+    }
+}

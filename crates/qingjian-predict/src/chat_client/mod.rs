@@ -148,7 +148,7 @@ impl ChatClient {
             let client = crate::youdao::client().map_err(|_| {
                 PredictError::Translation("Cannot create translation client".to_owned())
             })?;
-            let result = crate::youdao::translate(
+            let result = crate::youdao::translate_keeping_layout(
                 &client,
                 &self.youdao.app_key,
                 &secret,

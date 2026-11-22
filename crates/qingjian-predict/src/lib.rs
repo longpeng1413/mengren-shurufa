@@ -14,6 +14,7 @@ mod config;
 mod connection;
 mod error;
 mod gloss;
+mod layout;
 pub mod models;
 mod prompt;
 mod reply;

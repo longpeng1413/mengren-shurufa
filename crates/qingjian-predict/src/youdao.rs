@@ -45,6 +45,37 @@ pub fn client() -> Result<reqwest::Client, reqwest::Error> {
         .build()
 }
 
+/// 保留版式的翻译：只把正文一段一行合成一次请求，译文按原位置填回换行、缩进、列表记号与标记；
+/// 有道改了行数就退回整段翻译。
+pub async fn translate_keeping_layout(
+    client: &reqwest::Client,
+    app_key: &str,
+    secret: &str,
+    text: &str,
+    target: &str,
+) -> Result<String, String> {
+    let template = crate::layout::Template::parse(text);
+    let texts = template.texts();
+    if texts.is_empty() {
+        return Ok(text.trim().to_owned());
+    }
+    let translated = translate(client, app_key, secret, &texts.join("\n"), target).await?;
+    let lines: Vec<&str> = translated
+        .split('\n')
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    if let Some(output) = template.fill(&lines) {
+        return Ok(output);
+    }
+    tracing::debug!(
+        sent = texts.len(),
+        received = lines.len(),
+        "Youdao changed the line count; translating the text as a whole"
+    );
+    translate(client, app_key, secret, text, target).await
+}
+
 /// 固定 HTTPS 地址，错误只保留错误码，不包含原文、签名或密钥。
 pub async fn translate(
     client: &reqwest::Client,

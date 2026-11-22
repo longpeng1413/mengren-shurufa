@@ -150,6 +150,13 @@ impl Translation {
             want_sentence: true,
         });
     }
+    /// 朗读原文、译文各用哪种语言的声音：外文译成中文时原文是外文，反之原文是中文。
+    pub fn voices(&self) -> (&'static str, String) {
+        let foreign = LANGS[self.language].0;
+        let dest = target(&self.source, foreign);
+        let source = if dest == "zh" { foreign } else { "zh" };
+        (source, dest)
+    }
     pub fn tick(&mut self, now: Instant) -> bool {
         let mut changed = false;
         if self.pending.is_some_and(|due| now >= due) {

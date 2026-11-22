@@ -242,21 +242,29 @@ fn launch_sibling(name: &str) {
     }
 }
 
-/// 起翻译窗口并把选中的文字交给它（`--stdin`，经管道传，不放命令行：命令行别的进程看得见）。
-/// 窗口已开时新实例把文字转给它后退出。写管道放后台线程，不卡 UI 线程。
+/// 起翻译窗口并把选中的文字交给它，见 [`launch_translator`]。
 fn launch_translator_with(text: String) {
+    launch_translator(&[], Some(text));
+}
+
+/// 起翻译窗口程序：带文字时走 `--stdin`（经管道传，不放命令行：命令行别的进程看得见）。
+/// 窗口已开时新实例把文字转给它后退出。写管道放后台线程，不卡调用方。
+/// 划词翻译的词典卡片加 `--card x,y`，预先起好进程加 `--background`。
+pub fn launch_translator(args: &[String], text: Option<String>) {
     use std::io::Write;
     let _ = unsafe { AllowSetForegroundWindow(ASFW_ANY) };
     let exe = std::env::current_exe().map(|exe| exe.with_file_name("qingjian-translator.exe"));
     let spawned = exe.and_then(|exe| {
-        std::process::Command::new(exe)
-            .arg("--stdin")
-            .stdin(std::process::Stdio::piped())
-            .spawn()
+        let mut command = std::process::Command::new(exe);
+        command.args(args);
+        if text.is_some() {
+            command.arg("--stdin").stdin(std::process::Stdio::piped());
+        }
+        command.spawn()
     });
     match spawned {
         Ok(mut child) => {
-            if let Some(mut stdin) = child.stdin.take() {
+            if let (Some(text), Some(mut stdin)) = (text, child.stdin.take()) {
                 let _ = std::thread::Builder::new()
                     .name("qingjian-translator-text".to_owned())
                     .spawn(move || {

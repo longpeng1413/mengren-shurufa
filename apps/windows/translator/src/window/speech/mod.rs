@@ -1,12 +1,16 @@
 //! 朗读：本机声音优先（经典 SAPI 与系统新语音都认），没有这门语言的声音时按「朗读来源」联网用百度翻译的发音。
 //!
 //! 本机有哪些语言的声音在窗口每次切到前台时重查（窗口收起后进程会留十分钟，用户也可能开着窗口去装语音）；没有声音又不能联网读的语言不朗读（用默认中文声音硬读出来是错的），
-//! 由窗口底部的小字说明。倍速档位与朗读来源各存一个小文件。
+//! 由窗口底部的小字说明。原文、译文的倍速档位与朗读来源各存一个小文件。
 mod online;
+mod repeat;
+mod side;
 mod source;
 mod voices;
 
 pub use online::{MM_MCINOTIFY, Outcome, VOICE_IN};
+pub use repeat::{COUNTS as LOOP_COUNTS, Repeat};
+pub use side::Side;
 pub use source::Source;
 
 use super::translation::LANGS;
@@ -41,39 +45,49 @@ const SPEAK_FLAGS: u32 = 1 | 2 | 16;
 pub struct Speech {
     voice: Option<ISpVoice>,
 
-    /// 正在朗读的按钮，再点同一个按钮就停。
-    last: Option<usize>,
+    /// 正在朗读的是哪一边，再点同一个按钮就停。
+    last: Option<Side>,
 
     /// 本机有声音的语言（`zh`、`en`…）及选用的声音。
     voices: Vec<(&'static str, ISpObjectToken)>,
 
     online: Online,
 
-    /// 当前倍速在 [`SPEEDS`] 里的下标。
-    pub speed: usize,
+    /// 原文的倍速在 [`SPEEDS`] 里的下标。
+    source_speed: usize,
+
+    /// 译文的倍速在 [`SPEEDS`] 里的下标。
+    result_speed: usize,
 
     pub source: Source,
+
+    /// 循环播放的开关、次数与还没读完的几遍。
+    pub repeat: Repeat,
 }
 
 impl Speech {
     /// 查本机声音、读上次的倍速与朗读来源。调用前线程已初始化 COM。
     pub fn new(hwnd: HWND) -> Self {
         let voices = scan();
-        let speed = read_file("translator-speech-speed")
-            .and_then(|text| SPEEDS.iter().position(|s| s.0 == text.trim()))
-            .unwrap_or(NORMAL);
+        let saved = |side: Side| {
+            read_file(side.speed_file())
+                .and_then(|text| SPEEDS.iter().position(|s| s.0 == text.trim()))
+        };
+        let result_speed = saved(Side::Result).unwrap_or(NORMAL);
+        // 原文倍速是后加的：没存过就跟译文一样
+        let source_speed = saved(Side::Source).unwrap_or(result_speed);
         let source = read_file("translator-speech-source")
             .map(|text| Source::parse(&text))
             .unwrap_or_default();
-        let mut online = Online::new(hwnd);
-        online.set_speed(SPEEDS[speed].2);
         Self {
             voice: None,
             last: None,
             voices,
-            online,
-            speed,
+            online: Online::new(hwnd),
+            source_speed,
+            result_speed,
             source,
+            repeat: Repeat::load(),
         }
     }
 
@@ -109,17 +123,30 @@ impl Speech {
             .collect()
     }
 
-    /// 换倍速并记住；正在读的这段也跟着变。
-    pub fn set_speed(&mut self, index: usize) {
+    /// 这一边的倍速在 [`SPEEDS`] 里的下标。
+    pub fn speed(&self, side: Side) -> usize {
+        match side {
+            Side::Source => self.source_speed,
+            Side::Result => self.result_speed,
+        }
+    }
+
+    /// 换这一边的倍速并记住；正在读的正是这一边时也跟着变。
+    pub fn set_speed(&mut self, side: Side, index: usize) {
         let Some((label, rate, mci)) = SPEEDS.get(index) else {
             return;
         };
-        self.speed = index;
-        if let Some(voice) = &self.voice {
-            let _ = unsafe { voice.SetRate(*rate) };
+        match side {
+            Side::Source => self.source_speed = index,
+            Side::Result => self.result_speed = index,
         }
-        self.online.set_speed(*mci);
-        write_file("translator-speech-speed", label);
+        if self.last == Some(side) {
+            if let Some(voice) = &self.voice {
+                let _ = unsafe { voice.SetRate(*rate) };
+            }
+            self.online.set_speed(*mci);
+        }
+        write_file(side.speed_file(), label);
     }
 
     /// 换朗读来源并记住。
@@ -134,11 +161,24 @@ impl Speech {
         }
         self.online.stop();
         self.last = None;
+        self.repeat.clear();
     }
 
-    /// 读 `text`；同一个按钮正在读时再点就停。
-    pub fn read(&mut self, id: usize, text: &str, lang: &str) -> Result<()> {
-        if self.last == Some(id) && self.speaking() {
+    /// 定时器里调：开着循环且上一遍读完了，就接着读下一遍。
+    pub fn tick(&mut self) {
+        let speaking = self.speaking();
+        if let Some((side, text, language)) = self.repeat.next(speaking, std::time::Instant::now())
+        {
+            tracing::info!(?side, "speech repeat round");
+            if self.start(side, &text, &language).is_err() {
+                self.repeat.clear();
+            }
+        }
+    }
+
+    /// 读 `text`；同一边正在读（或循环中等着读下一遍）时再点就停。开着循环时读够次数。
+    pub fn read(&mut self, side: Side, text: &str, lang: &str) -> Result<()> {
+        if self.last == Some(side) && (self.speaking() || self.repeat.side() == Some(side)) {
             self.stop();
             return Ok(());
         }
@@ -146,6 +186,14 @@ impl Speech {
         if text.trim().is_empty() {
             return Ok(());
         }
+        if self.start(side, text, lang)? {
+            self.repeat.arm(side, text, lang, std::time::Instant::now());
+        }
+        Ok(())
+    }
+
+    /// 开读一遍，不动循环状态；读不了（没有这门语言的声音）回 `false`。
+    fn start(&mut self, side: Side, text: &str, lang: &str) -> Result<bool> {
         let token = self
             .voices
             .iter()
@@ -159,15 +207,18 @@ impl Speech {
                 let voice = self.voice.as_ref().unwrap();
                 unsafe {
                     voice.SetVoice(&token)?;
-                    voice.SetRate(SPEEDS[self.speed].1)?;
+                    voice.SetRate(SPEEDS[self.speed(side)].1)?;
                     voice.Speak(&HSTRING::from(text), SPEAK_FLAGS, None)?;
                 }
             }
-            None if self.online_reads(lang) => self.online.start(text, lang),
-            None => return Ok(()),
+            None if self.online_reads(lang) => {
+                self.online.set_speed(SPEEDS[self.speed(side)].2);
+                self.online.start(text, lang);
+            }
+            None => return Ok(false),
         }
-        self.last = Some(id);
-        Ok(())
+        self.last = Some(side);
+        Ok(true)
     }
 
     /// 窗口收到 [`VOICE_IN`]。

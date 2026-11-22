@@ -108,7 +108,7 @@ fn class_name(window: HWND) -> String {
 }
 
 /// 窗口所属进程的 exe 名（小写）。
-fn process_name(window: HWND) -> Option<String> {
+pub(super) fn process_name(window: HWND) -> Option<String> {
     let mut pid = 0u32;
     unsafe { GetWindowThreadProcessId(window, Some(&mut pid)) };
     if pid == 0 {

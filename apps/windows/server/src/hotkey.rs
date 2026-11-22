@@ -24,8 +24,9 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, DispatchMessageW, GetMessageW, HC_ACTION, KBDLLHOOKSTRUCT, LLKHF_INJECTED, MSG,
-    SetWindowsHookExW, TranslateMessage, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_LBUTTONDOWN,
-    WM_MBUTTONDOWN, WM_MOUSEHWHEEL, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_SYSKEYDOWN, WM_XBUTTONDOWN,
+    MSLLHOOKSTRUCT, SetWindowsHookExW, TranslateMessage, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN,
+    WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_MOUSEHWHEEL, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_SYSKEYDOWN,
+    WM_XBUTTONDOWN,
 };
 
 pub static LISTENING: AtomicBool = AtomicBool::new(false);
@@ -79,6 +80,8 @@ impl State {
         self.translate = combo(translator.combo);
         self.double_ctrl = translator.double_ctrl;
         self.double_shift = translator.double_shift;
+        crate::lookup::set_enabled(translator.selection);
+        crate::lookup::set_hover(translator.hover);
         self.tap_press = None;
         self.last_tap = None;
     }
@@ -251,6 +254,8 @@ pub fn install(work: Sender<Work>, voice: &VoiceConfig, translator: TranslatorKe
         translator = state.translate.is_some(),
         double_ctrl = state.double_ctrl,
         double_shift = state.double_shift,
+        selection = translator.selection,
+        hover = translator.hover.key(),
         "global shortcut configured"
     );
     *STATE.lock().unwrap() = Some(state);
@@ -285,6 +290,9 @@ pub fn reconfigure(voice: &VoiceConfig, translator: TranslatorKeys) {
 unsafe extern "system" fn hook(code: i32, w: WPARAM, l: LPARAM) -> LRESULT {
     if code == HC_ACTION as i32 {
         let k = unsafe { &*(l.0 as *const KBDLLHOOKSTRUCT) };
+        if w.0 == WM_KEYDOWN as usize || w.0 == WM_SYSKEYDOWN as usize {
+            crate::lookup::key(k.vkCode);
+        }
         let (swallow, mask) = STATE.lock().unwrap().as_mut().map_or((false, false), |s| {
             let swallow = s.key(
                 k.vkCode,
@@ -305,6 +313,10 @@ unsafe extern "system" fn hook(code: i32, w: WPARAM, l: LPARAM) -> LRESULT {
     unsafe { CallNextHookEx(None, code, w, l) }
 }
 unsafe extern "system" fn mouse_hook(code: i32, w: WPARAM, l: LPARAM) -> LRESULT {
+    if code == HC_ACTION as i32 {
+        let info = unsafe { &*(l.0 as *const MSLLHOOKSTRUCT) };
+        crate::lookup::mouse(w.0 as u32, info.pt.x, info.pt.y, info.time);
+    }
     if code == HC_ACTION as i32
         && matches!(
             w.0 as u32,

@@ -12,6 +12,7 @@
 //! `#` 开头为注释行。每个文件对应一种学习语言，语言由构造时指定。
 //!
 //! [`LevelTable`] 是词汇等级表（`levels-<语言>.tsv`，`词\t等级`），给词汇统计按级数词用。
+//! [`WordCards`] 是划词翻译的英文词典卡片表（美式音标、中文释义、考试标签）。
 //! [`PersonalGlossary`] 是用户目录里的个人释义表（释义兜底写入、可手改），[`LayeredTranslator`] 把它叠在随包表上面。
 
 #![forbid(unsafe_code)]
@@ -21,9 +22,11 @@ mod glossary;
 mod layered_translator;
 mod level_table;
 mod personal_glossary;
+mod word_card;
 
 pub use error::GlossaryError;
 pub use glossary::Glossary;
 pub use layered_translator::LayeredTranslator;
 pub use level_table::LevelTable;
 pub use personal_glossary::PersonalGlossary;
+pub use word_card::{WordCard, WordCards, phrase_words, single_word};

@@ -1,11 +1,19 @@
 //! 原生多行编辑框保留 TSF 输入。窗口过程只排队，控件通知不会重入界面状态。
+mod card;
 mod colors;
+mod fit;
 mod incoming;
+mod layout;
+mod lookup;
 mod popup;
+mod repeat_menu;
+mod run;
 mod speech;
 mod translation;
-use qingjian_platform::{Config, dirs, windows_text::tr};
-use speech::{MM_MCINOTIFY, Outcome, SPEEDS, Source, Speech, VOICE_IN};
+use card::{CARD_CLOSE, CARD_COMMAND, Card};
+use qingjian_platform::{Config, LookupConfig, windows_text::tr};
+pub use run::run;
+use speech::{MM_MCINOTIFY, Outcome, SPEEDS, Side, Source, Speech, VOICE_IN};
 use std::{
     cell::RefCell,
     collections::VecDeque,
@@ -13,30 +21,21 @@ use std::{
 };
 use translation::{LANGS, Translation};
 use windows::Win32::{
-    Foundation::{
-        CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HWND, LPARAM, LRESULT, RECT, SIZE, WPARAM,
-    },
+    Foundation::{HWND, LPARAM, LRESULT, RECT, SIZE, WPARAM},
     Graphics::Gdi::{
-        CLEARTYPE_QUALITY, CLIP_DEFAULT_PRECIS, COLOR_WINDOW, CreateFontW, DEFAULT_CHARSET,
-        DeleteObject, GetDC, GetTextExtentPoint32W, HDC, HFONT, OUT_DEFAULT_PRECIS, ReleaseDC,
-        SelectObject, VARIABLE_PITCH,
+        COLOR_WINDOW, DeleteObject, GetDC, GetTextExtentPoint32W, HDC, HFONT, ReleaseDC,
+        SelectObject,
     },
-    System::{
-        Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize},
-        LibraryLoader::GetModuleHandleW,
-        Threading::CreateMutexW,
-    },
-    UI::{
-        HiDpi::GetDpiForWindow,
-        Input::KeyboardAndMouse::{GetKeyState, SetFocus, VK_CONTROL},
-        WindowsAndMessaging::*,
-    },
+    System::LibraryLoader::GetModuleHandleW,
+    UI::{HiDpi::GetDpiForWindow, Input::KeyboardAndMouse::SetFocus, WindowsAndMessaging::*},
 };
 use windows::core::{HSTRING, PCWSTR, Result, w};
 const CLASS: PCWSTR = w!("Mengren.Translator.Window");
 const TOGGLE: u32 = WM_APP + 1;
 /// 收到 Server 转来的原文；投递一条让消息循环醒来处理（跨进程 SendMessage 不会让 GetMessage 返回）。
 const TEXT_IN: u32 = WM_APP + 2;
+/// 收到 Server 转来的划词卡片请求（+3 已给联网朗读）。
+const CARD_IN: u32 = WM_APP + 22;
 const LANG: usize = 1;
 const SWAP: usize = 2;
 const SOURCE: usize = 3;
@@ -54,11 +53,26 @@ const RESULT_LABEL: usize = 14;
 const SPEED: usize = 15;
 /// 底部说明小字：本机能朗读哪些语言。
 const NOTE: usize = 16;
-const CONTROL_COUNT: usize = NOTE + 1;
+/// 原文的倍速按钮（`SPEED` 是译文的）。
+const SOURCE_SPEED: usize = 17;
+/// 「取词…」菜单按钮。
+const LOOKUP: usize = 18;
+/// 循环播放按钮（译文一行）。
+const LOOP: usize = 19;
+/// 原文一行的循环播放按钮，与 `LOOP` 改同一份设置。
+const SOURCE_LOOP: usize = 20;
+const CONTROL_COUNT: usize = SOURCE_LOOP + 1;
 /// 按钮高度（96 DPI 下的像素）。
 const BUTTON_HEIGHT: i32 = 28;
 /// 按钮文字两侧留白之和。
 const BUTTON_PADDING: i32 = 28;
+/// 窗口默认外框尺寸（96 DPI 下的像素）。
+const DEFAULT_WIDTH: i32 = 660;
+const DEFAULT_HEIGHT: i32 = 615;
+/// 客户区里两块文本区以外的固定高度（96 DPI 下的像素），两块文本区平分剩下的。
+const FIXED_HEIGHT: i32 = 268;
+/// 每块文本区比其中的文本框高出的部分（96 DPI 下的像素）。
+const BOX_MARGIN: i32 = 20;
 thread_local! {static EVENTS:RefCell<VecDeque<(u32,usize)>>=const{RefCell::new(VecDeque::new())};}
 unsafe extern "system" fn proc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) -> LRESULT {
     match msg {
@@ -101,20 +115,25 @@ unsafe extern "system" fn proc(hwnd: HWND, msg: u32, w: WPARAM, l: LPARAM) -> LR
             size.ptMinTrackSize.y = 455 * dpi / 96;
             LRESULT(0)
         }
-        WM_COPYDATA => {
-            if unsafe { incoming::receive(l) } {
-                let _ = unsafe { PostMessageW(Some(hwnd), TEXT_IN, WPARAM(0), LPARAM(0)) };
+        WM_COPYDATA => match unsafe { incoming::receive(l) } {
+            Some(tag) => {
+                let event = if tag == incoming::COPY_CARD {
+                    CARD_IN
+                } else {
+                    TEXT_IN
+                };
+                let _ = unsafe { PostMessageW(Some(hwnd), event, WPARAM(0), LPARAM(0)) };
                 LRESULT(1)
-            } else {
-                LRESULT(0)
             }
-        }
+            None => LRESULT(0),
+        },
         // 切回窗口时重查朗读声音：用户可能刚在系统设置里装了语音
         WM_ACTIVATE if w.0 & 0xFFFF != WA_INACTIVE as usize => {
             EVENTS.with_borrow_mut(|q| q.push_back((msg, w.0)));
             unsafe { DefWindowProcW(hwnd, msg, w, l) }
         }
-        WM_CLOSE | WM_SIZE | WM_TIMER | WM_COMMAND | TOGGLE | TEXT_IN | VOICE_IN | MM_MCINOTIFY => {
+        WM_CLOSE | WM_SIZE | WM_TIMER | WM_COMMAND | TOGGLE | TEXT_IN | CARD_IN | VOICE_IN
+        | MM_MCINOTIFY => {
             EVENTS.with_borrow_mut(|q| q.push_back((msg, w.0)));
             LRESULT(0)
         }
@@ -152,9 +171,19 @@ struct Window {
     model: Translation,
     speech: Speech,
     hidden: Option<Instant>,
+
+    /// 上次自动调出的窗口外框尺寸；当前尺寸与它不同说明用户拖过，就不再缩小。
+    fitted: Option<(i32, i32)>,
+
+    /// 划词卡片。
+    card: Card,
+
+    /// `[lookup]`：划词翻译开着时进程常驻，随时弹卡片。
+    lookup: LookupConfig,
 }
 impl Window {
-    fn new(config: Config) -> Result<Self> {
+    /// `visible` 为假时只建好窗口不显示（后台预起、只弹卡片）。
+    fn new(config: Config, visible: bool) -> Result<Self> {
         unsafe {
             colors::init();
             let inst = GetModuleHandleW(None)?;
@@ -183,8 +212,8 @@ impl Window {
                 WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                 r.left + (r.right - r.left) / 4,
                 r.top + (r.bottom - r.top) / 7,
-                660,
-                615,
+                DEFAULT_WIDTH,
+                DEFAULT_HEIGHT,
                 None,
                 None,
                 Some(inst.into()),
@@ -199,8 +228,8 @@ impl Window {
                     None,
                     0,
                     0,
-                    660 * dpi / 96,
-                    615 * dpi / 96,
+                    DEFAULT_WIDTH * dpi / 96,
+                    DEFAULT_HEIGHT * dpi / 96,
                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
                 );
             }
@@ -210,6 +239,7 @@ impl Window {
                 (LANG, w!("BUTTON"), "", BS_OWNERDRAW as u32),
                 (SWAP, w!("BUTTON"), "swap", BS_OWNERDRAW as u32),
                 (BACKGROUND, w!("BUTTON"), "background", BS_OWNERDRAW as u32),
+                (LOOKUP, w!("BUTTON"), "lookup", BS_OWNERDRAW as u32),
                 (
                     SOURCE,
                     w!("EDIT"),
@@ -242,6 +272,9 @@ impl Window {
                     BS_OWNERDRAW as u32,
                 ),
                 (SPEED, w!("BUTTON"), "", BS_OWNERDRAW as u32),
+                (LOOP, w!("BUTTON"), "", BS_OWNERDRAW as u32),
+                (SOURCE_LOOP, w!("BUTTON"), "", BS_OWNERDRAW as u32),
+                (SOURCE_SPEED, w!("BUTTON"), "", BS_OWNERDRAW as u32),
                 (COPY, w!("BUTTON"), "copy", BS_OWNERDRAW as u32),
                 (STATUS, w!("STATIC"), "", 0),
                 (NOTE, w!("STATIC"), "", 0),
@@ -276,6 +309,11 @@ impl Window {
                     None,
                 )?;
             }
+            let lookup = config.lookup;
+            let card = Card::new(
+                config.clone(),
+                lookup.selection || lookup.hover != qingjian_platform::HoverMode::Off,
+            )?;
             let model = Translation::new(config);
             let mut this = Self {
                 hwnd,
@@ -285,125 +323,23 @@ impl Window {
                 dpi: 0,
                 model,
                 speech: Speech::new(hwnd),
-                hidden: None,
+                hidden: (!visible).then(Instant::now),
+                fitted: None,
+                card,
+                lookup,
             };
             this.layout();
             this.render();
             this.add_tooltip(SPEED, tr("speed_tip"));
-            let _ = ShowWindow(hwnd, SW_SHOW);
-            let _ = SetFocus(Some(this.controls[SOURCE]));
+            this.add_tooltip(SOURCE_SPEED, tr("speed_tip"));
+            this.add_tooltip(LOOP, tr("loop_tip"));
+            this.add_tooltip(SOURCE_LOOP, tr("loop_tip"));
+            if visible {
+                let _ = ShowWindow(hwnd, SW_SHOW);
+                let _ = SetFocus(Some(this.controls[SOURCE]));
+            }
             SetTimer(Some(hwnd), 1, 100, None);
             Ok(this)
-        }
-    }
-    fn layout(&mut self) {
-        unsafe {
-            let dpi = GetDpiForWindow(self.hwnd).max(96);
-            let px = |v: i32| v * dpi as i32 / 96;
-            if self.dpi != dpi {
-                let old = self.font;
-                self.font = CreateFontW(
-                    -px(14),
-                    0,
-                    0,
-                    0,
-                    400,
-                    0,
-                    0,
-                    0,
-                    DEFAULT_CHARSET,
-                    OUT_DEFAULT_PRECIS,
-                    CLIP_DEFAULT_PRECIS,
-                    CLEARTYPE_QUALITY,
-                    VARIABLE_PITCH.0 as u32,
-                    w!("Microsoft YaHei UI"),
-                );
-                let old_small = self.small;
-                self.small = CreateFontW(
-                    -px(12),
-                    0,
-                    0,
-                    0,
-                    400,
-                    0,
-                    0,
-                    0,
-                    DEFAULT_CHARSET,
-                    OUT_DEFAULT_PRECIS,
-                    CLIP_DEFAULT_PRECIS,
-                    CLEARTYPE_QUALITY,
-                    VARIABLE_PITCH.0 as u32,
-                    w!("Microsoft YaHei UI"),
-                );
-                self.dpi = dpi;
-                for (id, h) in self.controls.iter().enumerate().skip(1) {
-                    let font = if id == NOTE { self.small } else { self.font };
-                    SendMessageW(
-                        *h,
-                        WM_SETFONT,
-                        Some(WPARAM(font.0 as usize)),
-                        Some(LPARAM(1)),
-                    );
-                }
-                for font in [old, old_small] {
-                    if !font.is_invalid() {
-                        let _ = DeleteObject(font.into());
-                    }
-                }
-            }
-            let mut r = RECT::default();
-            let _ = GetClientRect(self.hwnd, &mut r);
-            let width = r.right * 96 / dpi as i32;
-            let height = r.bottom * 96 / dpi as i32;
-            let area = ((height - 268) / 2).max(40);
-            let left = 20;
-            let end = width - left;
-            let row = 96 + area;
-            let footer = row + area + 76;
-            let h = BUTTON_HEIGHT;
-            let gap = 8;
-            // 按钮宽度跟着文字走：英文、德文等文案长，写死宽度会截断
-            let label = self.text_width(tr("language")) + 4;
-            let lang = LANGS
-                .iter()
-                .enumerate()
-                .map(|(i, _)| self.button_width(&format!("{}  ▾", translation::label(i)), 110))
-                .max()
-                .unwrap_or(110);
-            let swap = self.button_width(tr("swap"), 64);
-            let background = self.button_width(tr("background"), 80);
-            let read_source = self.button_width(tr("read_source"), 88);
-            let clear = self.button_width(tr("clear"), 64);
-            let translate = self.button_width(tr("translate_now"), 88);
-            let read_result = self.button_width(tr("read_result"), 88);
-            let speed = SPEEDS
-                .iter()
-                .map(|s| self.button_width(s.0, 64))
-                .max()
-                .unwrap_or(64);
-            let copy = self.button_width(tr("copy"), 88);
-            let lang_x = left + label + 12;
-            for (i, x, y, w, h) in [
-                (LABEL, left, 25, label, 22),
-                (LANG, lang_x, 20, lang, h),
-                (SWAP, lang_x + lang + gap, 20, swap, h),
-                (BACKGROUND, end - background, 20, background, h),
-                (SOURCE_LABEL, left, 63, end - left, 20),
-                (SOURCE, left + 10, 96, end - left - 20, area - 20),
-                (READ_SOURCE, left, row + 3, read_source, h),
-                (CLEAR, left + read_source + gap, row + 3, clear, h),
-                (TRANSLATE, end - translate, row + 3, translate, h),
-                (RESULT_LABEL, left, row + 47, end - left, 20),
-                (RESULT, left + 10, row + 79, end - left - 20, area - 20),
-                (READ_RESULT, left, footer + 3, read_result, h),
-                (SPEED, left + read_result + gap, footer + 3, speed, h),
-                (COPY, end - copy, footer + 3, copy, h),
-                (STATUS, left, footer + 40, end - left, 22),
-                (NOTE, left, footer + 64, end - left, 18),
-            ] {
-                let _ = MoveWindow(self.controls[i], px(x), px(y), px(w.max(1)), px(h), true);
-            }
-            let _ = windows::Win32::Graphics::Gdi::InvalidateRect(Some(self.hwnd), None, true);
         }
     }
 
@@ -482,25 +418,27 @@ impl Window {
             SendMessageW(tip, TTM_SETMAXTIPWIDTH, None, Some(LPARAM(320 * dpi / 96)));
         }
     }
+    /// 控件里的文字，换行统一成 `\n`（系统文本框里存的是 `\r\n`）。
     fn text(&self, id: usize) -> String {
-        unsafe {
+        let text = unsafe {
             let mut buf = vec![0; GetWindowTextLengthW(self.controls[id]) as usize + 1];
             let n = GetWindowTextW(self.controls[id], &mut buf);
             String::from_utf16_lossy(&buf[..n as usize])
-        }
+        };
+        text.replace("\r\n", "\n")
     }
     /// 文字没变就不重设，免得按钮与状态行每次刷新都闪。
+    /// 系统多行文本框只认 `\r\n`，网页取来的选区与译文多是 `\n`，不换掉就挤成一段。
     fn set(&self, id: usize, text: &str) {
+        let text = text.replace("\r\n", "\n").replace('\r', "\n");
         if self.text(id) != text {
-            let _ = unsafe { SetWindowTextW(self.controls[id], &HSTRING::from(text)) };
+            let shown = text.replace('\n', "\r\n");
+            let _ = unsafe { SetWindowTextW(self.controls[id], &HSTRING::from(shown)) };
         }
     }
     /// 朗读原文、译文各用哪种语言的声音。
     fn speech_languages(&self) -> (&'static str, String) {
-        let foreign = LANGS[self.model.language].0;
-        let dest = translation::target(&self.model.source, foreign);
-        let source = if dest == "zh" { foreign } else { "zh" };
-        (source, dest)
+        self.model.voices()
     }
     /// 底部小字：本机能朗读哪些语言；当前外语读不了时直接点明。
     fn speech_note(&self) -> String {
@@ -540,15 +478,16 @@ impl Window {
         self.render();
     }
     fn render(&self) {
-        if self.text(RESULT) != self.model.output {
-            self.set(RESULT, &self.model.output);
-        }
+        self.set(RESULT, &self.model.output);
         self.set(STATUS, self.model.status);
         self.set(
             LANG,
             &format!("{}  ▾", translation::label(self.model.language)),
         );
-        self.set(SPEED, SPEEDS[self.speech.speed].0);
+        self.set(SPEED, SPEEDS[self.speech.speed(Side::Result)].0);
+        self.set(SOURCE_SPEED, SPEEDS[self.speech.speed(Side::Source)].0);
+        self.set(LOOP, &self.loop_label());
+        self.set(SOURCE_LOOP, &self.loop_label());
         self.set(NOTE, &self.speech_note());
         let (source_voice, result_voice) = self.speech_languages();
         for (id, enabled) in [
@@ -579,6 +518,13 @@ impl Window {
         self.speech.refresh();
         self.set(SOURCE, &text);
         self.translate_now();
+        unsafe {
+            // 最小化、最大化时先还原，才能按内容定大小
+            if IsIconic(self.hwnd).as_bool() || IsZoomed(self.hwnd).as_bool() {
+                let _ = ShowWindow(self.hwnd, SW_RESTORE);
+            }
+        }
+        self.fit(true);
         unsafe {
             let _ = ShowWindow(self.hwnd, SW_RESTORE);
             let _ = SetForegroundWindow(self.hwnd);
@@ -621,6 +567,8 @@ impl Window {
                 self.model.send();
                 self.render();
             }
+            LOOKUP => self.lookup_menu(),
+            LOOP | SOURCE_LOOP => self.loop_menu(self.hwnd, self.controls[id]),
             BACKGROUND => {
                 match self.menu(BACKGROUND, &[tr("background"), tr("reset_background")], &[]) {
                     Some(0) => colors::choose(self.hwnd),
@@ -643,26 +591,35 @@ impl Window {
             },
             READ_SOURCE | READ_RESULT => {
                 let (source_voice, result_voice) = self.speech_languages();
-                let (text, language) = if id == READ_RESULT {
-                    (self.model.output.clone(), result_voice.as_str())
+                let (side, text, language) = if id == READ_RESULT {
+                    (
+                        Side::Result,
+                        self.model.output.clone(),
+                        result_voice.as_str(),
+                    )
                 } else {
-                    (self.model.source.clone(), source_voice)
+                    (Side::Source, self.model.source.clone(), source_voice)
                 };
-                if self.speech.read(id, &text, language).is_err() {
+                if self.speech.read(side, &text, language).is_err() {
                     self.set(STATUS, tr("speech_failed"));
                 }
             }
-            SPEED => {
-                // 倍速各档，分隔线，再是朗读来源两项
+            SPEED | SOURCE_SPEED => {
+                let side = if id == SPEED {
+                    Side::Result
+                } else {
+                    Side::Source
+                };
+                // 倍速各档，分隔线，再是朗读来源两项（来源两边共用）
                 let mut labels: Vec<&str> = SPEEDS.iter().map(|s| s.0).collect();
                 labels.extend(["", tr("source_auto"), tr("source_local")]);
                 let source = SPEEDS.len() + 1;
                 let checked = [
-                    self.speech.speed,
+                    self.speech.speed(side),
                     source + usize::from(self.speech.source == Source::Local),
                 ];
-                match self.menu(SPEED, &labels, &checked) {
-                    Some(index) if index < SPEEDS.len() => self.speech.set_speed(index),
+                match self.menu(id, &labels, &checked) {
+                    Some(index) if index < SPEEDS.len() => self.speech.set_speed(side, index),
                     Some(index) if index == source => self.speech.set_source(Source::Auto),
                     Some(index) if index == source + 1 => {
                         self.speech.stop();
@@ -679,13 +636,30 @@ impl Window {
         while let Some((msg, param)) = EVENTS.with_borrow_mut(VecDeque::pop_front) {
             match msg {
                 WM_TIMER => {
+                    // 划词翻译开着时常驻，随时弹卡片；卡片开着时也不退
                     if self
                         .hidden
                         .is_some_and(|at| at.elapsed() >= Duration::from_secs(600))
+                        && !self.lookup.selection
+                        && self.lookup.hover == qingjian_platform::HoverMode::Off
+                        && !self.card.visible()
                     {
                         unsafe { PostQuitMessage(0) };
-                    } else if self.model.tick(Instant::now()) {
-                        self.render();
+                    } else {
+                        if self.card.model.tick(Instant::now()) {
+                            self.card.render();
+                            self.card_translated();
+                        }
+                        self.card.watch_outside_click();
+                        self.speech.tick();
+                        // 原文一变译文就清空，所以译文由空变有就是新结果到了
+                        let waiting = self.model.output.is_empty();
+                        if self.model.tick(Instant::now()) {
+                            self.render();
+                            if waiting && !self.model.output.is_empty() {
+                                self.fit(false);
+                            }
+                        }
                     }
                 }
                 WM_SIZE => self.layout(),
@@ -706,6 +680,13 @@ impl Window {
                         self.receive(text);
                     }
                 }
+                CARD_IN => {
+                    if let Some((x, y, text, hover)) = incoming::take_card() {
+                        self.show_card(x, y, text, hover);
+                    }
+                }
+                CARD_COMMAND => self.card_command(param),
+                CARD_CLOSE => self.card.hide(),
                 TOGGLE => unsafe {
                     if param == 1 {
                         self.hide();
@@ -734,87 +715,5 @@ impl Drop for Window {
                 }
             }
         }
-    }
-}
-pub fn run() -> Result<()> {
-    // 先读管道再判单实例：Server 写完就关管道，不读它会一直等
-    let text = incoming::stdin_text();
-    unsafe {
-        let mutex = CreateMutexW(None, false, w!("Local\\Mengren.Translator"))?;
-        if GetLastError() == ERROR_ALREADY_EXISTS {
-            for _ in 0..100 {
-                if let Ok(hwnd) = FindWindowW(CLASS, None) {
-                    let hide = GetForegroundWindow() == hwnd;
-                    let mut pid = 0;
-                    GetWindowThreadProcessId(hwnd, Some(&mut pid));
-                    let _ = AllowSetForegroundWindow(pid);
-                    // 带原文时总是显示并翻译；只按快捷键时在前台就收起
-                    match &text {
-                        Some(text) => incoming::forward(hwnd, text),
-                        None => PostMessageW(Some(hwnd), TOGGLE, WPARAM(hide as usize), LPARAM(0))?,
-                    }
-                    break;
-                }
-                std::thread::sleep(Duration::from_millis(20));
-            }
-            CloseHandle(mutex)?;
-            return Ok(());
-        }
-        CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok()?;
-        if let Some(dir) = dirs::user_dir() {
-            let _ = dotenvy::from_path(dir.join(".env"));
-        }
-        let _guard = dirs::log_dir().and_then(|dir| {
-            let log = tracing_appender::rolling::RollingFileAppender::builder()
-                .rotation(tracing_appender::rolling::Rotation::DAILY)
-                .filename_prefix("translator")
-                .max_log_files(7)
-                .build(dir)
-                .ok()?;
-            let (writer, guard) = tracing_appender::non_blocking(
-                qingjian_platform::logs::secrets::MaskingWriter::new(log),
-            );
-            let _ = tracing_subscriber::fmt()
-                .with_writer(writer)
-                .with_ansi(false)
-                .try_init();
-            Some(guard)
-        });
-        qingjian_platform::member::install();
-        let cfg = dirs::config_path()
-            .and_then(|p| Config::load(&p).ok())
-            .unwrap_or_default();
-        bamboo_slip_i18n::set_locale(cfg.general.ui_locale());
-        let mut win = Window::new(cfg)?;
-        if let Some(text) = text {
-            win.receive(text);
-        }
-        let mut msg = MSG::default();
-        loop {
-            let rc = GetMessageW(&mut msg, None, 0, 0).0;
-            if rc <= 0 {
-                break;
-            }
-            if msg.message == WM_KEYDOWN && msg.wParam.0 == 27 {
-                win.hide();
-                continue;
-            }
-            if msg.message == WM_KEYDOWN
-                && msg.wParam.0 == 13
-                && GetKeyState(VK_CONTROL.0 as i32) < 0
-            {
-                win.translate_now();
-                continue;
-            }
-            if !IsDialogMessageW(win.hwnd, &msg).as_bool() {
-                let _ = TranslateMessage(&msg);
-                DispatchMessageW(&msg);
-            }
-            win.events();
-        }
-        drop(win);
-        CoUninitialize();
-        CloseHandle(mutex)?;
-        Ok(())
     }
 }

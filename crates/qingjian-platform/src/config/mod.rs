@@ -10,11 +10,13 @@ mod emoji_count;
 mod font_size;
 mod general;
 mod highlight_keys;
+mod hover_mode;
 mod key_combo;
 mod key_hint_mode;
 mod layout_mode;
 mod legacy_traditional;
 mod log_level;
+mod lookup;
 mod model;
 mod modifiers;
 mod numpad_digit;
@@ -64,11 +66,13 @@ pub use general::{
     UI_LANGUAGE_SYSTEM,
 };
 pub use highlight_keys::HighlightKeys;
+pub use hover_mode::HoverMode;
 pub use key_combo::KeyCombo;
 pub use key_hint_mode::KeyHintMode;
 pub use layout_mode::LayoutMode;
 pub use legacy_traditional::LegacyTraditional;
 pub use log_level::LogLevel;
+pub use lookup::LookupConfig;
 pub use model::{LocalModel, LocalModelConfig, ZhiyiTier};
 pub use modifiers::Modifiers;
 pub use numpad_digit::NumpadDigit;
@@ -137,6 +141,9 @@ pub struct Config {
     /// 语音识别：本机离线 / 豆包云端，与云联想的密钥分开。
     #[serde(default)]
     pub voice: VoiceConfig,
+
+    /// 取词：划词翻译与查词发音（Windows）。
+    pub lookup: LookupConfig,
 }
 
 /// 模板的 `[apps]` 一节（Linux）：应用按 fcitx5 认到的名字（X11 是 WM_CLASS，Wayland 是 app_id）。
@@ -525,6 +532,14 @@ history_limit = 1000
 paused = false
 # 从这些程序复制的内容不记录：程序名，不分大小写
 excluded_apps = ["KeePass", "KeePassXC", "1Password", "Bitwarden"]
+
+[lookup]
+# 划词翻译（Windows）：鼠标拖选或双击选中文字后，鼠标旁出现「译」图标，点它弹出词典卡片（单个英文词）或译文。默认关
+selection = false
+# 弹出卡片时自动朗读外文：英文单词与外文句子读原文，中文读译文
+auto_speak = false
+# 悬停取词：off 关闭 / ctrl 按住 Ctrl 把鼠标停在词上 / always 鼠标停在词上一会儿就弹词典卡片
+hover = "off"
 
 [update]
 # 检查更新：每天向官网（qingjian.app）读一次版本索引，有新版在菜单与设置的「关于」页提示；请求不带任何标识，不自动下载安装

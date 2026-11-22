@@ -11,6 +11,9 @@ pub mod error;
 #[cfg(windows)]
 pub mod hotkey;
 pub mod ipc;
+/// 划词翻译的「译」图标（低级鼠标钩子认拖选 / 双击）；仅 Windows。
+#[cfg(windows)]
+pub mod lookup;
 /// 翻译窗口快捷键在输入法读不到选区时取选中文字（辅助接口 / 模拟复制）；仅 Windows。
 #[cfg(windows)]
 pub mod selection;

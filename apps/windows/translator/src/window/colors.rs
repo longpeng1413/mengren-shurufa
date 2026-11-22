@@ -330,9 +330,16 @@ pub fn draw_button(item: &DRAWITEMSTRUCT) {
 }
 
 pub fn erase(hwnd: HWND, dc: HDC) -> bool {
+    erase_panels(hwnd, dc, &[super::SOURCE, super::RESULT])
+}
+
+/// 铺窗口底色，再在 `panels` 这几个（显示着的）子控件后面画圆角卡片底；翻译窗口与划词卡片共用。
+pub fn erase_panels(hwnd: HWND, dc: HDC, panels: &[usize]) -> bool {
     use windows::Win32::Foundation::POINT;
     use windows::Win32::UI::{
-        HiDpi::GetDpiForWindow, Input::KeyboardAndMouse::GetFocus, WindowsAndMessaging::GetDlgItem,
+        HiDpi::GetDpiForWindow,
+        Input::KeyboardAndMouse::GetFocus,
+        WindowsAndMessaging::{GetDlgItem, IsWindowVisible},
     };
     PALETTE.with_borrow(|slot| {
         let Some(p) = slot else { return false };
@@ -343,10 +350,13 @@ pub fn erase(hwnd: HWND, dc: HDC) -> bool {
             }
             FillRect(dc, &rect, p.brush);
             let dpi = GetDpiForWindow(hwnd).max(96) as i32;
-            for id in [super::SOURCE, super::RESULT] {
+            for &id in panels {
                 let Ok(child) = GetDlgItem(Some(hwnd), id as i32) else {
                     continue;
                 };
+                if !IsWindowVisible(child).as_bool() {
+                    continue;
+                }
                 let mut size = RECT::default();
                 if GetClientRect(child, &mut size).is_err() {
                     continue;

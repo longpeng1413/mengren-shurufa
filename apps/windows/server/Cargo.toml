@@ -1,7 +1,7 @@
 [package]
 name = "qingjian-windows-server"
 description = "Windows 输入法的 Server 进程：持有 Engine，跑在应用进程外，与 TSF DLL（../tsf）走 IPC 协议通信"
-version = "0.4.15"
+version = "0.5.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -40,6 +40,13 @@ workspace = true
 [target."cfg(windows)".dependencies]
 windows-registry.workspace = true
 windows = { version = "0.62.2", features = [
+    # 悬停取词：系统文字识别（截图识字）与其位图、缓冲
+    "Foundation",
+    "Foundation_Collections",
+    "Graphics_Imaging",
+    "Media_Ocr",
+    "Security_Cryptography",
+    "Storage_Streams",
     "Win32_Devices_FunctionDiscovery",
     "Win32_Foundation",
     "Win32_Graphics_Dxgi_Common",
@@ -55,6 +62,7 @@ windows = { version = "0.62.2", features = [
     "Win32_System_IO",
     "Win32_System_LibraryLoader",
     "Win32_System_Memory",
+    "Win32_System_Ole",
     "Win32_System_Pipes",
     "Win32_System_Threading",
     "Win32_Media_Audio",

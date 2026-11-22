@@ -13,7 +13,8 @@ use std::time::{Duration, Instant};
 use windows::Win32::Foundation::{GlobalFree, HANDLE, HGLOBAL, HWND};
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData,
-    GetClipboardSequenceNumber, OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
+    GetClipboardSequenceNumber, GetOpenClipboardWindow, OpenClipboard, RegisterClipboardFormatW,
+    SetClipboardData,
 };
 use windows::Win32::System::Memory::{
     GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalSize, GlobalUnlock,
@@ -197,7 +198,14 @@ struct Saved(Vec<(u32, Vec<u8>)>);
 impl Saved {
     fn capture(owner: HWND) -> Option<Self> {
         if !open(owner, CAPTURE_PATIENCE) {
-            tracing::info!("selection copy skipped: clipboard busy");
+            // 记下谁占着：远程桌面这类同步剪贴板的程序卡住时会一直占着，所有程序都没法复制
+            let holder = unsafe { GetOpenClipboardWindow() }
+                .ok()
+                .and_then(super::target::process_name);
+            tracing::info!(
+                holder = holder.as_deref().unwrap_or("unknown"),
+                "selection copy skipped: clipboard busy"
+            );
             return None;
         }
         let sensitive = sensitive_formats();
