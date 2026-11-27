@@ -19,12 +19,12 @@ use windows::Win32::System::Threading::GetCurrentProcessId;
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Input::KeyboardAndMouse::GetDoubleClickTime;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, FindWindowW, GA_ROOT, GetAncestor,
-    GetClassNameW, GetClientRect, GetForegroundWindow, GetMessageW, GetSystemMetrics,
-    GetWindowRect, GetWindowThreadProcessId, HWND_TOPMOST, IDC_HAND, KillTimer, LoadCursorW,
-    MA_NOACTIVATE, MSG, RegisterClassW, SM_CXDOUBLECLK, SM_CXDRAG, SW_HIDE, SWP_NOACTIVATE,
-    SWP_SHOWWINDOW, SetTimer, SetWindowPos, ShowWindow, TranslateMessage, WM_APP, WM_LBUTTONUP,
-    WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_PAINT, WM_TIMER, WNDCLASSW, WS_EX_NOACTIVATE,
+    CURSORINFO, CreateWindowExW, DefWindowProcW, DispatchMessageW, FindWindowW, GA_ROOT,
+    GetAncestor, GetClassNameW, GetClientRect, GetCursorInfo, GetForegroundWindow, GetMessageW,
+    GetSystemMetrics, GetWindowRect, GetWindowThreadProcessId, HWND_TOPMOST, IDC_HAND, IDC_IBEAM,
+    KillTimer, LoadCursorW, MA_NOACTIVATE, MSG, RegisterClassW, SM_CXDOUBLECLK, SM_CXDRAG, SW_HIDE,
+    SWP_NOACTIVATE, SWP_SHOWWINDOW, SetTimer, SetWindowPos, ShowWindow, TranslateMessage, WM_APP,
+    WM_LBUTTONUP, WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_PAINT, WM_TIMER, WNDCLASSW, WS_EX_NOACTIVATE,
     WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP, WindowFromPoint,
 };
 use windows::core::w;
@@ -89,6 +89,9 @@ struct State {
 
     prewarmed: Option<Instant>,
 
+    /// 这次按下时鼠标指针是不是 I 形文字光标：只有在文字上按下拖选、双击，才可能选中了文字。
+    text_cursor: bool,
+
     /// 悬停取词的停留判断。
     dwell: Dwell,
 }
@@ -143,6 +146,7 @@ pub(super) fn spawn() {
                     rect: RECT::default(),
                     font: None,
                     prewarmed: None,
+                    text_cursor: false,
                     dwell: Dwell::default(),
                 });
             });
@@ -235,12 +239,18 @@ impl State {
         hide(hwnd);
         self.root = root_at(x, y);
         self.rect = window_rect(self.root);
+        self.text_cursor = text_cursor();
         self.gesture.down(x, y, at);
     }
 
     fn up(&mut self, hwnd: HWND, x: i32, y: i32) {
         let moved = window_rect(self.root) != self.rect;
-        if self.gesture.up(x, y, moved) && eligible(self.root) {
+        // 手势像选字还不够：拖图片、双击 K 线图或空白处也是这个手势。按下或松开时指针是文字光标
+        // （拖选常从行首空白处起手、落在字上），或辅助接口读得到选中的文字，才出图标
+        if self.gesture.up(x, y, moved)
+            && eligible(self.root)
+            && (self.text_cursor || text_cursor() || crate::selection::has_selected_text())
+        {
             self.show(hwnd, x, y);
             self.prewarm();
         }
@@ -342,6 +352,18 @@ impl State {
         if unsafe { FindWindowW(TRANSLATOR_CLASS, None) }.is_err() {
             crate::ui::launch_translator(&["--background".to_owned()], None);
         }
+    }
+}
+
+/// 鼠标指针此刻是不是系统的 I 形文字光标。
+fn text_cursor() -> bool {
+    let mut info = CURSORINFO {
+        cbSize: size_of::<CURSORINFO>() as u32,
+        ..Default::default()
+    };
+    unsafe {
+        GetCursorInfo(&mut info).is_ok()
+            && LoadCursorW(None, IDC_IBEAM).is_ok_and(|ibeam| ibeam == info.hCursor)
     }
 }
 

@@ -47,7 +47,6 @@ TEXT = [
         ('DefaultDirName={autopf}\\Qingjian', 'DefaultDirName={autopf}\\mengrenshurufa'),
         ('青简才会在所有应用里生效', '猛人输入法才会在所有应用里生效'),
         ('{group}\\青简设置"', '{group}\\猛人输入法设置"'),
-        ('{group}\\青简旧版设置"', '{group}\\猛人输入法旧版设置"'),
         ('{group}\\卸载青简"', '{group}\\卸载猛人输入法"'),
         ('{commonstartup}\\青简 Server"', '{commonstartup}\\猛人输入法 Server"'),
     ]),

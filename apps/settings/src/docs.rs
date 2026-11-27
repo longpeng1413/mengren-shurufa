@@ -157,6 +157,12 @@ const LINKS: &[(PageId, &str, &str, &str)] = &[
     ),
     (
         PageId::Language,
+        "language.default_ime",
+        "input/english-mode",
+        "默认模式与按应用记忆",
+    ),
+    (
+        PageId::Language,
         "language.auto_space",
         "input/english-mode",
         "中西文自动空格",

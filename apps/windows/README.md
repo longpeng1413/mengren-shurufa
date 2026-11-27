@@ -102,15 +102,10 @@ cargo run -p qingjian-windows-server
 regsvr32 /u target\debug\qingjian_tsf.dll
 ```
 
-## 旧版设置程序与 Windows App Runtime
+## 设置程序
 
 设置程序是三平台共用的 `apps/settings`（`qingjian-settings.exe`），状态条的齿轮打开它。
-`settings/`（`qingjian-settings-legacy.exe`，开始菜单「青简旧版设置」）是旧版，留一个版本作回退；它用 Windows Reactor（WinUI 3）画界面，是唯一依赖 Windows App Runtime 的产物。
-它的部署方式是**自包含**：`build.rs` 让 `windows-reactor-setup` 把 `Microsoft.WindowsAppSDK.Runtime` 的 MSIX 解到
-`target\release\` 并按自包含标记嵌清单，安装包把这些文件装到 exe 同级——不依赖机器上装没装框架包。
-Windows 10 上框架依赖的引导走不通（它要先调 Windows 11 才有的 `TryCreatePackageDependency`），
-同一个 `build.rs` 还把这两个 API 改成延迟加载：否则它们会进 exe 的导入表，Windows 10 在加载期就起不来。
-定位过程、上游 issue / PR 与取舍见 `docs/notes/windows-win10.md`；打包侧见 `apps/windows/installer/README.md`。
+旧版设置程序（`settings/`，WinUI 3，自带一份 Windows App Runtime）在猛人 0.5.0 之后移除：源码、打包与运行库清单一起删掉，安装包升级时删掉装机目录里的残留。需要回看时从 git 历史取，Windows 10 上踩过的坑见 `docs/notes/windows-win10.md`。
 
 ## 版本与发布
 

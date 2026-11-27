@@ -16,6 +16,10 @@ fn picks_one_english_word_out_of_the_selection() {
     assert_eq!(single_word("苹果"), None);
     assert_eq!(single_word("2026"), None);
     assert_eq!(single_word("a--b"), None);
+    assert_eq!(single_word("「Shift」"), Some("Shift"));
+    assert_eq!(single_word("而是 Windows 或别的程序"), None);
+    assert_eq!(single_word("日志显示：Windows"), None);
+    assert_eq!(single_word("Windows 改了输入状态。"), None);
 }
 
 #[test]
@@ -47,6 +51,10 @@ fn case_falls_back_and_unknown_words_are_none() {
     assert!(cards.lookup("vt").is_none(), "no definitions and no lemma");
     assert!(cards.lookup("zebra").is_none());
     assert!(cards.lookup("run fast").is_none());
+    assert!(
+        cards.lookup("变成英文是因为 run 了别的程序").is_none(),
+        "a Chinese paragraph with one English word is a sentence"
+    );
 }
 
 #[test]

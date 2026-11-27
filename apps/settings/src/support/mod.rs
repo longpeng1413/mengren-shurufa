@@ -24,6 +24,8 @@ pub enum Feature {
     SystemCtrlSpace,
     DefaultEnglish,
     RememberModePerApp,
+    /// 开机默认使用猛人输入法：改的是 Windows 的替代默认输入法。
+    DefaultInputMethod,
     /// 英文模式的全半角标点。
     EnglishPunctuation,
     AutoSpace,
@@ -72,7 +74,7 @@ pub enum Feature {
 
 impl Feature {
     #[cfg(test)]
-    pub const ALL: [Self; 34] = [
+    pub const ALL: [Self; 35] = [
         Self::AuxCode,
         Self::Schemes,
         Self::SwitchKeys,
@@ -80,6 +82,7 @@ impl Feature {
         Self::SystemCtrlSpace,
         Self::DefaultEnglish,
         Self::RememberModePerApp,
+        Self::DefaultInputMethod,
         Self::EnglishPunctuation,
         Self::AutoSpace,
         Self::StatusBar,
@@ -135,6 +138,7 @@ impl Feature {
             Self::SystemCtrlSpace => [No, Yes, No],
             Self::DefaultEnglish => [Todo, Yes, Yes],
             Self::RememberModePerApp => [Todo, Yes, Todo],
+            Self::DefaultInputMethod => [No, Yes, No],
             // macOS 英文模式一律半角
             Self::EnglishPunctuation => [No, Yes, Yes],
             // 要读应用里光标前的字
@@ -185,6 +189,7 @@ impl Feature {
             Self::SystemCtrlSpace => "系统的 Ctrl + Space",
             Self::DefaultEnglish => "默认英文模式",
             Self::RememberModePerApp => "按应用记住中英模式",
+            Self::DefaultInputMethod => "开机默认使用猛人输入法",
             Self::EnglishPunctuation => "英文标点全半角",
             Self::AutoSpace => "中文与英文、数字之间自动加空格",
             Self::StatusBar => "悬浮状态条",
@@ -228,6 +233,7 @@ impl Feature {
             Self::SwitchKeys => &[(PageId::Language, "language.switch_keys")],
             Self::DefaultEnglish => &[(PageId::Language, "language.default_english")],
             Self::RememberModePerApp => &[(PageId::Language, "language.remember_per_app")],
+            Self::DefaultInputMethod => &[(PageId::Language, "language.default_ime")],
             Self::AutoSpace => &[(PageId::Language, "language.auto_space")],
             Self::ExtraPageKeys => &[(PageId::Shortcuts, "shortcuts.extra_page_keys")],
             Self::CommitKeys => &[

@@ -5,6 +5,9 @@ pub mod assembly;
 #[cfg(windows)]
 pub mod audio;
 pub mod clipboard_process;
+/// 「开机默认使用猛人输入法」：改系统的替代默认输入法；仅 Windows。
+#[cfg(windows)]
+pub mod default_ime;
 pub mod dispatch;
 pub mod error;
 /// 全局语音热键（低级键盘钩子）；仅 Windows。

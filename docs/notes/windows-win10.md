@@ -1,5 +1,7 @@
 # Windows 10 上的设置程序（2026-09-13）
 
+> 2026-11-22 补记：文中的 WinUI 设置程序后来改名为旧版设置（`qingjian-settings-legacy.exe`），猛人 0.5.0 之后连同源码 `apps/windows/settings`、`settings-runtime.txt` 一起移除。本文只作历史记录。
+
 ## 起因
 
 Windows 10 22H2 上点开始菜单的「青简设置」，弹的是系统错误框：

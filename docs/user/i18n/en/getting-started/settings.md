@@ -43,9 +43,16 @@ Click the 中 / 英 item in the menu bar to open it: the cloud suggestions switc
 
 ## The taskbar icon (Windows)
 
-Right-click the 中 / 英 icon on the taskbar: switch to Chinese / English, full-width punctuation, show or hide the floating status bar, open the symbol panel, open Settings or legacy Settings. New versions are also announced here.
+Right-click the 中 / 英 icon on the taskbar: switch to Chinese / English, full-width punctuation, show or hide the floating status bar, open the symbol panel, open Settings. New versions are also announced here.
 
 ## Legacy settings
 
-This version keeps the old settings window as a fallback; if the new one won't open or a setting doesn't take effect, use the old one: 旧版设置… (Legacy Settings…) in the macOS input method menu; 旧版设置… in the Windows taskbar icon's right-click menu, or 青简旧版设置 (Qingjian Legacy Settings) in the Start menu.
-Both change the same settings. The legacy settings will be removed in a later version; if you find you need them, please [report it](../help/feedback.md).
+macOS keeps the old settings window as a fallback: 旧版设置… (Legacy Settings…) in the input method menu. It changes the same settings as the new window.
+
+Mengren for Windows no longer ships the legacy settings app after 0.5.0; the taskbar menu and Start menu entries are gone, and updating removes the app and its bundled runtime (about 70 MB). If the new settings window won't open, [edit the config file](../advanced/config-file.md) directly and please [report it](../help/feedback.md).
+
+## Removed files (Windows)
+
+Mengren for Windows only ships the data for learning English. After 0.5.0 these are no longer bundled and are removed on update: Japanese, Spanish, Vietnamese and German candidate translations; the Japanese level list; and the Vietnamese input word list. English translations, Chinese meanings for English candidates and the vocabulary book are unaffected.
+
+To restore them, first choose the language in Settings (Candidates → Translation, or Vietnamese for the double-Shift input method), then install the **v0.5.0** Windows installer from the [Mengren GitHub releases page](https://github.com/longpeng1413/mengren-shurufa/releases) once, and update to the latest version as usual. The update keeps the files for a language that is selected in the config.

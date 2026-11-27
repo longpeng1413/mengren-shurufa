@@ -101,8 +101,10 @@ impl Router {
                 self.persist("status_bar", "enabled", self.config.status_enabled);
                 self.reconcile_status();
             }
-            IndicatorCommand::OpenSettings => self.status.open_settings(),
-            IndicatorCommand::OpenLegacySettings => self.status.open_legacy_settings(),
+            // 旧版设置程序已不随包；更新前加载的旧 DLL 菜单里还有那一项，点了改开新版设置
+            IndicatorCommand::OpenSettings | IndicatorCommand::OpenLegacySettings => {
+                self.status.open_settings();
+            }
             IndicatorCommand::OpenDownload => self.status.open_download(),
             IndicatorCommand::OpenSymbolPanel => self.open_panel_for(self.mode_session),
         }

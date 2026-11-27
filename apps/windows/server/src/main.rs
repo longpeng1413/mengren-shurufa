@@ -265,6 +265,13 @@ fn main() -> ExitCode {
     let usage_path = user_dir().map(|dir| dir.join(qingjian_predict::API_USAGE_FILE));
     qingjian_windows_server::clipboard_process::sync(config.clipboard.enabled);
     dispatch::attach_cloud(&mut engine, &config.predict, usage_path);
+    // 开机默认输入法：Server 随登录启动，每次启动按开关对一遍（已对就不动）
+    {
+        let on = config.general.default_input_method;
+        let _ = std::thread::Builder::new()
+            .name("qingjian-default-ime".to_owned())
+            .spawn(move || qingjian_windows_server::default_ime::apply(on));
+    }
     let router_config = RouterConfig::from(&config);
     let mut router = Router::new(engine, router_config.clone());
     let vietnamese_words = generated(&root, "vietnamese.tsv").and_then(|path| {

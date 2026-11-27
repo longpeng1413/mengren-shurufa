@@ -6,12 +6,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use qingjian_platform::HoverMode;
-use windows::Win32::Foundation::{HWND, POINT, RECT};
+use windows::Win32::Foundation::{HWND, LPARAM, POINT, RECT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, VIRTUAL_KEY, VK_CONTROL, VK_LBUTTON, VK_MBUTTON, VK_RBUTTON,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    FindWindowW, GetCursorPos, IsWindowVisible, KillTimer, SetTimer,
+    FindWindowW, GetCursorPos, IsWindowVisible, KillTimer, PostMessageW, SetTimer, WM_CLOSE,
 };
 use windows::core::w;
 
@@ -27,6 +27,9 @@ const PERIOD: u32 = 80;
 
 /// 正在取词：取词可能被卡住的程序拖住，同时只取一个。
 static BUSY: AtomicBool = AtomicBool::new(false);
+
+/// 这次按住 Ctrl 期间弹过悬停卡片：Ctrl 还按着又按了别的键（Ctrl+C 这类快捷键）就把卡片收起。
+static CTRL_CARD: AtomicBool = AtomicBool::new(false);
 
 /// 上一张悬停卡片的词与位置：卡片还开着时同一个词不再弹。
 static LAST: Mutex<Option<(String, RECT)>> = Mutex::new(None);
@@ -54,6 +57,7 @@ pub(super) fn tick(dwell: &mut Dwell) -> bool {
     let ctrl = down(VK_CONTROL);
     if !ctrl {
         OTHER_KEY.store(false, Ordering::Release);
+        CTRL_CARD.store(false, Ordering::Release);
     }
     let sample = Sample {
         x: cursor.x,
@@ -97,6 +101,9 @@ fn show(word: String, rect: RECT) {
     *last = Some(key);
     drop(last);
     tracing::debug!(chars = word.chars().count(), "hover word found");
+    if dwell_by_ctrl() {
+        CTRL_CARD.store(true, Ordering::Release);
+    }
     crate::ui::launch_translator(
         &[
             "--card".to_owned(),
@@ -105,6 +112,24 @@ fn show(word: String, rect: RECT) {
         ],
         Some(word),
     );
+}
+
+/// 键盘钩子：Ctrl 按着时按了别的键，而这次按 Ctrl 弹过悬停卡片，说明用户是在按快捷键，把卡片收起
+/// （卡片收起时翻译程序会停掉它发起的朗读）。
+pub(super) fn close_ctrl_card() {
+    if !CTRL_CARD.swap(false, Ordering::AcqRel) {
+        return;
+    }
+    if let Ok(card) = unsafe { FindWindowW(w!("Mengren.Translator.Card"), None) } {
+        let _ = unsafe { PostMessageW(Some(card), WM_CLOSE, WPARAM(0), LPARAM(0)) };
+        tracing::info!("hover card closed: Ctrl was part of a shortcut");
+    }
+}
+
+/// 悬停取词用的是「按住 Ctrl」方式，而且 Ctrl 此刻按着。
+fn dwell_by_ctrl() -> bool {
+    super::hover_mode(super::HOVER.load(Ordering::Acquire)) == HoverMode::Ctrl
+        && unsafe { GetAsyncKeyState(i32::from(VK_CONTROL.0)) } as u16 & 0x8000 != 0
 }
 
 fn card_visible() -> bool {

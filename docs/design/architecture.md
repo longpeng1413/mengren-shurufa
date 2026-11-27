@@ -55,7 +55,7 @@ qingjian/
 │   ├── settings/               # 设置程序：三平台共用，画在 bamboo-slip 上，读写同一份配置
 │   ├── macos/                  # IMK 输入法壳（app / host / imk / candidates / menubar / preferences（旧版设置））
 │   ├── windows/                # 同一个产品的四个 package：server（IPC 分派 + Engine + 命名管道 + 自绘候选窗）、
-│   │                           #   tsf（TSF 文本服务 DLL：COM 链路 + 连 Server 的管道客户端）、settings（旧版设置，WinUI 3）、installer
+│   │                           #   tsf（TSF 文本服务 DLL：COM 链路 + 连 Server 的管道客户端）、installer
 │   ├── linux/                  # server（Engine + Unix socket）+ fcitx5（C++ 插件）+ scripts
 │   └── android/                # core（Rust：Engine 装配 + JNI，cdylib）+ app（Kotlin InputMethodService 壳）；Engine 在输入法进程内
 │

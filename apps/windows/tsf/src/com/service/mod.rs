@@ -113,6 +113,10 @@ pub struct TextService {
     /// 激活后一小段时间内忽略转换模式 compartment 的变化，见 [`TextService_Impl::sync_from_conversion_mode`]。
     conversion_guard_until: Cell<Option<Instant>>,
 
+    /// 系统把转换模式 / 输入法开关改成了英文而我们没跟：下一拍把任务栏中 / 英与开关写回当前模式
+    /// （在 compartment 自己的 `OnChange` 里写会报 0x8000FFFF）。
+    indicator_stale: Cell<bool>,
+
     /// 自启拉起请求后继续吞拼音键的宽限截止时刻；到点还没连上就放行字母（见 [`super::key_sink`]）。
     /// 连上即清；拉不起 Server（[`launch::LaunchOutcome::Refused`](self::launch::LaunchOutcome)）立即过期。
     launch_grace_until: Cell<Option<Instant>>,
@@ -170,9 +174,12 @@ pub(super) fn on_reconnect_tick() {
     });
 }
 
-/// 每拍落实超过 150 ms 的 Shift 单击。
+/// 每拍落实超过 150 ms 的 Shift 单击，顺带写回被系统改掉的中 / 英指示。
 pub(super) fn on_shift_tick() {
-    with_active(TextService_Impl::resolve_pending_shift);
+    with_active(|service| {
+        service.resolve_pending_shift();
+        service.restore_indicator();
+    });
 }
 
 /// 轮询取到了 Server 的全局模式（见 [`super::poll`]）；与当前相同就不动。
@@ -229,6 +236,7 @@ impl TextService {
             input_settings: Cell::new(None),
             indicator_state: Cell::new(IndicatorState::default()),
             conversion_guard_until: Cell::new(None),
+            indicator_stale: Cell::new(false),
             launch_grace_until: Cell::new(None),
             launch_grace_logged: Cell::new(false),
             pending_digit: RefCell::new(None),

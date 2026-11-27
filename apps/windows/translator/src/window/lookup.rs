@@ -53,8 +53,18 @@ impl Window {
         }
     }
 
+    /// 收起卡片；卡片发起的朗读（含循环的下一遍）一并停掉，主窗口自己在读的不动。
+    pub(super) fn close_card(&mut self) {
+        self.card.hide();
+        if self.card_speech {
+            self.speech.stop();
+            self.card_speech = false;
+        }
+    }
+
     fn auto_read(&mut self, side: Side, text: &str, language: &str) {
         if self.speech.readable(language) {
+            self.card_speech = true;
             let spoken = self.speech.read(side, text, language);
             tracing::info!(ok = spoken.is_ok(), language, "lookup card auto read");
         }
@@ -68,12 +78,13 @@ impl Window {
         }
         self.card.engage();
         match param & 0xffff {
-            CLOSE => self.card.hide(),
+            CLOSE => self.close_card(),
             SPEAK_SOURCE => {
                 let (text, language) = match &self.card.word {
                     Some(word) => (word.word.clone(), WORD_VOICE),
                     None => (self.card.text.clone(), self.card.model.voices().0),
                 };
+                self.card_speech = true;
                 if self.speech.read(Side::Source, &text, language).is_err() {
                     tracing::warn!("card speech failed");
                 }
@@ -81,6 +92,7 @@ impl Window {
             SPEAK_RESULT => {
                 let (_, language) = self.card.model.voices();
                 let text = self.card.model.output.clone();
+                self.card_speech = true;
                 if self.speech.read(Side::Result, &text, &language).is_err() {
                     tracing::warn!("card speech failed");
                 }
@@ -92,7 +104,7 @@ impl Window {
             }
             OPEN => {
                 let text = self.card.text.clone();
-                self.card.hide();
+                self.close_card();
                 self.receive(text);
             }
             _ => {}

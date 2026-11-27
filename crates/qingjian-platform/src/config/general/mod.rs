@@ -132,6 +132,10 @@ pub struct GeneralConfig {
     /// Windows：按应用 exe 名记住中英状态，仅保存在本次 Server 运行期间。
     pub remember_mode_per_app: bool,
 
+    /// Windows：把系统的默认输入法设成猛人（等同「设置 → 时间和语言 → 输入 → 高级键盘设置 → 替代默认输入法」），
+    /// 开机后新打开的程序先用猛人。关掉时恢复打开前系统原来的默认。缺省关。
+    pub default_input_method: bool,
+
     /// 连按两次 Shift 时切换到的第三输入法；缺省关。当前先保存用户选择，运行时接入随第三输入法实现补上。
     pub double_shift_input: ThirdInputMethod,
 
@@ -272,6 +276,7 @@ impl Default for GeneralConfig {
             english_mode: true,
             default_english: false,
             remember_mode_per_app: false,
+            default_input_method: false,
             double_shift_input: ThirdInputMethod::default(),
             full_width_punctuation: true,
             english_full_width_punctuation: false,

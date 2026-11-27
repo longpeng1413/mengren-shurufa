@@ -8,8 +8,8 @@ use qingjian_platform::HoverMode;
 /// 鼠标挪动多少像素以内还算停着（物理像素）。
 const SLOP: i32 = 4;
 
-/// 按住 Ctrl 时停多久取词。
-const CTRL_DELAY: Duration = Duration::from_millis(150);
+/// 按住 Ctrl 时停多久取词：太短的话按 Ctrl+C 时 C 还没按下卡片就弹了（0.15 秒时用户常遇到）。
+const CTRL_DELAY: Duration = Duration::from_millis(500);
 
 /// 不按 Ctrl 时停多久取词：短了鼠标随手一停就弹。
 const REST_DELAY: Duration = Duration::from_millis(500);

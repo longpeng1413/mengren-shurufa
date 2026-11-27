@@ -321,6 +321,8 @@ impl Router {
         self.reload_mode(&next);
         let themes_stamp = self.config.themes_stamp;
         self.reload_voice(&next);
+        #[cfg(windows)]
+        crate::default_ime::apply(config.general.default_input_method);
         self.config = next;
         self.config.themes_stamp = themes_stamp;
         // 两个展开开关都不生效了（排布切走 / 开关关掉）：展开着的矩阵收回去，等下一帧照单行画

@@ -34,17 +34,17 @@ def main():
     exports = [
         "apps/android/app/src/main/kotlin/app/qingjian/inputmethod/settings/page/AdvancedActivity.kt",
         "apps/settings/src/system/action.rs",
-        "apps/windows/settings/src/panel/controls.rs",
     ]
     for name in exports:
         text = (ROOT / name).read_text(encoding="utf-8-sig")
         assert "mengren-shurufa-logs" in text and "qingjian-logs" not in text, name
-    for name in ["apps/settings/build.rs", "apps/clipboard/build.rs", "apps/windows/server/build.rs", "apps/windows/settings/build.rs"]:
+    resources = ["apps/settings/build.rs", "apps/clipboard/build.rs", "apps/windows/server/build.rs"]
+    for name in resources:
         text = (ROOT / name).read_text(encoding="utf-8-sig")
         assert '.set("ProductName", "猛人输入法")' in text, name
         assert '.set("FileDescription", "猛人' in text, name
     print(json.dumps({"runtime_icon_targets_verified": len(icons), "exports_verified": len(exports),
-        "windows_version_resources_verified": 4, "attribution_and_internal_ids_preserved": True}, ensure_ascii=False))
+        "windows_version_resources_verified": len(resources), "attribution_and_internal_ids_preserved": True}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

@@ -78,24 +78,15 @@ Source: "{#Repo}\target\i686-pc-windows-msvc\release\qingjian_tsf.dll"; DestDir:
 Source: "{#Repo}\target\release\qingjian-settings.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Repo}\target\release\qingjian-translator.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Repo}\target\release\qingjian-clipboard.exe"; DestDir: "{app}"; Flags: ignoreversion
-; 旧版设置程序（WinUI）留一个版本作回退，下个版本删掉它与下面的运行时
-Source: "{#Repo}\target\release\qingjian-settings-legacy.exe"; DestDir: "{app}"; Flags: ignoreversion
-; 旧版设置程序自带一份 Windows App Runtime（自包含部署：Windows 10 上机器装的框架包用不了，见 docs\notes\windows-win10.md）；
-; 文件由 build.ps1 按 settings-runtime.txt 从 target\release 挑进 target\installer\settings-runtime，必须与 exe 同级。
-Source: "{#Repo}\target\installer\settings-runtime\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#Repo}\apps\windows\tsf\resources\qingjian.ico"; DestDir: "{app}"; Flags: ignoreversion
 ; —— 随包生成数据（只装运行时要的 .qj / .tsv，不装 dev 中间产物）——
 Source: "{#Repo}\data\generated\dict.qj";        DestDir: "{app}\data\generated";       Flags: ignoreversion
 Source: "{#Repo}\data\generated\lm.qj";          DestDir: "{app}\data\generated";       Flags: ignoreversion
 Source: "{#Repo}\data\generated\glossary-en.qj"; DestDir: "{app}\data\generated";       Flags: ignoreversion
-Source: "{#Repo}\data\generated\glossary-ja.qj"; DestDir: "{app}\data\generated";       Flags: ignoreversion
+; glossary-zh 是英→中释义（英文候选的中文意思、生词本），不是「学中文」用的，必须带。
+; 猛人只带英文用的释义：日 / 西 / 越 / 德释义、日语等级表与越南语输入词表 0.5.0 后不随包，见 [InstallDelete] 与 [Code] 的 ConfigHas。
 Source: "{#Repo}\data\generated\glossary-zh.qj"; DestDir: "{app}\data\generated";       Flags: ignoreversion
-Source: "{#Repo}\data\generated\glossary-es.qj"; DestDir: "{app}\data\generated";       Flags: ignoreversion
-Source: "{#Repo}\data\generated\glossary-vi.qj"; DestDir: "{app}\data\generated";       Flags: ignoreversion
-Source: "{#Repo}\data\generated\glossary-de.qj"; DestDir: "{app}\data\generated";       Flags: ignoreversion
 Source: "{#Repo}\data\generated\english.tsv";    DestDir: "{app}\data\generated";       Flags: ignoreversion
-Source: "{#Repo}\data\generated\vietnamese.tsv"; DestDir: "{app}\data\generated";       Flags: ignoreversion
-Source: "{#Repo}\data\generated\vietnamese-zh.tsv"; DestDir: "{app}\data\generated";    Flags: ignoreversion
 Source: "{#Repo}\data\generated\dicts\*.qj";     DestDir: "{app}\data\generated\dicts";  Flags: ignoreversion
 ; —— 随包辅码码表（笔画，开箱可用）：Server 扫 data\generated\codes\；CNS11643 筆順資料派生，署名见「关于」页 ——
 ;    产品数据一律不加 skipifsourcedoesntexist：缺了就编不过，不悄悄打出少数据的包（build.ps1 编译前先查一遍）
@@ -106,7 +97,6 @@ Source: "{#Repo}\assets\stroke\LICENSE-CNS11643.txt"; DestDir: "{app}\data\gener
 Source: "{#Repo}\assets\emoji\emoji-zh.tsv";     DestDir: "{app}\assets\emoji";  Flags: ignoreversion
 Source: "{#Repo}\assets\emoji\emoji-en.tsv";     DestDir: "{app}\assets\emoji";  Flags: ignoreversion
 Source: "{#Repo}\assets\levels\levels-en.tsv";   DestDir: "{app}\assets\levels"; Flags: ignoreversion
-Source: "{#Repo}\assets\levels\levels-ja.tsv";   DestDir: "{app}\assets\levels"; Flags: ignoreversion
 ; 划词翻译的英文词典卡片（ECDICT MIT + CMUdict BSD，许可证随装，见 assets/wordcard/README.md）
 Source: "{#Repo}\assets\wordcard\wordcard-en.tsv";      DestDir: "{app}\assets\wordcard"; Flags: ignoreversion
 Source: "{#Repo}\assets\wordcard\LICENSE-ECDICT.txt";   DestDir: "{app}\assets\wordcard"; Flags: ignoreversion
@@ -132,7 +122,6 @@ Source: "{#Repo}\target\release\qingjian-server.exe";   DestDir: "{app}"; Flags:
 
 [Icons]
 Name: "{group}\猛人输入法设置"; Filename: "{app}\qingjian-settings.exe"; IconFilename: "{app}\qingjian.ico"
-Name: "{group}\猛人输入法旧版设置"; Filename: "{app}\qingjian-settings-legacy.exe"; IconFilename: "{app}\qingjian.ico"
 Name: "{group}\卸载猛人输入法"; Filename: "{uninstallexe}"
 ; 登录自启：登录时 Explorer 走 ShellExecute 拉起本快捷方式 → AppInfo 授予 uiAccess，候选窗才能盖过商店 / 任务栏搜索。
 ; 用 {commonstartup}（所有用户「启动」文件夹）而非 {userstartup}：本安装器是 admin 机器级安装，
@@ -167,8 +156,6 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/im qingjian-translator.exe /f"; \
   Flags: runhidden; RunOnceId: "KillTranslator"
 Filename: "{sys}\taskkill.exe"; Parameters: "/im qingjian-clipboard.exe /f"; \
   Flags: runhidden; RunOnceId: "KillClipboard"
-Filename: "{sys}\taskkill.exe"; Parameters: "/im qingjian-settings-legacy.exe /f"; \
-  Flags: runhidden; RunOnceId: "KillLegacySettings"
 Filename: "{sys}\regsvr32.exe"; Parameters: "/u /s ""{app}\{#TsfDll}"""; \
   Flags: runhidden; RunOnceId: "UnregDll"
 Filename: "{syswow64}\regsvr32.exe"; Parameters: "/u /s ""{app}\{#TsfDll32}"""; \
@@ -183,6 +170,32 @@ Type: filesandordirs; Name: "{app}\data\model"
 Type: filesandordirs; Name: "{app}\data\models"
 ; 0.1.4 开发版的随包码表旧位置
 Type: filesandordirs; Name: "{app}\codes"
+; 0.5.0 及以前随包的旧版设置程序（WinUI）与它自带的 Windows App Runtime（约 70 MB）。
+; 各语言资源目录（en-us、zh-cn…）在 [Code] 的 DeleteLegacyRuntimeDirs 里按目录里的 .mui 认出来删。
+Type: files; Name: "{group}\猛人输入法旧版设置.lnk"
+Type: files; Name: "{app}\qingjian-settings-legacy.exe"
+Type: files; Name: "{app}\microsoft.*.dll"
+Type: files; Name: "{app}\microsoft.*.pri"
+Type: filesandordirs; Name: "{app}\microsoft.ui.xaml"
+Type: files; Name: "{app}\coremessagingxp.dll"
+Type: files; Name: "{app}\dcompi.dll"
+Type: files; Name: "{app}\dwmcorei.dll"
+Type: files; Name: "{app}\dwmscenei.dll"
+Type: files; Name: "{app}\dwritecore.dll"
+Type: files; Name: "{app}\marshal.dll"
+Type: files; Name: "{app}\mrm.dll"
+Type: files; Name: "{app}\resources.pri"
+Type: files; Name: "{app}\sessionhandleipcproxystub.dll"
+Type: files; Name: "{app}\winuiedit.dll"
+Type: files; Name: "{app}\wuceffectsi.dll"
+; 0.5.0 及以前随包的其他语种数据。配置里正选着这门学习语言 / 越南语输入的保留（用户按说明用旧安装包恢复过）。
+Type: files; Name: "{app}\data\generated\glossary-ja.qj"; Check: not ConfigHas('learning_language', 'ja')
+Type: files; Name: "{app}\assets\levels\levels-ja.tsv"; Check: not ConfigHas('learning_language', 'ja')
+Type: files; Name: "{app}\data\generated\glossary-es.qj"; Check: not ConfigHas('learning_language', 'es')
+Type: files; Name: "{app}\data\generated\glossary-vi.qj"; Check: not ConfigHas('learning_language', 'vi')
+Type: files; Name: "{app}\data\generated\glossary-de.qj"; Check: not ConfigHas('learning_language', 'de')
+Type: files; Name: "{app}\data\generated\vietnamese.tsv"; Check: not ConfigHas('double_shift_input', 'vietnamese')
+Type: files; Name: "{app}\data\generated\vietnamese-zh.tsv"; Check: not ConfigHas('double_shift_input', 'vietnamese')
 
 [UninstallDelete]
 ; 历次升级留下的旧版本 DLL（正常在升级时就删了；仍被占用的会留到这里）。
@@ -256,6 +269,7 @@ begin
   KillProcess('qingjian-settings.exe');
   KillProcess('qingjian-translator.exe');
   KillProcess('qingjian-clipboard.exe');
+  { 0.5.0 及以前的旧版设置程序：开着就删不掉它和运行库（[InstallDelete]） }
   KillProcess('qingjian-settings-legacy.exe');
   RetireLoadedDll('{#TsfDll}');
   RetireLoadedDll('{#TsfDll32}');
@@ -319,6 +333,45 @@ begin
   end;
 end;
 
+{ 配置文件里有没有 Key = "Value"（去掉空格后找；注释掉的同名行也算，宁可多留文件）。
+  安装器以管理员身份跑，userappdata 常量是提权那个账户的；本机常见的同一账户提权读得到，读不到时按没选处理。 }
+function ConfigHas(const Key, Value: String): Boolean;
+var
+  Raw: AnsiString;
+  Text: String;
+begin
+  Result := False;
+  if LoadStringFromFile(ExpandConstant('{userappdata}\Qingjian\config.toml'), Raw) then
+  begin
+    Text := Raw;
+    StringChangeEx(Text, ' ', '', True);
+    Result := Pos(Key + '="' + Value + '"', Text) > 0;
+  end;
+end;
+
+{ 删掉旧版设置程序的 WinUI 语言资源目录（en-us、zh-cn… 八十多个）：里面有 Microsoft.ui.xaml.dll.mui 的才删，
+  自己的 data / assets / licenses 不会有这个文件。 }
+procedure DeleteLegacyRuntimeDirs;
+var
+  Dir: String;
+  Found: TFindRec;
+begin
+  Dir := ExpandConstant('{app}');
+  if FindFirst(Dir + '\*', Found) then
+  begin
+    try
+      repeat
+        if ((Found.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0)
+          and (Found.Name <> '.') and (Found.Name <> '..')
+          and FileExists(Dir + '\' + Found.Name + '\Microsoft.ui.xaml.dll.mui') then
+          DelTree(Dir + '\' + Found.Name, True, True, True);
+      until not FindNext(Found);
+    finally
+      FindClose(Found);
+    end;
+  end;
+end;
+
 var
   UpdateLaunchError: Integer;
 
@@ -329,6 +382,7 @@ begin
     DeleteLegacyLogonTask;
     DeleteStaleDlls;
     DeleteRetiredServers;
+    DeleteLegacyRuntimeDirs;
   end;
   if (CurStep = ssDone) and WizardSilent then
     ShellExecAsOriginalUser('', ExpandConstant('{app}\qingjian-server.exe'), '', '',

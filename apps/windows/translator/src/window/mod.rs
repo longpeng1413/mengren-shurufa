@@ -170,6 +170,9 @@ struct Window {
     dpi: u32,
     model: Translation,
     speech: Speech,
+
+    /// 当前的朗读是卡片发起的：卡片收起时要一起停掉。
+    card_speech: bool,
     hidden: Option<Instant>,
 
     /// 上次自动调出的窗口外框尺寸；当前尺寸与它不同说明用户拖过，就不再缩小。
@@ -323,6 +326,7 @@ impl Window {
                 dpi: 0,
                 model,
                 speech: Speech::new(hwnd),
+                card_speech: false,
                 hidden: (!visible).then(Instant::now),
                 fitted: None,
                 card,
@@ -600,6 +604,7 @@ impl Window {
                 } else {
                     (Side::Source, self.model.source.clone(), source_voice)
                 };
+                self.card_speech = false;
                 if self.speech.read(side, &text, language).is_err() {
                     self.set(STATUS, tr("speech_failed"));
                 }
@@ -686,7 +691,7 @@ impl Window {
                     }
                 }
                 CARD_COMMAND => self.card_command(param),
-                CARD_CLOSE => self.card.hide(),
+                CARD_CLOSE => self.close_card(),
                 TOGGLE => unsafe {
                     if param == 1 {
                         self.hide();

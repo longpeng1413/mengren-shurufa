@@ -10,8 +10,9 @@ pub use self::table::WordCards;
 const MAX_WORD: usize = 40;
 
 /// 选中的文字去掉首尾空白与标点后是不是一个英文词（可带 `'`、`-` 连接，如 `don't`、`well-known`）；是就返回它。
+/// 只剥空白与标点，汉字等别的文字留着：夹着一个英文词的中文段落不能被剥成那个词。
 pub fn single_word(text: &str) -> Option<&str> {
-    let word = text.trim_matches(|c: char| !c.is_ascii_alphanumeric());
+    let word = text.trim_matches(|c: char| !c.is_alphanumeric());
     let valid = !word.is_empty()
         && word.len() <= MAX_WORD
         && word.starts_with(|c: char| c.is_ascii_alphabetic())

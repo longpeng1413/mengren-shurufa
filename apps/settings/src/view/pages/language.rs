@@ -78,6 +78,17 @@ pub fn language(ui: &mut Ui<Message>, page: &Page) -> Result<Vec<NodeId>, Render
             !general.english_mode,
         )?);
     }
+    if Feature::DefaultInputMethod.here() {
+        rows.push(toggle_info(
+            ui,
+            page,
+            tr("language.default_ime"),
+            Some(tr("language.default_ime_info")),
+            ("general", "default_input_method"),
+            general.default_input_method,
+            false,
+        )?);
+    }
     let only_in_apps = !config.apps.english_candidates_everywhere();
     let apps = if only_in_apps {
         vec!["*".to_owned()]

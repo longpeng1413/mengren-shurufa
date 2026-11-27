@@ -340,6 +340,8 @@ double_shift_input = "off"
 default_english = false
 # Windows：按应用 exe 名记住中英状态，重启青简后重新使用初始模式
 remember_mode_per_app = false
+# Windows：把系统的默认输入法设成猛人，开机后新打开的程序先用猛人（中文）；关掉时恢复系统原来的默认
+default_input_method = false
 # 中文模式下（没在组句时）敲的标点转全角：, . ? ! : ; ( ) 等，数字后面的 . 保持半角。Windows 上悬浮状态条的「，。」格可以点着切；macOS 在偏好设置中选择默认中文标点模式
 full_width_punctuation = true
 # 英文模式下的同一件事，中英各记一份，状态条切的是当前模式那份；只有 Windows 用

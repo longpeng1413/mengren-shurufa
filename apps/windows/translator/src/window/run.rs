@@ -98,7 +98,7 @@ pub fn run() -> Result<()> {
             }
             if msg.message == WM_KEYDOWN && msg.wParam.0 == 27 {
                 if win.card.owns(msg.hwnd) {
-                    win.card.hide();
+                    win.close_card();
                 } else {
                     win.hide();
                 }

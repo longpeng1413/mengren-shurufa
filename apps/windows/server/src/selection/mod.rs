@@ -19,8 +19,22 @@ const MAX_CHARS: usize = 4000;
 /// 辅助接口的等待上限。
 const UIA_TIMEOUT: Duration = Duration::from_millis(800);
 
+/// 划词判断有没有选中文字时等辅助接口的上限：图标要跟手，宁可不出。
+const PROBE_TIMEOUT: Duration = Duration::from_millis(300);
+
 /// 翻译窗口的窗口类名（`apps/windows/translator`）。
 const TRANSLATOR_CLASS: &str = "Mengren.Translator.Window";
+
+/// 划词时问一下：辅助接口能不能读到选中的文字（不碰剪贴板）。最多等 [`PROBE_TIMEOUT`]，读不到或超时都算没有。
+pub fn has_selected_text() -> bool {
+    let (sender, receiver) = mpsc::channel();
+    let spawned = std::thread::Builder::new()
+        .name("qingjian-selection-probe".to_owned())
+        .spawn(move || {
+            let _ = sender.send(uia::selected_text(64).is_some());
+        });
+    spawned.is_ok() && receiver.recv_timeout(PROBE_TIMEOUT).unwrap_or(false)
+}
 
 /// 前台是不是翻译窗口自己：是就只收起，不去读。
 pub fn translator_in_front() -> bool {

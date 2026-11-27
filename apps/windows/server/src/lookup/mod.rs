@@ -79,6 +79,7 @@ fn hover_mode(code: usize) -> HoverMode {
 pub fn key(vk: u32) {
     if !matches!(vk, 0x11 | 0xA2 | 0xA3) {
         OTHER_KEY.store(true, Ordering::Release);
+        watch::close_ctrl_card();
     }
     hide();
 }

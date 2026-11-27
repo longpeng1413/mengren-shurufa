@@ -87,21 +87,26 @@ mod hover {
         assert_eq!(dwell.tick(at(100, 100, true), ms(t, 1000)), None);
         assert_eq!(dwell.tick(at(101, 102, true), ms(t, 1100)), None);
         assert_eq!(
-            dwell.tick(at(101, 101, true), ms(t, 1160)),
+            dwell.tick(at(101, 101, true), ms(t, 1300)),
+            None,
+            "Ctrl+C 常在按下 Ctrl 后 0.3 秒内按 C，这时还不弹"
+        );
+        assert_eq!(
+            dwell.tick(at(101, 101, true), ms(t, 1500)),
             Some((100, 100))
         );
         assert_eq!(
-            dwell.tick(at(101, 101, true), ms(t, 1400)),
+            dwell.tick(at(101, 101, true), ms(t, 1800)),
             None,
             "once per rest"
         );
         assert_eq!(
-            dwell.tick(at(160, 101, true), ms(t, 1500)),
+            dwell.tick(at(160, 101, true), ms(t, 1900)),
             None,
             "moved away"
         );
         assert_eq!(
-            dwell.tick(at(160, 101, true), ms(t, 1700)),
+            dwell.tick(at(160, 101, true), ms(t, 2400)),
             Some((160, 101))
         );
     }

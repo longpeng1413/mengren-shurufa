@@ -316,7 +316,7 @@ impl TextService_Impl {
             log(&format!(
                 "转换模式变了（任务栏 / 系统快捷键），english={english}"
             ));
-            self.follow_system_mode(english);
+            self.follow_system_change(english);
         }
     }
 
@@ -335,7 +335,26 @@ impl TextService_Impl {
             log(&format!(
                 "输入法开关变了（系统 Ctrl + Space），english={english}"
             ));
-            self.follow_system_mode(english);
+            self.follow_system_change(english);
+        }
+    }
+
+    /// 系统那边改了中 / 英：回中文照跟；改成英文不跟（2026-11-26 用户要求只认自己按的切换键、点的状态条）。
+    /// 日志里闲置后、刚连上时变成英文，多半是系统或别的程序写的转换模式 / 输入法开关，不是用户操作；
+    /// 跟了还会报给 Server 变成全局模式，之后每个程序都是英文。下一拍把指示写回中文，免得任务栏显示「英」。
+    fn follow_system_change(&self, english: bool) {
+        if english && !self.mode_state.english() {
+            log("系统改成英文，只认用户自己切换：保持中文");
+            self.indicator_stale.set(true);
+            return;
+        }
+        self.follow_system_mode(english);
+    }
+
+    /// 轮询每拍调：系统刚把指示改成英文而我们没跟，就把任务栏中 / 英与输入法开关写回当前模式。
+    pub(super) fn restore_indicator(&self) {
+        if self.indicator_stale.replace(false) {
+            self.refresh_mode_indicator();
         }
     }
 

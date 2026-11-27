@@ -12,7 +12,8 @@ pub enum IndicatorCommand {
     /// 打开设置程序。DLL 可能在 UWP 沙箱里起不了进程，交给 Server 起。
     OpenSettings,
 
-    /// 打开旧版设置程序（`qingjian-settings-legacy.exe`，留一个版本作回退），同样交给 Server。
+    /// 原「旧版设置」菜单项。旧版设置程序已不随包，新 DLL 不再发它；按序号编码，保留占位，
+    /// 更新前加载的旧 DLL 发来时 Server 改开新版设置。
     OpenLegacySettings,
 
     /// 查到新版本时菜单里的「有新版本」：打开下载页，同样交给 Server。
